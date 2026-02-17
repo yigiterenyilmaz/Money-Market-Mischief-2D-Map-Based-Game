@@ -5,11 +5,16 @@ using UnityEngine;
 public class WarForOilEvent : ScriptableObject
 {
     public string id;
-    public string displayName;
+    [TextArea(1, 3)] public string displayName;
     [TextArea(2, 8)] public string description;
+
+    [Header("Geliştirici Notu")]
+    [TextArea(3, 10)] public string devNote; //sadece Inspector'da görünür, oyuna etkisi yok
 
     public float minWarTime = 0f; //bu event savaş başladıktan en az kaç saniye sonra gelebilir
     public float decisionTime = 10f; //karar süresi (saniye)
+    public bool isRepeatable; //aynı savaşta tekrar tetiklenebilir mi
+    public int maxRepeatCount = 1; //en fazla kaç kez tekrar edebilir (isRepeatable true ise)
     public List<WarForOilEventChoice> choices;
     public int defaultChoiceIndex = -1; //süre dolunca otomatik seçilecek seçenek (-1 = ilk seçenek)
 
@@ -37,9 +42,20 @@ public class WarForOilEventChoice
     [TextArea(2, 4)] public string description;
     public float supportModifier; //destek stat'ını etkiler (pozitif = ülkeyi destekle)
     public float suspicionModifier; //şüphe etkisi
+    public float politicalInfluenceModifier; //politik nüfuz etkisi (negatif = düşürür)
     public int costModifier; //maliyet etkisi
 
-    [Header("Ön Koşullar")]
+    //diğer sonuçlar (Editor tarafından foldout içinde çizilir)
+    public bool endsWar; //bu seçenek savaşı bitirir mi
+    public float warEndDelay; //savaş kaç saniye sonra biter (0 = anında)
+    public bool reducesReward; //ödülü düşürür mü
+    [Range(0f, 1f)] public float baseRewardReduction; //base reward'ı bu oranda düşürür (0.3 = %30 düşüş)
+    public bool endsWarWithDeal; //savaşı anlaşmayla bitirir (garanti ödül)
+    public float dealDelay; //anlaşma kaç saniye sonra savaşı bitirir (0 = anında)
+    [Range(0f, 1f)] public float dealRewardRatio; //normal kazanımın bu oranı garanti verilir (0.8 = %80)
+    public bool blocksEvents; //seçilirse savaş sonuna kadar yeni event gelmez
+
+    //ön koşullar (Editor tarafından foldout içinde çizilir)
     public List<Skill> requiredSkills; //bu seçenek için açılmış olması gereken skill'ler
     public List<StatCondition> statConditions; //bu seçenek için sağlanması gereken stat koşulları
 

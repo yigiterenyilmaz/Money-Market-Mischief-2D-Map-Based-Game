@@ -8,7 +8,7 @@ public class WarForOilCountry : ScriptableObject
     public string displayName;
     [TextArea(2, 4)] public string description;
 
-    [Range(0f, 1f)] public float resourceRichness; //doğal kaynak zenginliği — kazanç çarpanı
+    public float baseReward; //savaş kazanıldığında taban ödül (supportRatio ile çarpılır)
     [Range(0f, 1f)] public float invasionDifficulty; //işgal zorluğu — savaş kazanma şansını düşürür
 
     public List<WarForOilEvent> events; //bu ülkeye özel savaş eventleri

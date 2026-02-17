@@ -10,11 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
-  m_Name: New War For Oil Event
+  m_Name: WarChestRunningDry
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
   id: 
   displayName: 
   description: 
+  devNote: 
+  minWarTime: 0
   decisionTime: 10
   choices: []
   defaultChoiceIndex: -1

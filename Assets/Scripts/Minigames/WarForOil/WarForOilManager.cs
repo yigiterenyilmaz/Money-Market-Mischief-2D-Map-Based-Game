@@ -23,11 +23,16 @@ public class WarForOilManager : MonoBehaviour
     private float eventCheckTimer;
     private float eventDecisionTimer;
     private WarForOilEvent currentEvent;
-    private List<WarForOilEvent> triggeredEvents = new List<WarForOilEvent>();
+    private Dictionary<WarForOilEvent, int> eventTriggerCounts = new Dictionary<WarForOilEvent, int>();
 
     //operasyon boyunca biriken modifier'lar
     private float accumulatedSuspicionModifier;
+    private float accumulatedPoliticalInfluenceModifier;
     private int accumulatedCostModifier;
+    private float rewardMultiplier; //baseRewardReduction'lar sonucu biriken ödül çarpanı (1.0'dan başlar)
+    private bool eventsBlocked; //bir choice eventleri engelledi mi
+    private bool pendingDeal; //anlaşmayla bitirme aktif mi
+    private float dealRewardRatio; //anlaşma ödül oranı
 
     //sonuç ekranı beklerken saklanan sonuç
     private WarForOilResult pendingResult;
@@ -177,6 +182,7 @@ public class WarForOilManager : MonoBehaviour
 
         //modifier'ları biriktir
         accumulatedSuspicionModifier += choice.suspicionModifier;
+        accumulatedPoliticalInfluenceModifier += choice.politicalInfluenceModifier;
         accumulatedCostModifier += choice.costModifier;
 
         //supportStat güncelle
@@ -189,6 +195,30 @@ public class WarForOilManager : MonoBehaviour
         //oyunu devam ettir
         if (GameManager.Instance != null)
             GameManager.Instance.ResumeGame();
+
+        //ödül düşürme
+        if (choice.reducesReward && choice.baseRewardReduction > 0f)
+            rewardMultiplier *= (1f - choice.baseRewardReduction);
+
+        //event engelleme (blocksEvents, endsWar veya anlaşma seçildiyse artık event gelmez)
+        if (choice.blocksEvents || choice.endsWar || choice.endsWarWithDeal)
+            eventsBlocked = true;
+
+        //savaşı bitirme seçeneği seçildiyse kalan süreyi ayarla
+        if (choice.endsWar)
+        {
+            float targetTimer = database.warDuration - choice.warEndDelay;
+            warTimer = Mathf.Max(warTimer, targetTimer); //süreyi geri almaz, sadece ileri sarar
+        }
+
+        //anlaşmayla bitirme — süreyi ilerlet ve garanti ödül işaretle
+        if (choice.endsWarWithDeal)
+        {
+            float targetTimer = database.warDuration - choice.dealDelay;
+            warTimer = Mathf.Max(warTimer, targetTimer);
+            pendingDeal = true;
+            dealRewardRatio = choice.dealRewardRatio;
+        }
 
         //savaş sürecine geri dön
         currentState = WarForOilState.WarProcess;
@@ -210,7 +240,7 @@ public class WarForOilManager : MonoBehaviour
         //kazanç hesapla: düşük support → zarar, yüksek support → kâr
         float wealthChange = Mathf.Lerp(
             -database.ceasefirePenalty,
-            database.ceasefireMaxReward * selectedCountry.resourceRichness,
+            selectedCountry.baseReward * rewardMultiplier * database.ceasefireMaxReward,
             ratio
         ) - accumulatedCostModifier;
 
@@ -222,7 +252,7 @@ public class WarForOilManager : MonoBehaviour
         pendingResult.winChance = 0f;
         pendingResult.wealthChange = wealthChange;
         pendingResult.suspicionChange = accumulatedSuspicionModifier;
-        pendingResult.politicalInfluenceChange = 0f;
+        pendingResult.politicalInfluenceChange = accumulatedPoliticalInfluenceModifier;
 
         currentState = WarForOilState.ResultPhase;
 
@@ -480,8 +510,13 @@ public class WarForOilManager : MonoBehaviour
         warTimer = 0f;
         eventCheckTimer = 0f;
         accumulatedSuspicionModifier = 0f;
+        accumulatedPoliticalInfluenceModifier = 0f;
         accumulatedCostModifier = 0;
-        triggeredEvents.Clear();
+        rewardMultiplier = 1f;
+        eventsBlocked = false;
+        pendingDeal = false;
+        dealRewardRatio = 0f;
+        eventTriggerCounts.Clear();
         currentEvent = null;
 
         OnWarStarted?.Invoke(selectedCountry, database.warDuration);
@@ -492,14 +527,20 @@ public class WarForOilManager : MonoBehaviour
     /// </summary>
     private void TryTriggerWarEvent()
     {
+        if (eventsBlocked) return;
         if (selectedCountry.events == null || selectedCountry.events.Count == 0) return;
 
-        //daha önce tetiklenmemiş ve minimum süreyi geçmiş eventleri filtrele
+        //tetiklenebilir eventleri filtrele (tekrar limiti + minimum süre)
         List<WarForOilEvent> available = new List<WarForOilEvent>();
         for (int i = 0; i < selectedCountry.events.Count; i++)
         {
             WarForOilEvent evt = selectedCountry.events[i];
-            if (!triggeredEvents.Contains(evt) && warTimer >= evt.minWarTime)
+            if (warTimer < evt.minWarTime) continue;
+
+            eventTriggerCounts.TryGetValue(evt, out int count);
+            if (count == 0) //hiç tetiklenmemiş — her zaman uygun
+                available.Add(evt);
+            else if (evt.isRepeatable && count <= evt.maxRepeatCount) //tekrar limiti içinde
                 available.Add(evt);
         }
 
@@ -508,10 +549,11 @@ public class WarForOilManager : MonoBehaviour
         //EventCoordinator cooldown kontrolü
         if (!EventCoordinator.CanShowEvent()) return;
 
-        //rastgele bir event seç
+        //rastgele bir event seç ve sayacını artır
         int idx = UnityEngine.Random.Range(0, available.Count);
         currentEvent = available[idx];
-        triggeredEvents.Add(currentEvent);
+        eventTriggerCounts.TryGetValue(currentEvent, out int currentCount);
+        eventTriggerCounts[currentEvent] = currentCount + 1;
 
         EventCoordinator.MarkEventShown();
 
@@ -528,47 +570,66 @@ public class WarForOilManager : MonoBehaviour
 
     /// <summary>
     /// Savaş sonu: kazanma olasılığı hesapla, random check yap.
+    /// Anlaşma varsa zar atılmaz, garanti ödül verilir.
     /// </summary>
     private void CalculateWarResult()
     {
-        //destek oranı (0-1)
-        float supportRatio = supportStat / 100f;
-
-        //kazanma şansı hesapla
-        float winChance = database.baseWinChance
-            - selectedCountry.invasionDifficulty
-            + supportRatio * database.supportWinBonus;
-        winChance = Mathf.Clamp(winChance, database.minWinChance, database.maxWinChance);
-
-        bool warWon = UnityEngine.Random.value < winChance;
-
-        //sonucu hazırla
-        pendingResult = new WarForOilResult();
-        pendingResult.country = selectedCountry;
-        pendingResult.warWon = warWon;
-        pendingResult.finalSupportStat = supportStat;
-        pendingResult.winChance = winChance;
-
-        if (warWon)
+        //anlaşmayla bitirme aktifse — zar yok, garanti ödül
+        if (pendingDeal)
         {
-            //kazanıldı — ödül destek oranına göre
-            float reward = database.baseWarReward * selectedCountry.resourceRichness * supportRatio;
-            pendingResult.wealthChange = reward - accumulatedCostModifier;
+            float dealReward = selectedCountry.baseReward * rewardMultiplier * dealRewardRatio;
+
+            pendingResult = new WarForOilResult();
+            pendingResult.country = selectedCountry;
+            pendingResult.warWon = true;
+            pendingResult.wasDeal = true;
+            pendingResult.finalSupportStat = supportStat;
+            pendingResult.winChance = 1f;
+            pendingResult.wealthChange = dealReward - accumulatedCostModifier;
             pendingResult.suspicionChange = accumulatedSuspicionModifier;
-            pendingResult.politicalInfluenceChange = 0f; //kazanınca nüfuz değişmez
+            pendingResult.politicalInfluenceChange = accumulatedPoliticalInfluenceModifier;
         }
         else
         {
-            //kaybedildi — ceza
-            pendingResult.wealthChange = -(database.warLossPenalty + accumulatedCostModifier);
-            pendingResult.suspicionChange = database.warLossSuspicionIncrease + accumulatedSuspicionModifier;
-            pendingResult.politicalInfluenceChange = -database.warLossPoliticalPenalty;
+            //destek oranı (0-1)
+            float supportRatio = supportStat / 100f;
+
+            //kazanma şansı hesapla
+            float winChance = database.baseWinChance
+                - selectedCountry.invasionDifficulty
+                + supportRatio * database.supportWinBonus;
+            winChance = Mathf.Clamp(winChance, database.minWinChance, database.maxWinChance);
+
+            bool warWon = UnityEngine.Random.value < winChance;
+
+            //sonucu hazırla
+            pendingResult = new WarForOilResult();
+            pendingResult.country = selectedCountry;
+            pendingResult.warWon = warWon;
+            pendingResult.finalSupportStat = supportStat;
+            pendingResult.winChance = winChance;
+
+            if (warWon)
+            {
+                //kazanıldı — ödül destek oranına göre (supportRewardRatio ile sınırlı)
+                float reward = selectedCountry.baseReward * rewardMultiplier * supportRatio * database.supportRewardRatio;
+                pendingResult.wealthChange = reward - accumulatedCostModifier;
+                pendingResult.suspicionChange = accumulatedSuspicionModifier;
+                pendingResult.politicalInfluenceChange = accumulatedPoliticalInfluenceModifier;
+            }
+            else
+            {
+                //kaybedildi — ceza
+                pendingResult.wealthChange = -(database.warLossPenalty + accumulatedCostModifier);
+                pendingResult.suspicionChange = database.warLossSuspicionIncrease + accumulatedSuspicionModifier;
+                pendingResult.politicalInfluenceChange = -database.warLossPoliticalPenalty + accumulatedPoliticalInfluenceModifier;
+            }
         }
 
         currentState = WarForOilState.ResultPhase;
 
-        //kazanıldıysa ülkeyi işgal edilmiş olarak işaretle
-        if (warWon)
+        //kazanıldıysa ülkeyi işgal edilmiş olarak işaretle (anlaşma hariç — anlaşma işgal sayılmaz)
+        if (pendingResult.warWon && !pendingResult.wasDeal)
             conqueredCountries.Add(selectedCountry);
 
         //oyunu duraklat — sonuç ekranında zaman durmalı
@@ -662,6 +723,7 @@ public class WarForOilResult
     public WarForOilCountry country;
     public bool warWon;
     public bool wasCeasefire;
+    public bool wasDeal; //anlaşmayla mı bitti
     public float finalSupportStat;
     public float winChance; //hesaplanan kazanma şansı
     public float wealthChange;

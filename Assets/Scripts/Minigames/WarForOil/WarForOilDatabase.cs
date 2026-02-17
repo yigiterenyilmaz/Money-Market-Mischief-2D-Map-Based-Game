@@ -23,6 +23,7 @@ public class WarForOilDatabase : ScriptableObject
     [Header("Sonuç Ayarları")]
     public float baseWinChance = 0.375f; //temel savaş kazanma şansı (invasionDifficulty ve support'a göre değişir)
     public float supportWinBonus = 0.625f; //tam destek vermenin kazanma şansına max katkısı
+    [Range(0f, 1f)] public float supportRewardRatio = 0.8f; //support 100 olsa bile baseReward'ın max bu oranı alınır
     public float minWinChance = 0.1f; //minimum kazanma şansı
     public float maxWinChance = 0.9f; //maximum kazanma şansı
 
@@ -32,7 +33,6 @@ public class WarForOilDatabase : ScriptableObject
     public float ceasefireMaxReward = 200f; //en iyi ateşkesteki max kazanç çarpanı (support 100'de)
 
     [Header("Ödül/Ceza Ayarları")]
-    public float baseWarReward = 500f; //savaş kazanıldığında base ödül
     public float warLossPenalty = 200f; //savaş kaybedildiğinde para kaybı
     public float warLossPoliticalPenalty = 20f; //savaş kaybedildiğinde siyasi nüfuz düşüşü
     public float warLossSuspicionIncrease = 15f; //savaş kaybedildiğinde şüphe artışı
