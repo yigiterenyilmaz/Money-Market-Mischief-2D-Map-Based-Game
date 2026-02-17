@@ -85,7 +85,7 @@ public class ScientistSmuggleManager : MonoBehaviour
         Instance = this;
         nextOfferTime = UnityEngine.Random.Range(minOfferInterval, maxOfferInterval);
     }
-
+    
     private void Update()
     {
         switch (currentState)

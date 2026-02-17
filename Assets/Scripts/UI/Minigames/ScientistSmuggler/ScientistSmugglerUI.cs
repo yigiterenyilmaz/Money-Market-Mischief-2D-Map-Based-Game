@@ -63,9 +63,6 @@ public class ScientistSmuggleUI : MonoBehaviour
     // Runtime değişkenler
     private ScientistSmuggleEvent currentOffer;
     private ScientistSmuggleEvent currentEvent;
-    private float currentOfferDecisionTime;
-    private float currentEventDecisionTime;
-    private bool isInPostProcess;
     private List<GameObject> spawnedScientistButtons = new List<GameObject>();
     private List<GameObject> spawnedChoiceButtons = new List<GameObject>();
 
@@ -172,7 +169,6 @@ public class ScientistSmuggleUI : MonoBehaviour
         }
 
         // Timer başlangıç değeri
-        currentOfferDecisionTime = offer.decisionTime;
         if (offerTimerSlider != null)
         {
             offerTimerSlider.maxValue = offer.decisionTime;
@@ -189,7 +185,6 @@ public class ScientistSmuggleUI : MonoBehaviour
         if (processPanel == null) return;
 
         processPanel.SetActive(true);
-        isInPostProcess = false;
 
         if (processTargetText != null)
             processTargetText.text = $"Hedef: {offer.displayName}";
@@ -215,7 +210,6 @@ public class ScientistSmuggleUI : MonoBehaviour
 
         eventPanel.SetActive(true);
         currentEvent = evt;
-        currentEventDecisionTime = evt.decisionTime;
 
         if (eventTitleText != null)
             eventTitleText.text = evt.displayName;
@@ -336,7 +330,7 @@ public class ScientistSmuggleUI : MonoBehaviour
             // Ana text'i bul ve doldur
             if (texts.Length > 0)
             {
-                string status = scientist.isCompleted ? "Hazır" : $"Eğitimde ({scientist.trainingProgress * 100:F0}%)";
+                string status = scientist.isCompleted ? "Hazır" : "Eğitimde";
                 texts[0].text = $"{scientist.data.displayName}\n" +
                                 $"Gizlilik: {scientist.data.stealthLevel * 100:F0}%\n" +
                                 $"{status}";
@@ -557,8 +551,6 @@ public class ScientistSmuggleUI : MonoBehaviour
 
     private void HandlePostProcessStarted()
     {
-        isInPostProcess = true;
-
         // Result panelini kapat (eğer açıksa)
         if (resultPanel != null)
             resultPanel.SetActive(false);
@@ -584,7 +576,6 @@ public class ScientistSmuggleUI : MonoBehaviour
 
     private void HandlePostProcessEnded()
     {
-        isInPostProcess = false;
         HideAllPanels();
     }
 
@@ -702,4 +693,12 @@ public class ScientistSmuggleUI : MonoBehaviour
         int secs = Mathf.FloorToInt(seconds % 60f);
         return $"{mins}:{secs:D2}";
     }
+    
+    public void ShowOfferDirectly(ScientistSmuggleEvent offer)
+    {
+        if (offer == null || offer.eventType != ScientistSmuggleEventType.Offer) return;
+    
+        ShowOfferPanel(offer);
+    }
 }
+

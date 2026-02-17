@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c260054ab26bfd4b940f8e220a9c437, type: 3}
+  m_Name: a 4
+  m_EditorClassIdentifier: Assembly-CSharp::ScientistSmuggleEvent
+  id: 
+  displayName: 
+  description: 
+  eventType: 0
+  baseReward: 0
+  riskLevel: 0
+  processEvents: []
+  postProcessEffect: 0
+  scientistKillCount: 0
+  decisionTime: 10
+  choices: []
+  defaultChoiceIndex: -1

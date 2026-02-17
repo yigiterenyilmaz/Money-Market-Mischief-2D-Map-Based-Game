@@ -77,7 +77,7 @@ public class ScientistSmuggleScientistButton : MonoBehaviour
         {
             if (statusText != null)
             {
-                statusText.text = $"EĞİTİMDE ({scientist.trainingProgress * 100:F0}%)";
+                statusText.text = "EĞİTİMDE";
                 statusText.color = trainingColor;
             }
 
@@ -85,10 +85,7 @@ public class ScientistSmuggleScientistButton : MonoBehaviour
             if (trainingIndicator != null) trainingIndicator.SetActive(true);
 
             if (trainingProgressSlider != null)
-            {
-                trainingProgressSlider.gameObject.SetActive(true);
-                trainingProgressSlider.value = scientist.trainingProgress;
-            }
+                trainingProgressSlider.gameObject.SetActive(false);
 
             if (backgroundImage != null)
                 backgroundImage.color = Color.Lerp(Color.black, disabledColor, 0.15f);
@@ -97,16 +94,9 @@ public class ScientistSmuggleScientistButton : MonoBehaviour
                 button.interactable = false;
         }
 
-        // Avatar (eğer data'da varsa)
-        if (avatarImage != null && scientist.data.avatar != null)
-        {
-            avatarImage.sprite = scientist.data.avatar;
-            avatarImage.gameObject.SetActive(true);
-        }
-        else if (avatarImage != null)
-        {
+        // Avatar gizle (ScientistData'da avatar yok)
+        if (avatarImage != null)
             avatarImage.gameObject.SetActive(false);
-        }
     }
 
     /// <summary>
@@ -152,29 +142,4 @@ public class ScientistSmuggleScientistButton : MonoBehaviour
     {
         return $"#{ColorUtility.ToHtmlStringRGB(color)}";
     }
-}
-
-/// <summary>
-/// ScientistData placeholder - gerçek projede SkillTreeManager'dan gelmeli.
-/// Eğer projede zaten varsa bu tanımı silin.
-/// </summary>
-[System.Serializable]
-public class ScientistData
-{
-    public string id;
-    public string displayName;
-    [Range(0f, 1f)] public float stealthLevel;
-    public Sprite avatar;
-}
-
-/// <summary>
-/// ScientistTraining placeholder - gerçek projede SkillTreeManager'dan gelmeli.
-/// Eğer projede zaten varsa bu tanımı silin.
-/// </summary>
-[System.Serializable]
-public class ScientistTraining
-{
-    public ScientistData data;
-    public float trainingProgress; // 0-1
-    public bool isCompleted;
 }
