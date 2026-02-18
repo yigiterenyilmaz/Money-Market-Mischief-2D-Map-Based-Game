@@ -5,6 +5,9 @@ using System.Collections.Generic;
 
 public class WarForOilUI : MonoBehaviour
 {
+    [Header("Content Root")]
+    public GameObject contentRoot; // Child of this GameObject — wraps all panels. Start INACTIVE in Inspector.
+
     [Header("Panels")]
     public GameObject selectionPanel;
     public GameObject pressurePanel;
@@ -50,52 +53,65 @@ public class WarForOilUI : MonoBehaviour
     private float eventDuration;
     private float pressureCooldown;
     private bool initialized = false;
+
     public static WarForOilUI Instance { get; private set; }
 
     void Awake()
     {
+        // Always set Instance here — root GameObject must be ACTIVE in the scene
+        // so Awake fires on scene load. contentRoot is the child we hide/show instead.
         Instance = this;
-        gameObject.SetActive(false);
+
+        // Hide content on start — root stays active
+        if (contentRoot != null)
+            contentRoot.SetActive(false);
     }
 
     void SetupButtons()
     {
         pressureButton.onClick.AddListener(() => manager.AttemptPressure());
-        cancelButton.onClick.AddListener(Close);
+        cancelButton.onClick.AddListener(OnCancelClicked);
         ceasefireButton.onClick.AddListener(() => manager.RequestCeasefire());
         dismissButton.onClick.AddListener(() => manager.DismissResultScreen());
     }
 
+    void HideAllPanels()
+    {
+        if (selectionPanel != null) selectionPanel.SetActive(false);
+        if (pressurePanel != null) pressurePanel.SetActive(false);
+        if (warPanel != null) warPanel.SetActive(false);
+        if (eventPanel != null) eventPanel.SetActive(false);
+        if (resultPanel != null) resultPanel.SetActive(false);
+    }
+
     void Close()
     {
-        selectionPanel.SetActive(false);
-        pressurePanel.SetActive(false);
-        warPanel.SetActive(false);
-        eventPanel.SetActive(false);
-        resultPanel.SetActive(false);
-        gameObject.SetActive(false);
-
+        HideAllPanels();
+        if (contentRoot != null) contentRoot.SetActive(false);
         UImanager.Instance.ToggleUI();
     }
-    
+
     void OnCancelClicked()
     {
         manager.CancelPressure();
         CloseWarForOil();
     }
-    
+
     public static void OpenWarForOil()
     {
         if (Instance == null)
         {
-            Debug.LogError("[WarForOilUI] Instance not found!");
-            return;
+            // Last resort — find even if somehow missed
+            Instance = FindFirstObjectByType<WarForOilUI>(FindObjectsInactive.Include);
+            if (Instance == null)
+            {
+                Debug.LogError("[WarForOilUI] Instance not found! Make sure the root GameObject is ACTIVE in the scene.");
+                return;
+            }
         }
 
-        // Set manager BEFORE anything else
         Instance.manager = WarForOilManager.Instance;
-    
-        // Setup if first time
+
         if (!Instance.initialized)
         {
             Instance.SubscribeEvents();
@@ -103,7 +119,9 @@ public class WarForOilUI : MonoBehaviour
             Instance.initialized = true;
         }
 
-        Instance.gameObject.SetActive(true);
+        // Show content
+        if (Instance.contentRoot != null)
+            Instance.contentRoot.SetActive(true);
 
         // Show panel based on current state
         var state = Instance.manager.GetCurrentState();
@@ -113,20 +131,18 @@ public class WarForOilUI : MonoBehaviour
                 Instance.ShowPanel(Instance.pressurePanel);
                 var country = Instance.manager.GetSelectedCountry();
                 if (country != null)
-                {
                     Instance.pressureCountryName.text = country.displayName;
-                }
                 break;
-            
+
             case WarForOilState.WarProcess:
             case WarForOilState.EventPhase:
                 Instance.ShowPanel(Instance.warPanel);
                 break;
-            
+
             case WarForOilState.ResultPhase:
                 Instance.ShowPanel(Instance.resultPanel);
                 break;
-            
+
             default:
                 Instance.ShowPanel(Instance.selectionPanel);
                 Instance.TryRefreshCountries();
@@ -135,25 +151,21 @@ public class WarForOilUI : MonoBehaviour
 
         UImanager.Instance.ToggleUI();
     }
-    
+
     public static void CloseWarForOil()
     {
         if (Instance == null) return;
-    
-        Instance.selectionPanel.SetActive(false);
-        Instance.pressurePanel.SetActive(false);
-        Instance.warPanel.SetActive(false);
-        Instance.eventPanel.SetActive(false);
-        Instance.resultPanel.SetActive(false);
-        Instance.gameObject.SetActive(false);
+
+        Instance.HideAllPanels();
+        if (Instance.contentRoot != null)
+            Instance.contentRoot.SetActive(false);
 
         UImanager.Instance.ToggleUI();
     }
 
     void Update()
     {
-        // Try to refresh country list if empty
-        if (initialized && selectionPanel.activeSelf && spawnedCards.Count == 0)
+        if (initialized && selectionPanel != null && selectionPanel.activeSelf && spawnedCards.Count == 0)
         {
             TryRefreshCountries();
         }
@@ -180,23 +192,12 @@ public class WarForOilUI : MonoBehaviour
         }
 
         var countries = manager.GetActiveCountries();
-    
-        Debug.Log($"[WarForOilUI] TryRefreshCountries: {countries?.Count ?? 0} countries");
-    
-        if (countries == null)
-        {
-            Debug.LogError("[WarForOilUI] GetActiveCountries returned null!");
-            return;
-        }
 
-        if (countries.Count == 0)
+        Debug.Log($"[WarForOilUI] TryRefreshCountries: {countries?.Count ?? 0} countries");
+
+        if (countries == null || countries.Count == 0)
         {
             Debug.LogWarning("[WarForOilUI] GetActiveCountries returned empty list!");
-        
-            if (manager.database != null)
-            {
-                Debug.Log($"[WarForOilUI] Database has {manager.database.countries?.Count ?? 0} countries");
-            }
             return;
         }
 
@@ -206,9 +207,7 @@ public class WarForOilUI : MonoBehaviour
     void OnEnable()
     {
         if (initialized && manager != null)
-        {
             TryRefreshCountries();
-        }
     }
 
     void OnDestroy() => UnsubscribeEvents();
@@ -247,15 +246,13 @@ public class WarForOilUI : MonoBehaviour
 
     void ShowPanel(GameObject panel)
     {
-        selectionPanel.SetActive(panel == selectionPanel);
-        pressurePanel.SetActive(panel == pressurePanel);
-        warPanel.SetActive(panel == warPanel);
-        resultPanel.SetActive(panel == resultPanel);
+        if (selectionPanel != null) selectionPanel.SetActive(panel == selectionPanel);
+        if (pressurePanel != null) pressurePanel.SetActive(panel == pressurePanel);
+        if (warPanel != null) warPanel.SetActive(panel == warPanel);
+        if (resultPanel != null) resultPanel.SetActive(panel == resultPanel);
 
         if (panel == selectionPanel)
-        {
             TryRefreshCountries();
-        }
     }
 
     void RefreshCountryCards(List<WarForOilCountry> countries)
@@ -281,6 +278,21 @@ public class WarForOilUI : MonoBehaviour
             var card = Instantiate(countryCardPrefab, countryContainer);
             spawnedCards.Add(card);
 
+            // Try dedicated card component first
+            var cardUI = card.GetComponent<WarForOilCountryCardUI>();
+            if (cardUI != null)
+            {
+                bool conquered = manager.IsCountryConquered(country);
+                var countryCopy = country;
+                cardUI.Setup(country, conquered, () =>
+                {
+                    Debug.Log($"[WarForOilUI] CLICK FIRED: {countryCopy.displayName}");
+                    manager.SelectCountry(countryCopy);
+                });
+                continue;
+            }
+
+            // Fallback: plain text + button
             var txt = card.GetComponentInChildren<TextMeshProUGUI>();
             var btn = card.GetComponent<Button>();
 
@@ -290,16 +302,16 @@ public class WarForOilUI : MonoBehaviour
                 continue;
             }
 
-            bool conquered = manager.IsCountryConquered(country);
-            txt.text = conquered
+            bool isConquered = manager.IsCountryConquered(country);
+            txt.text = isConquered
                 ? $"<s>{country.displayName}</s>\n<size=70%>CONQUERED</size>"
-                : $"{country.displayName}\n<size=70%> Difficulty: {country.invasionDifficulty:P0}</size>";
+                : $"{country.displayName}\n<size=70%>Reward: ${country.baseReward:F0} | Difficulty: {country.invasionDifficulty:P0}</size>";
 
             if (btn != null)
             {
-                btn.interactable = !conquered;
+                btn.interactable = !isConquered;
                 var countryCopy = country;
-                btn.onClick.AddListener(() => 
+                btn.onClick.AddListener(() =>
                 {
                     Debug.Log($"[WarForOilUI] CLICK FIRED: {countryCopy.displayName}");
                     manager.SelectCountry(countryCopy);
@@ -319,7 +331,7 @@ public class WarForOilUI : MonoBehaviour
     void OnCountrySelected(WarForOilCountry country)
     {
         Debug.Log($"[WarForOilUI] OnCountrySelected: {country?.displayName}");
-        CloseWarForOil(); // Close menu when country selected
+        CloseWarForOil();
     }
 
     void OnPressureResult(bool success, float cooldown)
@@ -380,15 +392,11 @@ public class WarForOilUI : MonoBehaviour
 
             var txt = btn.GetComponentInChildren<TextMeshProUGUI>();
             if (txt != null)
-            {
                 txt.text = $"{choice.displayName}\n<size=70%>{FormatModifiers(choice)}</size>";
-            }
 
             var button = btn.GetComponent<Button>();
             if (button != null)
-            {
                 button.onClick.AddListener(() => manager.ResolveEvent(idx));
-            }
         }
     }
 

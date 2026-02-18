@@ -5,16 +5,20 @@ using TMPro;
 
 /// <summary>
 /// IllegalScientistProvider minigame UI controller.
-/// Handles all UI states: Offer, Process, Event choices, Results, and PostProcess.
+/// Root GameObject must be ACTIVE in the scene at all times.
+/// Use contentRoot child to hide/show the UI visually.
 /// </summary>
 public class IllegalScientistProviderUI : MonoBehaviour
 {
+    [Header("Content Root")]
+    public GameObject contentRoot; // Child wrapping all panels. Set INACTIVE in Inspector.
+
     [Header("Ana Paneller")]
-    public GameObject offerPanel;           // Teklif geldiğinde gösterilen panel
-    public GameObject processPanel;         // Operasyon sırasında gösterilen panel
-    public GameObject eventPanel;           // Event seçim popup'ı (process ve postProcess için ortak)
-    public GameObject resultPanel;          // Operasyon sonucu paneli
-    public GameObject scientistsKilledPanel;// Bilim adamları öldürüldü bildirimi
+    public GameObject offerPanel;
+    public GameObject processPanel;
+    public GameObject eventPanel;
+    public GameObject resultPanel;
+    public GameObject scientistsKilledPanel;
 
     [Header("Teklif Paneli - Offer Panel")]
     public TextMeshProUGUI offerTitleText;
@@ -60,13 +64,20 @@ public class IllegalScientistProviderUI : MonoBehaviour
     public Color mediumRiskColor = new Color(0.9f, 0.7f, 0.1f);
     public Color highRiskColor = new Color(0.9f, 0.2f, 0.2f);
 
-    // Runtime
     private IllegalScientistProviderEvent currentOffer;
     private IllegalScientistProviderEvent currentEvent;
     private List<GameObject> spawnedScientistButtons = new List<GameObject>();
     private List<GameObject> spawnedChoiceButtons = new List<GameObject>();
 
     // ==================== LIFECYCLE ====================
+
+    private void Awake()
+    {
+        // Root stays active so Awake always fires on scene load.
+        // Hide content via contentRoot child instead of disabling the root.
+        if (contentRoot != null)
+            contentRoot.SetActive(false);
+    }
 
     private void OnEnable()
     {
@@ -104,31 +115,20 @@ public class IllegalScientistProviderUI : MonoBehaviour
     {
         if (rejectOfferButton != null)
             rejectOfferButton.onClick.AddListener(OnRejectOfferClicked);
-
         if (resultContinueButton != null)
             resultContinueButton.onClick.AddListener(OnResultContinueClicked);
-
         if (killedAcknowledgeButton != null)
             killedAcknowledgeButton.onClick.AddListener(OnKilledAcknowledgeClicked);
-
-        Debug.Log($"[IllegalScientistProviderUI] offerTimerSlider: {(offerTimerSlider != null ? "OK" : "NULL")}");
-        Debug.Log($"[IllegalScientistProviderUI] eventTimerSlider: {(eventTimerSlider != null ? "OK" : "NULL")}");
-        Debug.Log($"[IllegalScientistProviderUI] processProgressSlider: {(processProgressSlider != null ? "OK" : "NULL")}");
-        Debug.Log($"[IllegalScientistProviderUI] riskMeterSlider: {(riskMeterSlider != null ? "OK" : "NULL")}");
-
-        HideAllPanels();
     }
 
     private void Update()
     {
-        if (IllegalScientistProviderManager.Instance != null)
+        if (IllegalScientistProviderManager.Instance == null) return;
+        var state = IllegalScientistProviderManager.Instance.GetCurrentState();
+        if (state == IllegalScientistProviderState.ActiveProcess ||
+            state == IllegalScientistProviderState.EventPhase)
         {
-            var state = IllegalScientistProviderManager.Instance.GetCurrentState();
-            if (state == IllegalScientistProviderState.ActiveProcess ||
-                state == IllegalScientistProviderState.EventPhase)
-            {
-                UpdateRiskMeter();
-            }
+            UpdateRiskMeter();
         }
     }
 
@@ -145,20 +145,16 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void ShowOfferPanel(IllegalScientistProviderEvent offer)
     {
+        if (contentRoot != null) contentRoot.SetActive(true);
         HideAllPanels();
         if (offerPanel == null) return;
 
         offerPanel.SetActive(true);
         currentOffer = offer;
 
-        if (offerTitleText != null)
-            offerTitleText.text = offer.displayName;
-
-        if (offerDescriptionText != null)
-            offerDescriptionText.text = offer.description;
-
-        if (offerRewardText != null)
-            offerRewardText.text = $"Ödül: ${offer.baseReward:N0}";
+        if (offerTitleText != null) offerTitleText.text = offer.displayName;
+        if (offerDescriptionText != null) offerDescriptionText.text = offer.description;
+        if (offerRewardText != null) offerRewardText.text = $"Ödül: ${offer.baseReward:N0}";
 
         if (offerRiskText != null)
         {
@@ -178,25 +174,15 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void ShowProcessPanel(IllegalScientistProviderEvent offer, float duration)
     {
+        if (contentRoot != null) contentRoot.SetActive(true);
         HideAllPanels();
         if (processPanel == null) return;
 
         processPanel.SetActive(true);
-
-        if (processTargetText != null)
-            processTargetText.text = $"Hedef: {offer.displayName}";
-
-        if (processProgressSlider != null)
-        {
-            processProgressSlider.maxValue = 1f;
-            processProgressSlider.value = 0f;
-        }
-
-        if (processProgressText != null)
-            processProgressText.text = "0%";
-
-        if (postProcessIndicator != null)
-            postProcessIndicator.SetActive(false);
+        if (processTargetText != null) processTargetText.text = $"Hedef: {offer.displayName}";
+        if (processProgressSlider != null) { processProgressSlider.maxValue = 1f; processProgressSlider.value = 0f; }
+        if (processProgressText != null) processProgressText.text = "0%";
+        if (postProcessIndicator != null) postProcessIndicator.SetActive(false);
 
         UpdateRiskMeter();
     }
@@ -204,15 +190,11 @@ public class IllegalScientistProviderUI : MonoBehaviour
     private void ShowEventPanel(IllegalScientistProviderEvent evt)
     {
         if (eventPanel == null) return;
-
         eventPanel.SetActive(true);
         currentEvent = evt;
 
-        if (eventTitleText != null)
-            eventTitleText.text = evt.displayName;
-
-        if (eventDescriptionText != null)
-            eventDescriptionText.text = evt.description;
+        if (eventTitleText != null) eventTitleText.text = evt.displayName;
+        if (eventDescriptionText != null) eventDescriptionText.text = evt.description;
 
         if (eventTimerSlider != null)
         {
@@ -225,9 +207,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void HideEventPanel()
     {
-        if (eventPanel != null)
-            eventPanel.SetActive(false);
-
+        if (eventPanel != null) eventPanel.SetActive(false);
         currentEvent = null;
         ClearChoiceButtons();
     }
@@ -235,7 +215,6 @@ public class IllegalScientistProviderUI : MonoBehaviour
     private void ShowResultPanel(bool success, IllegalScientistProviderResult result)
     {
         HideEventPanel();
-
         if (resultPanel == null) return;
         resultPanel.SetActive(true);
 
@@ -278,23 +257,15 @@ public class IllegalScientistProviderUI : MonoBehaviour
     private void ShowScientistsKilledPanel(List<ScientistData> killed)
     {
         if (scientistsKilledPanel == null) return;
-
         scientistsKilledPanel.SetActive(true);
 
         if (killedScientistsText != null)
         {
             if (killed.Count == 1)
-            {
                 killedScientistsText.text = $"{killed[0].displayName} öldürüldü!";
-            }
             else
             {
-                string names = "";
-                for (int i = 0; i < killed.Count; i++)
-                {
-                    if (i > 0) names += ", ";
-                    names += killed[i].displayName;
-                }
+                string names = string.Join(", ", killed.ConvertAll(s => s.displayName));
                 killedScientistsText.text = $"{killed.Count} bilim adamı öldürüldü:\n{names}";
             }
         }
@@ -305,7 +276,6 @@ public class IllegalScientistProviderUI : MonoBehaviour
     private void PopulateScientistList()
     {
         ClearScientistButtons();
-
         if (scientistListContainer == null || scientistButtonPrefab == null) return;
         if (SkillTreeManager.Instance == null) return;
 
@@ -315,14 +285,10 @@ public class IllegalScientistProviderUI : MonoBehaviour
         {
             GameObject infoObj = Instantiate(scientistButtonPrefab, scientistListContainer);
             spawnedScientistButtons.Add(infoObj);
-
             var button = infoObj.GetComponent<Button>();
             if (button != null) button.interactable = false;
-
             var allTexts = infoObj.GetComponentsInChildren<TextMeshProUGUI>();
             if (allTexts.Length > 0) allTexts[0].text = "Eğitimli bilim adamı yok! Teklifi reddetmelisiniz.";
-            if (allTexts.Length > 1) allTexts[1].text = "";
-            if (allTexts.Length > 2) allTexts[2].text = "";
             return;
         }
 
@@ -333,7 +299,6 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
             GameObject buttonObj = Instantiate(scientistButtonPrefab, scientistListContainer);
             spawnedScientistButtons.Add(buttonObj);
-
             var button = buttonObj.GetComponent<Button>();
 
             var scientistButton = buttonObj.GetComponent<IllegalScientistProviderScientistButton>();
@@ -344,21 +309,19 @@ public class IllegalScientistProviderUI : MonoBehaviour
             else
             {
                 var allTexts = buttonObj.GetComponentsInChildren<TextMeshProUGUI>();
-                string status = scientist.isCompleted ? "Hazır" : "Eğitimde";
-
                 if (allTexts.Length > 0) allTexts[0].text = scientist.data.displayName;
                 if (allTexts.Length > 1) allTexts[1].text = $"Gizlilik: {scientist.data.stealthLevel * 100:F0}%";
-                if (allTexts.Length > 2) allTexts[2].text = status;
+                if (allTexts.Length > 2) allTexts[2].text = scientist.isCompleted ? "Hazır" : "Eğitimde";
             }
 
             if (!scientist.isCompleted)
             {
-                button.interactable = false;
+                if (button != null) button.interactable = false;
             }
             else
             {
                 int capturedIndex = i;
-                button.onClick.AddListener(() => OnScientistSelected(capturedIndex));
+                button?.onClick.AddListener(() => OnScientistSelected(capturedIndex));
             }
         }
     }
@@ -366,9 +329,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
     private void ClearScientistButtons()
     {
         foreach (var btn in spawnedScientistButtons)
-        {
             if (btn != null) Destroy(btn);
-        }
         spawnedScientistButtons.Clear();
     }
 
@@ -377,19 +338,16 @@ public class IllegalScientistProviderUI : MonoBehaviour
     private void PopulateChoiceButtons(IllegalScientistProviderEvent evt)
     {
         ClearChoiceButtons();
-
         if (choiceButtonContainer == null || choiceButtonPrefab == null) return;
         if (evt.choices == null || evt.choices.Count == 0) return;
 
         for (int i = 0; i < evt.choices.Count; i++)
         {
             IllegalScientistProviderEventChoice choice = evt.choices[i];
-
             GameObject buttonObj = Instantiate(choiceButtonPrefab, choiceButtonContainer);
             spawnedChoiceButtons.Add(buttonObj);
 
             var button = buttonObj.GetComponent<Button>();
-
             var choiceButton = buttonObj.GetComponent<IllegalScientistProviderChoiceButton>();
             if (choiceButton != null)
             {
@@ -399,48 +357,27 @@ public class IllegalScientistProviderUI : MonoBehaviour
             {
                 var text = buttonObj.GetComponentInChildren<TextMeshProUGUI>();
                 if (text != null)
-                {
-                    string modifiers = BuildModifierText(choice);
-                    text.text = $"{choice.displayName}\n{choice.description}\n<size=80%><color=#888888>{modifiers}</color></size>";
-                }
+                    text.text = $"{choice.displayName}\n{choice.description}\n<size=80%><color=#888888>{BuildModifierText(choice)}</color></size>";
             }
 
             int capturedIndex = i;
-            button.onClick.AddListener(() => OnChoiceSelected(capturedIndex));
+            button?.onClick.AddListener(() => OnChoiceSelected(capturedIndex));
         }
     }
 
     private void ClearChoiceButtons()
     {
         foreach (var btn in spawnedChoiceButtons)
-        {
             if (btn != null) Destroy(btn);
-        }
         spawnedChoiceButtons.Clear();
     }
 
     private string BuildModifierText(IllegalScientistProviderEventChoice choice)
     {
-        List<string> mods = new List<string>();
-
-        if (choice.riskModifier != 0)
-        {
-            string sign = choice.riskModifier > 0 ? "+" : "";
-            mods.Add($"Risk: {sign}{choice.riskModifier * 100:F0}%");
-        }
-
-        if (choice.suspicionModifier != 0)
-        {
-            string sign = choice.suspicionModifier > 0 ? "+" : "";
-            mods.Add($"Şüphe: {sign}{choice.suspicionModifier:F1}");
-        }
-
-        if (choice.costModifier != 0)
-        {
-            string sign = choice.costModifier > 0 ? "-" : "+";
-            mods.Add($"Para: {sign}${Mathf.Abs(choice.costModifier)}");
-        }
-
+        var mods = new List<string>();
+        if (choice.riskModifier != 0) mods.Add($"Risk: {(choice.riskModifier > 0 ? "+" : "")}{choice.riskModifier * 100:F0}%");
+        if (choice.suspicionModifier != 0) mods.Add($"Şüphe: {(choice.suspicionModifier > 0 ? "+" : "")}{choice.suspicionModifier:F1}");
+        if (choice.costModifier != 0) mods.Add($"Para: {(choice.costModifier > 0 ? "-" : "+")}${Mathf.Abs(choice.costModifier)}");
         return mods.Count > 0 ? string.Join(" | ", mods) : "Etkisiz";
     }
 
@@ -449,20 +386,9 @@ public class IllegalScientistProviderUI : MonoBehaviour
     private void UpdateRiskMeter()
     {
         if (IllegalScientistProviderManager.Instance == null) return;
-
         float risk = IllegalScientistProviderManager.Instance.GetEffectiveRisk();
-
-        if (riskMeterSlider != null)
-        {
-            riskMeterSlider.maxValue = 1f;
-            riskMeterSlider.value = risk;
-        }
-
-        if (riskMeterText != null)
-        {
-            riskMeterText.text = $"Risk: {risk * 100:F0}%";
-            riskMeterText.color = GetRiskColor(risk);
-        }
+        if (riskMeterSlider != null) { riskMeterSlider.maxValue = 1f; riskMeterSlider.value = risk; }
+        if (riskMeterText != null) { riskMeterText.text = $"Risk: {risk * 100:F0}%"; riskMeterText.color = GetRiskColor(risk); }
     }
 
     private Color GetRiskColor(float risk)
@@ -481,205 +407,127 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     // ==================== EVENT HANDLER'LAR ====================
 
-    private void HandleOfferReceived(IllegalScientistProviderEvent offer)
-    {
-        ShowOfferPanel(offer);
-    }
+    private void HandleOfferReceived(IllegalScientistProviderEvent offer) => ShowOfferPanel(offer);
 
     private void HandleOfferTimerUpdate(float remainingTime)
     {
-        if (offerTimerSlider != null)
-            offerTimerSlider.value = remainingTime;
-
-        if (offerTimerText != null)
-            offerTimerText.text = $"{remainingTime:F1}s";
+        if (offerTimerSlider != null) offerTimerSlider.value = remainingTime;
+        if (offerTimerText != null) offerTimerText.text = $"{remainingTime:F1}s";
     }
 
-    private void HandleProcessStarted(IllegalScientistProviderEvent offer, float duration)
-    {
-        ShowProcessPanel(offer, duration);
-    }
+    private void HandleProcessStarted(IllegalScientistProviderEvent offer, float duration) => ShowProcessPanel(offer, duration);
 
     private void HandleProcessProgress(float progress)
     {
-        if (processProgressSlider != null)
-            processProgressSlider.value = progress;
-
-        if (processProgressText != null)
-            processProgressText.text = $"{progress * 100:F0}%";
+        if (processProgressSlider != null) processProgressSlider.value = progress;
+        if (processProgressText != null) processProgressText.text = $"{progress * 100:F0}%";
     }
 
-    private void HandleEventTriggered(IllegalScientistProviderEvent evt)
-    {
-        ShowEventPanel(evt);
-    }
+    private void HandleEventTriggered(IllegalScientistProviderEvent evt) => ShowEventPanel(evt);
 
     private void HandleEventTimerUpdate(float remainingTime)
     {
-        if (eventTimerSlider != null)
-            eventTimerSlider.value = remainingTime;
-
-        if (eventTimerText != null)
-            eventTimerText.text = $"{remainingTime:F1}s";
+        if (eventTimerSlider != null) eventTimerSlider.value = remainingTime;
+        if (eventTimerText != null) eventTimerText.text = $"{remainingTime:F1}s";
     }
 
-    private void HandleEventResolved(IllegalScientistProviderEventChoice choice)
-    {
-        HideEventPanel();
-    }
+    private void HandleEventResolved(IllegalScientistProviderEventChoice choice) => HideEventPanel();
 
     private void HandleMinigameFailed(string reason)
     {
-        if (IllegalScientistProviderManager.Instance != null)
+        var failResult = new IllegalScientistProviderResult
         {
-            IllegalScientistProviderResult failResult = new IllegalScientistProviderResult();
-            failResult.success = false;
-            failResult.offer = currentOffer;
-            failResult.wealthChange = 0;
-            failResult.suspicionChange = 0;
-
-            ShowResultPanel(false, failResult);
-
-            if (resultDescriptionText != null)
-                resultDescriptionText.text = reason;
-        }
+            success = false,
+            offer = currentOffer,
+            wealthChange = 0,
+            suspicionChange = 0
+        };
+        ShowResultPanel(false, failResult);
+        if (resultDescriptionText != null) resultDescriptionText.text = reason;
     }
 
-    private void HandleProcessCompleted(IllegalScientistProviderResult result)
-    {
-        ShowResultPanel(result.success, result);
-    }
+    private void HandleProcessCompleted(IllegalScientistProviderResult result) => ShowResultPanel(result.success, result);
 
     private void HandlePostProcessStarted()
     {
-        if (resultPanel != null)
-            resultPanel.SetActive(false);
-
+        if (resultPanel != null) resultPanel.SetActive(false);
         if (processPanel != null)
         {
             processPanel.SetActive(true);
-
-            if (processTargetText != null)
-                processTargetText.text = "Musallat Süreci";
-
-            if (processProgressSlider != null)
-                processProgressSlider.gameObject.SetActive(false);
-
-            if (processProgressText != null)
-                processProgressText.text = "Operasyon sonrası takip devam ediyor...";
-
-            if (postProcessIndicator != null)
-                postProcessIndicator.SetActive(true);
+            if (processTargetText != null) processTargetText.text = "Musallat Süreci";
+            if (processProgressSlider != null) processProgressSlider.gameObject.SetActive(false);
+            if (processProgressText != null) processProgressText.text = "Operasyon sonrası takip devam ediyor...";
+            if (postProcessIndicator != null) postProcessIndicator.SetActive(true);
         }
     }
 
     private void HandlePostProcessEnded()
     {
         HideAllPanels();
+        if (contentRoot != null) contentRoot.SetActive(false);
     }
 
-    private void HandleScientistsKilled(List<ScientistData> killed)
-    {
-        ShowScientistsKilledPanel(killed);
-    }
+    private void HandleScientistsKilled(List<ScientistData> killed) => ShowScientistsKilledPanel(killed);
 
     // ==================== BUTON CALLBACK'LERİ ====================
 
     private void OnScientistSelected(int scientistIndex)
     {
-        if (IllegalScientistProviderManager.Instance == null) return;
-        IllegalScientistProviderManager.Instance.AcceptOffer(scientistIndex);
+        IllegalScientistProviderManager.Instance?.AcceptOffer(scientistIndex);
     }
 
     private void OnRejectOfferClicked()
     {
-        if (IllegalScientistProviderManager.Instance == null) return;
-        IllegalScientistProviderManager.Instance.RejectOffer();
+        IllegalScientistProviderManager.Instance?.RejectOffer();
         HideAllPanels();
+        if (contentRoot != null) contentRoot.SetActive(false);
     }
 
     private void OnChoiceSelected(int choiceIndex)
     {
         if (IllegalScientistProviderManager.Instance == null) return;
-
         var state = IllegalScientistProviderManager.Instance.GetCurrentState();
-
         if (state == IllegalScientistProviderState.EventPhase)
-        {
             IllegalScientistProviderManager.Instance.ResolveEvent(choiceIndex);
-        }
         else if (state == IllegalScientistProviderState.PostEventPhase)
-        {
             IllegalScientistProviderManager.Instance.ResolvePostEvent(choiceIndex);
-        }
     }
 
     private void OnResultContinueClicked()
     {
-        if (resultPanel != null)
-            resultPanel.SetActive(false);
+        if (resultPanel != null) resultPanel.SetActive(false);
     }
 
     private void OnKilledAcknowledgeClicked()
     {
-        if (scientistsKilledPanel != null)
-            scientistsKilledPanel.SetActive(false);
+        if (scientistsKilledPanel != null) scientistsKilledPanel.SetActive(false);
     }
 
     // ==================== PUBLIC METODLAR ====================
 
     /// <summary>
-    /// Minigame'i açar ve teklif tetikler. Inspector'dan butona bağla.
+    /// Minigame'i açar ve teklif tetikler.
+    /// Root GameObject her zaman aktif olmalı — contentRoot görünürlüğü yönetir.
     /// </summary>
     public void OpenAndTriggerOffer()
     {
-        gameObject.SetActive(true);
-
+        if (contentRoot != null) contentRoot.SetActive(true);
         if (IllegalScientistProviderManager.Instance == null) return;
-
         if (IllegalScientistProviderManager.Instance.IsActive()) return;
-
         IllegalScientistProviderManager.Instance.GenerateOffer();
     }
 
-    /// <summary>
-    /// Minigame UI'ını açar. Eğer aktif bir operasyon varsa ilgili paneli gösterir.
-    /// </summary>
     public void OpenMinigame()
     {
-        gameObject.SetActive(true);
-
-        if (IllegalScientistProviderManager.Instance != null)
-        {
-            var state = IllegalScientistProviderManager.Instance.GetCurrentState();
-
-            switch (state)
-            {
-                case IllegalScientistProviderState.Idle:
-                    HideAllPanels();
-                    break;
-                case IllegalScientistProviderState.OfferPending:
-                case IllegalScientistProviderState.ActiveProcess:
-                case IllegalScientistProviderState.EventPhase:
-                case IllegalScientistProviderState.PostProcess:
-                case IllegalScientistProviderState.PostEventPhase:
-                    // İlgili panel zaten manager event'leriyle gösterilmişti
-                    break;
-            }
-        }
+        if (contentRoot != null) contentRoot.SetActive(true);
     }
 
-    /// <summary>
-    /// Minigame UI'ını kapatır.
-    /// </summary>
     public void CloseMinigame()
     {
-        gameObject.SetActive(false);
+        HideAllPanels();
+        if (contentRoot != null) contentRoot.SetActive(false);
     }
 
-    /// <summary>
-    /// Minigame aktif mi kontrol eder.
-    /// </summary>
     public bool IsMinigameActive()
     {
         if (IllegalScientistProviderManager.Instance == null) return false;
