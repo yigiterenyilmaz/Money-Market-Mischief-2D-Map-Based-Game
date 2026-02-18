@@ -9,6 +9,7 @@ public class WarForOilEventEditor : Editor
     private Dictionary<int, bool> consequenceFoldouts = new Dictionary<int, bool>();
     private Dictionary<int, bool> prerequisiteFoldouts = new Dictionary<int, bool>();
     private Dictionary<int, bool> chainChoiceFoldouts = new Dictionary<int, bool>();
+    private Dictionary<int, bool> rivalFoldouts = new Dictionary<int, bool>();
     private bool chainFoldout;
 
     public override void OnInspectorGUI()
@@ -221,6 +222,26 @@ public class WarForOilEventEditor : Editor
 
         EditorGUILayout.Space(2);
 
+        //rakip işgal flagleri — foldout
+        if (!rivalFoldouts.ContainsKey(index))
+            rivalFoldouts[index] = false;
+        rivalFoldouts[index] = EditorGUILayout.Foldout(
+            rivalFoldouts[index], "Rakip İşgal Flagleri", true);
+
+        if (rivalFoldouts[index])
+        {
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(
+                choice.FindPropertyRelative("acceptsRivalDeal"),
+                new GUIContent("Anlaşmayı Kabul"));
+            EditorGUILayout.PropertyField(
+                choice.FindPropertyRelative("rejectsRivalDeal"),
+                new GUIContent("Anlaşmayı Reddet"));
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space(2);
+
         //ön koşullar — foldout
         if (!prerequisiteFoldouts.ContainsKey(index))
             prerequisiteFoldouts[index] = false;
@@ -258,6 +279,8 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("continuesChain").boolValue = false;
         choice.FindPropertyRelative("isChainRefusal").boolValue = false;
         choice.FindPropertyRelative("triggersCeasefire").boolValue = false;
+        choice.FindPropertyRelative("acceptsRivalDeal").boolValue = false;
+        choice.FindPropertyRelative("rejectsRivalDeal").boolValue = false;
         choice.FindPropertyRelative("requiredSkills").ClearArray();
         choice.FindPropertyRelative("statConditions").ClearArray();
     }

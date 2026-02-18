@@ -15,6 +15,9 @@ public class WarForOilDatabase : ScriptableObject
     public float pressureCooldown = 20f; //baskı başarısız olunca bekleme süresi (saniye)
     public float politicalInfluenceMultiplier = 0.01f; //siyasi nüfuzun başarı şansına çarpanı
 
+    [Header("Savaş Eventleri")]
+    public List<WarForOilEvent> events; //savaş sırasında tetiklenen eventler
+
     [Header("Savaş Ayarları")]
     public float warDuration = 300f; //savaş süresi (saniye)
     public float eventInterval = 15f; //savaş sırasında event kontrol aralığı (saniye)
@@ -36,4 +39,12 @@ public class WarForOilDatabase : ScriptableObject
     public float warLossPenalty = 200f; //savaş kaybedildiğinde para kaybı
     public float warLossPoliticalPenalty = 20f; //savaş kaybedildiğinde siyasi nüfuz düşüşü
     public float warLossSuspicionIncrease = 15f; //savaş kaybedildiğinde şüphe artışı
+
+    [Header("Rakip İşgal Ayarları")]
+    public float rivalInvasionMinWarTime = 60f; //rakip işgalin en erken tetiklenebileceği savaş süresi (saniye)
+    [Range(0f, 1f)] public float rivalInvasionChance = 0.3f; //her event check'te rakip işgal tetiklenme şansı
+    [Range(0f, 1f)] public float rivalDealRewardRatio = 0.6f; //anlaşmada oyuncuya kalan ödül oranı
+    public float rivalDealEndDelay = 10f; //anlaşma kabul edilince savaş bitiş gecikmesi (saniye)
+    public WarForOilEvent rivalOfferEvent; //rakip işgal teklif event'i (kabul/red seçenekleri)
+    public List<WarForOilEvent> cornerGrabEvents; //köşe kapma yarışı event havuzu
 }

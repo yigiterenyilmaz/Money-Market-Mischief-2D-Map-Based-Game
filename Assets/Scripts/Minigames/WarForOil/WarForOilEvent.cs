@@ -68,6 +68,10 @@ public class WarForOilEventChoice
     public bool isChainRefusal; //zincirde reddetme sayacını artırır
     public bool triggersCeasefire; //zincirden ateşkes tetikler (minSupport kontrolü yok)
 
+    //rakip işgal flagleri (Editor tarafından foldout içinde çizilir)
+    public bool acceptsRivalDeal; //rakip işgal anlaşmasını kabul eder
+    public bool rejectsRivalDeal; //rakip işgal anlaşmasını reddeder → köşe kapma yarışı başlar
+
     //ön koşullar (Editor tarafından foldout içinde çizilir)
     public List<Skill> requiredSkills; //bu seçenek için açılmış olması gereken skill'ler
     public List<StatCondition> statConditions; //bu seçenek için sağlanması gereken stat koşulları

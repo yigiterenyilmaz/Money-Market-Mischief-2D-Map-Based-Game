@@ -44,6 +44,12 @@ public class WarForOilManager : MonoBehaviour
     private float chainTimer; //sonraki zincir eventine geri sayım
     private WarForOilEvent pendingChainEvent; //sıradaki zincir eventi (beklemede)
 
+    //rakip işgal sistemi
+    private bool isCornerGrabRace; //köşe kapma yarışı aktif mi
+    private bool rivalInvasionTriggered; //bu savaşta rakip işgal zaten tetiklendi mi
+    private WarForOilCountry rivalCountry; //rakip işgale giren ülke
+    private Dictionary<WarForOilCountry, float> bonusRewards = new Dictionary<WarForOilCountry, float>(); //rakip işgallerden ülkelere eklenen bonus ödül
+
     //sonuç ekranı beklerken saklanan sonuç
     private WarForOilResult pendingResult;
 
@@ -74,6 +80,8 @@ public class WarForOilManager : MonoBehaviour
     public static event Action<List<WarForOilCountry>> OnActiveCountriesChanged; //UI'daki ülke listesi değişti
     public static event Action OnChainStarted; //zincir başladı (UI savaş timer'ı dondurabilir)
     public static event Action<string> OnChainEnded; //zincir bitti (sebep: "collapse", "ceasefire", "government_collapse")
+    public static event Action<WarForOilCountry> OnRivalInvasionStarted; //rakip işgal tetiklendi (UI rakip ülkeyi gösterebilir)
+    public static event Action OnCornerGrabStarted; //köşe kapma yarışı başladı (anlaşma reddedildi)
 
     void Start()
     {
@@ -278,6 +286,24 @@ public class WarForOilManager : MonoBehaviour
             return;
         }
 
+        //rakip işgal teklifi — kabul veya red
+        if (choice.acceptsRivalDeal)
+        {
+            if (GameManager.Instance != null)
+                GameManager.Instance.ResumeGame();
+
+            AcceptRivalDeal();
+            return;
+        }
+        if (choice.rejectsRivalDeal)
+        {
+            if (GameManager.Instance != null)
+                GameManager.Instance.ResumeGame();
+
+            RejectRivalDeal();
+            return;
+        }
+
         //normal event akışı (zincir dışı)
 
         //oyunu devam ettir
@@ -325,10 +351,12 @@ public class WarForOilManager : MonoBehaviour
         float ratio = (supportStat - database.ceasefireMinSupport)
             / (100f - database.ceasefireMinSupport);
 
+        float effectiveCeasefireReward = GetEffectiveBaseReward(selectedCountry);
+
         //kazanç hesapla: düşük support → zarar, yüksek support → kâr
         float wealthChange = Mathf.Lerp(
             -database.ceasefirePenalty,
-            selectedCountry.baseReward * rewardMultiplier * database.ceasefireMaxReward,
+            effectiveCeasefireReward * rewardMultiplier * database.ceasefireMaxReward,
             ratio
         ) - accumulatedCostModifier;
 
@@ -711,10 +739,11 @@ public class WarForOilManager : MonoBehaviour
         {
             //ateşkes — normal ateşkes formülü ama minSupport kontrolü yok
             float ratio = supportStat / 100f; //0 support = en kötü, 100 = en iyi
+            float effectiveChainReward = GetEffectiveBaseReward(selectedCountry);
 
             float wealthChange = Mathf.Lerp(
                 -database.ceasefirePenalty,
-                selectedCountry.baseReward * rewardMultiplier * database.ceasefireMaxReward,
+                effectiveChainReward * rewardMultiplier * database.ceasefireMaxReward,
                 ratio
             ) - accumulatedCostModifier;
 
@@ -753,6 +782,95 @@ public class WarForOilManager : MonoBehaviour
         }
     }
 
+    // ==================== RAKİP İŞGAL SİSTEMİ ====================
+
+    /// <summary>
+    /// Rakip işgal anlaşması kabul edildi — savaş hızla biter, ödül bölüşülür.
+    /// </summary>
+    private void AcceptRivalDeal()
+    {
+        //savaşı hızla bitir
+        float targetTimer = database.warDuration - database.rivalDealEndDelay;
+        warTimer = Mathf.Max(warTimer, targetTimer);
+
+        //anlaşma ödül oranını işaretle — CalculateWarResult'ta kullanılacak
+        pendingDeal = true;
+        dealRewardRatio = database.rivalDealRewardRatio;
+        eventsBlocked = true; //artık event gelmez
+
+        //rakip ülkenin payını bonusRewards'a ekle
+        float totalReward = GetEffectiveBaseReward(selectedCountry);
+        float rivalShare = totalReward * (1f - database.rivalDealRewardRatio);
+        AddBonusReward(rivalCountry, rivalShare);
+
+        //savaş sürecine geri dön
+        currentState = WarForOilState.WarProcess;
+    }
+
+    /// <summary>
+    /// Rakip işgal anlaşması reddedildi — köşe kapma yarışı başlar.
+    /// Bundan sonra eventler sadece cornerGrabEvents havuzundan gelir.
+    /// </summary>
+    private void RejectRivalDeal()
+    {
+        isCornerGrabRace = true;
+        eventTriggerCounts.Clear(); //yeni havuz için sayaçları sıfırla
+
+        OnCornerGrabStarted?.Invoke();
+
+        //savaş sürecine geri dön
+        currentState = WarForOilState.WarProcess;
+    }
+
+    /// <summary>
+    /// Bir ülkenin efektif base reward'ını döner (baseReward + bonus).
+    /// </summary>
+    private float GetEffectiveBaseReward(WarForOilCountry country)
+    {
+        float reward = country.baseReward;
+        if (bonusRewards.TryGetValue(country, out float bonus))
+            reward += bonus;
+        return reward;
+    }
+
+    /// <summary>
+    /// Bir ülkeye bonus ödül ekler (rakip işgalden kazandığı pay).
+    /// </summary>
+    private void AddBonusReward(WarForOilCountry country, float amount)
+    {
+        if (country == null || amount <= 0f) return;
+        if (bonusRewards.ContainsKey(country))
+            bonusRewards[country] += amount;
+        else
+            bonusRewards[country] = amount;
+    }
+
+    /// <summary>
+    /// Bir ülkenin bonus reward'ını döner (UI için).
+    /// </summary>
+    public float GetBonusReward(WarForOilCountry country)
+    {
+        if (country == null) return 0f;
+        bonusRewards.TryGetValue(country, out float bonus);
+        return bonus;
+    }
+
+    /// <summary>
+    /// Köşe kapma yarışı aktif mi.
+    /// </summary>
+    public bool IsCornerGrabRace()
+    {
+        return isCornerGrabRace;
+    }
+
+    /// <summary>
+    /// Rakip ülkeyi döner (aktif savaşta rakip işgal varsa).
+    /// </summary>
+    public WarForOilCountry GetRivalCountry()
+    {
+        return rivalCountry;
+    }
+
     // ==================== İÇ MANTIK ====================
 
     /// <summary>
@@ -779,23 +897,42 @@ public class WarForOilManager : MonoBehaviour
         chainRefusalCount = 0;
         chainTimer = 0f;
         pendingChainEvent = null;
+        isCornerGrabRace = false;
+        rivalInvasionTriggered = false;
+        rivalCountry = null;
 
         OnWarStarted?.Invoke(selectedCountry, database.warDuration);
     }
 
     /// <summary>
     /// Savaş sırasında event tetiklemeyi dener.
+    /// Köşe kapma yarışı aktifse cornerGrabEvents'ten, değilse database.events'ten çeker.
     /// </summary>
     private void TryTriggerWarEvent()
     {
         if (eventsBlocked) return;
-        if (selectedCountry.events == null || selectedCountry.events.Count == 0) return;
+
+        //rakip işgal tetikleme kontrolü (henüz tetiklenmemişse ve koşullar uygunsa)
+        if (!rivalInvasionTriggered && !isCornerGrabRace && !isInChain
+            && warTimer >= database.rivalInvasionMinWarTime
+            && database.rivalOfferEvent != null)
+        {
+            if (UnityEngine.Random.value < database.rivalInvasionChance)
+            {
+                TryTriggerRivalInvasion();
+                if (currentState != WarForOilState.WarProcess) return; //tetiklendiyse çık
+            }
+        }
+
+        //aktif event havuzunu belirle
+        List<WarForOilEvent> eventPool = isCornerGrabRace ? database.cornerGrabEvents : database.events;
+        if (eventPool == null || eventPool.Count == 0) return;
 
         //tetiklenebilir eventleri filtrele (tekrar limiti + minimum süre)
         List<WarForOilEvent> available = new List<WarForOilEvent>();
-        for (int i = 0; i < selectedCountry.events.Count; i++)
+        for (int i = 0; i < eventPool.Count; i++)
         {
-            WarForOilEvent evt = selectedCountry.events[i];
+            WarForOilEvent evt = eventPool[i];
             if (warTimer < evt.minWarTime) continue;
 
             eventTriggerCounts.TryGetValue(evt, out int count);
@@ -830,15 +967,56 @@ public class WarForOilManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Rakip işgal tetiklemeyi dener — uygun rakip ülke varsa teklif event'ini fırlatır.
+    /// </summary>
+    private void TryTriggerRivalInvasion()
+    {
+        //rakip ülke seç — hedef ülke ve conquered ülkeler hariç
+        List<WarForOilCountry> rivalPool = new List<WarForOilCountry>();
+        if (database.countries != null)
+        {
+            for (int i = 0; i < database.countries.Count; i++)
+            {
+                WarForOilCountry c = database.countries[i];
+                if (c != selectedCountry && !conqueredCountries.Contains(c))
+                    rivalPool.Add(c);
+            }
+        }
+
+        if (rivalPool.Count == 0) return; //rakip ülke yok
+
+        rivalCountry = rivalPool[UnityEngine.Random.Range(0, rivalPool.Count)];
+        rivalInvasionTriggered = true;
+
+        //EventCoordinator cooldown kontrolü
+        if (!EventCoordinator.CanShowEvent()) return;
+
+        EventCoordinator.MarkEventShown();
+
+        //teklif event'ini göster
+        currentEvent = database.rivalOfferEvent;
+        currentState = WarForOilState.EventPhase;
+        eventDecisionTimer = currentEvent.decisionTime;
+
+        if (GameManager.Instance != null)
+            GameManager.Instance.PauseGame();
+
+        OnRivalInvasionStarted?.Invoke(rivalCountry);
+        OnWarEventTriggered?.Invoke(currentEvent);
+    }
+
+    /// <summary>
     /// Savaş sonu: kazanma olasılığı hesapla, random check yap.
     /// Anlaşma varsa zar atılmaz, garanti ödül verilir.
     /// </summary>
     private void CalculateWarResult()
     {
+        float effectiveBaseReward = GetEffectiveBaseReward(selectedCountry);
+
         //anlaşmayla bitirme aktifse — zar yok, garanti ödül
         if (pendingDeal)
         {
-            float dealReward = selectedCountry.baseReward * rewardMultiplier * dealRewardRatio;
+            float dealReward = effectiveBaseReward * rewardMultiplier * dealRewardRatio;
 
             pendingResult = new WarForOilResult();
             pendingResult.country = selectedCountry;
@@ -872,8 +1050,15 @@ public class WarForOilManager : MonoBehaviour
 
             if (warWon)
             {
+                //köşe kapma yarışı aktifse rakip ülkeye payını ekle
+                if (isCornerGrabRace && rivalCountry != null)
+                {
+                    float rivalShare = effectiveBaseReward * (1f - supportRatio);
+                    AddBonusReward(rivalCountry, rivalShare);
+                }
+
                 //kazanıldı — ödül destek oranına göre (supportRewardRatio ile sınırlı)
-                float reward = selectedCountry.baseReward * rewardMultiplier * supportRatio * database.supportRewardRatio;
+                float reward = effectiveBaseReward * rewardMultiplier * supportRatio * database.supportRewardRatio;
                 pendingResult.wealthChange = reward - accumulatedCostModifier;
                 pendingResult.suspicionChange = accumulatedSuspicionModifier;
                 pendingResult.politicalInfluenceChange = accumulatedPoliticalInfluenceModifier;
@@ -884,6 +1069,24 @@ public class WarForOilManager : MonoBehaviour
                 pendingResult.wealthChange = -(database.warLossPenalty + accumulatedCostModifier);
                 pendingResult.suspicionChange = database.warLossSuspicionIncrease + accumulatedSuspicionModifier;
                 pendingResult.politicalInfluenceChange = -database.warLossPoliticalPenalty + accumulatedPoliticalInfluenceModifier;
+            }
+        }
+
+        //rakip işgal bilgilerini sonuca ekle
+        if (rivalCountry != null)
+        {
+            pendingResult.rivalCountry = rivalCountry;
+            pendingResult.wasCornerGrabRace = isCornerGrabRace;
+
+            //rakip ülkenin bu savaştan kazandığı toplam bonus
+            if (isCornerGrabRace && pendingResult.warWon)
+            {
+                float supportRatioForRival = supportStat / 100f;
+                pendingResult.rivalRewardGain = effectiveBaseReward * (1f - supportRatioForRival);
+            }
+            else if (pendingDeal)
+            {
+                pendingResult.rivalRewardGain = effectiveBaseReward * (1f - database.rivalDealRewardRatio);
             }
         }
 
@@ -993,6 +1196,9 @@ public class WarForOilResult
     public bool wasCeasefire;
     public bool wasDeal; //anlaşmayla mı bitti
     public bool wasChainCollapse; //zincir çöküşüyle mi bitti
+    public bool wasCornerGrabRace; //köşe kapma yarışı mıydı
+    public WarForOilCountry rivalCountry; //rakip ülke (varsa)
+    public float rivalRewardGain; //rakip ülkenin kazandığı bonus reward
     public float finalSupportStat;
     public float winChance; //hesaplanan kazanma şansı
     public float wealthChange;

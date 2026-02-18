@@ -10,6 +10,4 @@ public class WarForOilCountry : ScriptableObject
 
     public float baseReward; //savaş kazanıldığında taban ödül (supportRatio ile çarpılır)
     [Range(0f, 1f)] public float invasionDifficulty; //işgal zorluğu — savaş kazanma şansını düşürür
-
-    public List<WarForOilEvent> events; //bu ülkeye özel savaş eventleri
 }
