@@ -5,14 +5,14 @@ using TMPro;
 
 /// <summary>
 /// IllegalScientistProvider minigame UI controller.
-/// Root GameObject must be ACTIVE in the scene at all times.
-/// Use contentRoot child to hide/show the UI visually.
+/// 
+/// SETUP: Root GameObject must be ACTIVE in the Hierarchy so Awake fires.
+/// All panels will be hidden automatically in Awake — you do NOT need to
+/// set them inactive in the scene yourself.
+/// Call OpenAndTriggerOffer() to show the UI.
 /// </summary>
 public class IllegalScientistProviderUI : MonoBehaviour
 {
-    [Header("Content Root")]
-    public GameObject contentRoot; // Child wrapping all panels. Set INACTIVE in Inspector.
-
     [Header("Ana Paneller")]
     public GameObject offerPanel;
     public GameObject processPanel;
@@ -64,6 +64,9 @@ public class IllegalScientistProviderUI : MonoBehaviour
     public Color mediumRiskColor = new Color(0.9f, 0.7f, 0.1f);
     public Color highRiskColor = new Color(0.9f, 0.2f, 0.2f);
 
+    // Only show UI panels when player explicitly opens the minigame
+    private bool isOpen = false;
+
     private IllegalScientistProviderEvent currentOffer;
     private IllegalScientistProviderEvent currentEvent;
     private List<GameObject> spawnedScientistButtons = new List<GameObject>();
@@ -73,10 +76,20 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void Awake()
     {
-        // Root stays active so Awake always fires on scene load.
-        // Hide content via contentRoot child instead of disabling the root.
-        if (contentRoot != null)
-            contentRoot.SetActive(false);
+        // Always hide all panels on start.
+        // Root GameObject must be active so this runs — panels are hidden here in code,
+        // so it doesn't matter what state they are set to in the scene.
+        ForceHideAll();
+    }
+
+    private void ForceHideAll()
+    {
+        if (offerPanel != null) offerPanel.SetActive(false);
+        if (processPanel != null) processPanel.SetActive(false);
+        if (eventPanel != null) eventPanel.SetActive(false);
+        if (resultPanel != null) resultPanel.SetActive(false);
+        if (scientistsKilledPanel != null) scientistsKilledPanel.SetActive(false);
+        isOpen = false;
     }
 
     private void OnEnable()
@@ -123,6 +136,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void Update()
     {
+        if (!isOpen) return;
         if (IllegalScientistProviderManager.Instance == null) return;
         var state = IllegalScientistProviderManager.Instance.GetCurrentState();
         if (state == IllegalScientistProviderState.ActiveProcess ||
@@ -145,7 +159,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void ShowOfferPanel(IllegalScientistProviderEvent offer)
     {
-        if (contentRoot != null) contentRoot.SetActive(true);
+        if (!isOpen) return;
         HideAllPanels();
         if (offerPanel == null) return;
 
@@ -158,8 +172,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
         if (offerRiskText != null)
         {
-            string riskLabel = GetRiskLabel(offer.riskLevel);
-            offerRiskText.text = $"Risk: {riskLabel} ({offer.riskLevel * 100:F0}%)";
+            offerRiskText.text = $"Risk: {GetRiskLabel(offer.riskLevel)} ({offer.riskLevel * 100:F0}%)";
             offerRiskText.color = GetRiskColor(offer.riskLevel);
         }
 
@@ -174,7 +187,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void ShowProcessPanel(IllegalScientistProviderEvent offer, float duration)
     {
-        if (contentRoot != null) contentRoot.SetActive(true);
+        if (!isOpen) return;
         HideAllPanels();
         if (processPanel == null) return;
 
@@ -189,7 +202,9 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void ShowEventPanel(IllegalScientistProviderEvent evt)
     {
+        if (!isOpen) return;
         if (eventPanel == null) return;
+
         eventPanel.SetActive(true);
         currentEvent = evt;
 
@@ -214,6 +229,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void ShowResultPanel(bool success, IllegalScientistProviderResult result)
     {
+        if (!isOpen) return;
         HideEventPanel();
         if (resultPanel == null) return;
         resultPanel.SetActive(true);
@@ -256,6 +272,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void ShowScientistsKilledPanel(List<ScientistData> killed)
     {
+        if (!isOpen) return;
         if (scientistsKilledPanel == null) return;
         scientistsKilledPanel.SetActive(true);
 
@@ -411,6 +428,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void HandleOfferTimerUpdate(float remainingTime)
     {
+        if (!isOpen) return;
         if (offerTimerSlider != null) offerTimerSlider.value = remainingTime;
         if (offerTimerText != null) offerTimerText.text = $"{remainingTime:F1}s";
     }
@@ -419,6 +437,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void HandleProcessProgress(float progress)
     {
+        if (!isOpen) return;
         if (processProgressSlider != null) processProgressSlider.value = progress;
         if (processProgressText != null) processProgressText.text = $"{progress * 100:F0}%";
     }
@@ -427,6 +446,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void HandleEventTimerUpdate(float remainingTime)
     {
+        if (!isOpen) return;
         if (eventTimerSlider != null) eventTimerSlider.value = remainingTime;
         if (eventTimerText != null) eventTimerText.text = $"{remainingTime:F1}s";
     }
@@ -435,6 +455,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void HandleMinigameFailed(string reason)
     {
+        if (!isOpen) return;
         var failResult = new IllegalScientistProviderResult
         {
             success = false,
@@ -450,6 +471,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     private void HandlePostProcessStarted()
     {
+        if (!isOpen) return;
         if (resultPanel != null) resultPanel.SetActive(false);
         if (processPanel != null)
         {
@@ -464,7 +486,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
     private void HandlePostProcessEnded()
     {
         HideAllPanels();
-        if (contentRoot != null) contentRoot.SetActive(false);
+        isOpen = false;
     }
 
     private void HandleScientistsKilled(List<ScientistData> killed) => ShowScientistsKilledPanel(killed);
@@ -480,7 +502,7 @@ public class IllegalScientistProviderUI : MonoBehaviour
     {
         IllegalScientistProviderManager.Instance?.RejectOffer();
         HideAllPanels();
-        if (contentRoot != null) contentRoot.SetActive(false);
+        isOpen = false;
     }
 
     private void OnChoiceSelected(int choiceIndex)
@@ -507,25 +529,44 @@ public class IllegalScientistProviderUI : MonoBehaviour
 
     /// <summary>
     /// Minigame'i açar ve teklif tetikler.
-    /// Root GameObject her zaman aktif olmalı — contentRoot görünürlüğü yönetir.
+    /// Root GameObject her zaman sahnede aktif olmalı.
     /// </summary>
     public void OpenAndTriggerOffer()
     {
-        if (contentRoot != null) contentRoot.SetActive(true);
+        isOpen = true;
+
         if (IllegalScientistProviderManager.Instance == null) return;
-        if (IllegalScientistProviderManager.Instance.IsActive()) return;
+
+        // If a process is already active, show the right panel
+        if (IllegalScientistProviderManager.Instance.IsActive())
+        {
+            var state = IllegalScientistProviderManager.Instance.GetCurrentState();
+            switch (state)
+            {
+                case IllegalScientistProviderState.ActiveProcess:
+                case IllegalScientistProviderState.EventPhase:
+                    if (processPanel != null) processPanel.SetActive(true);
+                    break;
+                case IllegalScientistProviderState.PostProcess:
+                case IllegalScientistProviderState.PostEventPhase:
+                    if (processPanel != null) processPanel.SetActive(true);
+                    break;
+            }
+            return;
+        }
+
         IllegalScientistProviderManager.Instance.GenerateOffer();
     }
 
     public void OpenMinigame()
     {
-        if (contentRoot != null) contentRoot.SetActive(true);
+        isOpen = true;
     }
 
     public void CloseMinigame()
     {
         HideAllPanels();
-        if (contentRoot != null) contentRoot.SetActive(false);
+        isOpen = false;
     }
 
     public bool IsMinigameActive()

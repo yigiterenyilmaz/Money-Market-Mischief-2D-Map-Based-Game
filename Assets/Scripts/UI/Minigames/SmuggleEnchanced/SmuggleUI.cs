@@ -314,9 +314,13 @@ public class SmuggleSelectionUI : MonoBehaviour
 
     public void OpenSelectionMenu()
     {
-        if (SmuggleManager.Instance != null)
+        if (SmuggleManager.Instance == null)
         {
-            SmuggleManager.Instance.TryStartMinigame();
+            Debug.LogError("SmuggleManager.Instance is null!");
+            return;
         }
+
+        Debug.Log($"Calling TryStartMinigame. State: {SmuggleManager.Instance.GetCurrentState()}");
+        SmuggleManager.Instance.TryStartMinigame();
     }
 }

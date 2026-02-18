@@ -16,6 +16,9 @@ public class SmuggleManager : MonoBehaviour
 
     [Header("Şüphe Ayarları")]
     public int jewelersForFullReduction = 3; //bu kadar kuyumcu sabit şüpheyi tamamen sıfırlar
+    
+    [Header("Debug")]
+    [SerializeField] private bool bypassUnlockCheck = false;
 
     private SmuggleState currentState = SmuggleState.Idle;
     private SmuggleRoutePack currentRoutePack;
@@ -106,17 +109,20 @@ public class SmuggleManager : MonoBehaviour
 
     public bool TryStartMinigame()
     {
-        if (MinigameManager.Instance == null || !MinigameManager.Instance.IsMinigameUnlocked(minigameData))
+        if (!bypassUnlockCheck)
         {
-            OnSmuggleFailed?.Invoke("Minigame is not unlocked yet.");
-            return false;
-        }
+            if (MinigameManager.Instance == null || !MinigameManager.Instance.IsMinigameUnlocked(minigameData))
+            {
+                OnSmuggleFailed?.Invoke("Minigame is not unlocked yet.");
+                return false;
+            }
 
-        if (MinigameManager.Instance.IsOnCooldown(minigameData))
-        {
-            float remaining = MinigameManager.Instance.GetRemainingCooldown(minigameData);
-            OnSmuggleFailed?.Invoke("Cooldown active. Remaining: " + Mathf.CeilToInt(remaining) + "s");
-            return false;
+            if (MinigameManager.Instance.IsOnCooldown(minigameData))
+            {
+                float remaining = MinigameManager.Instance.GetRemainingCooldown(minigameData);
+                OnSmuggleFailed?.Invoke("Cooldown active. Remaining: " + Mathf.CeilToInt(remaining) + "s");
+                return false;
+            }
         }
 
         if (currentState != SmuggleState.Idle)
@@ -128,11 +134,8 @@ public class SmuggleManager : MonoBehaviour
         if (currentRoutePack != null && currentCourierOptions.Count > 0)
         {
             currentState = SmuggleState.SelectingRoute;
-
-            //oyunu duraklat — seçim ekranında zaman durmalı
             if (GameManager.Instance != null)
                 GameManager.Instance.PauseGame();
-
             OnSelectionPhaseStarted?.Invoke(currentRoutePack, currentCourierOptions);
             return true;
         }
