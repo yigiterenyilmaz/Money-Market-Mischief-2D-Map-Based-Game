@@ -139,6 +139,8 @@ public class WarForOilEventEditor : Editor
         EditorGUILayout.PropertyField(choice.FindPropertyRelative("description"));
         EditorGUILayout.PropertyField(choice.FindPropertyRelative("supportModifier"));
         EditorGUILayout.PropertyField(choice.FindPropertyRelative("suspicionModifier"));
+        EditorGUILayout.PropertyField(choice.FindPropertyRelative("reputationModifier"),
+            new GUIContent("İtibar Modifier"));
         EditorGUILayout.PropertyField(choice.FindPropertyRelative("politicalInfluenceModifier"));
         EditorGUILayout.PropertyField(choice.FindPropertyRelative("costModifier"));
         EditorGUILayout.PropertyField(choice.FindPropertyRelative("cornerGrabModifier"),
@@ -270,6 +272,7 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("description").stringValue = "";
         choice.FindPropertyRelative("supportModifier").floatValue = 0f;
         choice.FindPropertyRelative("suspicionModifier").floatValue = 0f;
+        choice.FindPropertyRelative("reputationModifier").floatValue = 0f;
         choice.FindPropertyRelative("politicalInfluenceModifier").floatValue = 0f;
         choice.FindPropertyRelative("costModifier").intValue = 0;
         choice.FindPropertyRelative("cornerGrabModifier").floatValue = 0f;

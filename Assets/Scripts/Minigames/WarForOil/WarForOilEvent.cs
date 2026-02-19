@@ -50,6 +50,7 @@ public class WarForOilEventChoice
     [TextArea(2, 4)] public string description;
     public float supportModifier; //destek stat'ını etkiler (pozitif = ülkeyi destekle)
     public float suspicionModifier; //şüphe etkisi
+    public float reputationModifier; //itibar etkisi (pozitif = artar, negatif = düşer)
     public float politicalInfluenceModifier; //politik nüfuz etkisi (negatif = düşürür)
     public int costModifier; //maliyet etkisi
     public float cornerGrabModifier; //köşe kapma stat'ını etkiler (pozitif = bizim lehimize)

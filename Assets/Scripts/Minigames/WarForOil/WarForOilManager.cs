@@ -30,6 +30,7 @@ public class WarForOilManager : MonoBehaviour
 
     //operasyon boyunca biriken modifier'lar
     private float accumulatedSuspicionModifier;
+    private float accumulatedReputationModifier;
     private float accumulatedPoliticalInfluenceModifier;
     private int accumulatedCostModifier;
     private float rewardMultiplier; //baseRewardReduction'lar sonucu biriken ödül çarpanı (1.0'dan başlar)
@@ -238,6 +239,7 @@ public class WarForOilManager : MonoBehaviour
 
         //modifier'ları biriktir
         accumulatedSuspicionModifier += choice.suspicionModifier;
+        accumulatedReputationModifier += choice.reputationModifier;
         accumulatedPoliticalInfluenceModifier += choice.politicalInfluenceModifier;
         accumulatedCostModifier += choice.costModifier;
 
@@ -412,6 +414,7 @@ public class WarForOilManager : MonoBehaviour
         pendingResult.winChance = 0f;
         pendingResult.wealthChange = wealthChange;
         pendingResult.suspicionChange = accumulatedSuspicionModifier;
+        pendingResult.reputationChange = accumulatedReputationModifier;
         pendingResult.politicalInfluenceChange = accumulatedPoliticalInfluenceModifier;
 
         currentState = WarForOilState.ResultPhase;
@@ -441,6 +444,8 @@ public class WarForOilManager : MonoBehaviour
                 GameStatManager.Instance.AddWealth(result.wealthChange);
             if (result.suspicionChange != 0)
                 GameStatManager.Instance.AddSuspicion(result.suspicionChange);
+            if (result.reputationChange != 0)
+                GameStatManager.Instance.AddReputation(result.reputationChange);
             if (result.politicalInfluenceChange != 0)
                 GameStatManager.Instance.AddPoliticalInfluence(result.politicalInfluenceChange);
         }
@@ -843,6 +848,7 @@ public class WarForOilManager : MonoBehaviour
             pendingResult.winChance = 0f;
             pendingResult.wealthChange = -(database.warLossPenalty + accumulatedCostModifier);
             pendingResult.suspicionChange = database.warLossSuspicionIncrease + accumulatedSuspicionModifier;
+            pendingResult.reputationChange = accumulatedReputationModifier;
             pendingResult.politicalInfluenceChange = -database.warLossPoliticalPenalty + accumulatedPoliticalInfluenceModifier;
 
             currentState = WarForOilState.ResultPhase;
@@ -1010,6 +1016,7 @@ public class WarForOilManager : MonoBehaviour
         pendingResult.winChance = 0f;
         pendingResult.wealthChange = wealthChange;
         pendingResult.suspicionChange = accumulatedSuspicionModifier;
+        pendingResult.reputationChange = accumulatedReputationModifier;
         pendingResult.politicalInfluenceChange = accumulatedPoliticalInfluenceModifier;
 
         currentState = WarForOilState.ResultPhase;
@@ -1062,6 +1069,7 @@ public class WarForOilManager : MonoBehaviour
         warTimer = 0f;
         eventCheckTimer = 0f;
         accumulatedSuspicionModifier = 0f;
+        accumulatedReputationModifier = 0f;
         accumulatedPoliticalInfluenceModifier = 0f;
         accumulatedCostModifier = 0;
         rewardMultiplier = 1f;
@@ -1434,5 +1442,6 @@ public class WarForOilResult
     public float winChance; //hesaplanan kazanma şansı
     public float wealthChange;
     public float suspicionChange;
+    public float reputationChange;
     public float politicalInfluenceChange;
 }

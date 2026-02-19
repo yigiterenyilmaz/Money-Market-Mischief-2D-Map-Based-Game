@@ -167,6 +167,7 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `description` | Secenek aciklamasi (TextArea) |
 | `supportModifier` | Destek stat degisimi (+ = destek artar) |
 | `suspicionModifier` | Suphe degisimi |
+| `reputationModifier` | Itibar degisimi (+ = artar, - = duser) |
 | `politicalInfluenceModifier` | Politik nufuz degisimi (- = dusurur) |
 | `costModifier` | Maliyet degisimi (int) |
 | `cornerGrabModifier` | Kose kapma stat degisimi (+ = bizim lehimize, sadece yaris aktifken uygulanir) |
@@ -211,6 +212,7 @@ Savas sonucu. Manager tarafindan olusturulur, event'lerle UI'a iletilir.
 | `winChance` | Hesaplanan kazanma sansi |
 | `wealthChange` | Para degisimi (+ kazanc, - kayip) |
 | `suspicionChange` | Suphe degisimi |
+| `reputationChange` | Itibar degisimi |
 | `politicalInfluenceChange` | Siyasi nufuz degisimi |
 
 ---
