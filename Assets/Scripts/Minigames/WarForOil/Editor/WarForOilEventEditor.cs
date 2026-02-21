@@ -240,6 +240,9 @@ public class WarForOilEventEditor : Editor
             EditorGUILayout.PropertyField(
                 choice.FindPropertyRelative("freezesFeed"),
                 new GUIContent("Feed Dondur"));
+            EditorGUILayout.PropertyField(
+                choice.FindPropertyRelative("slowsFeed"),
+                new GUIContent("Feed Yavaşlat"));
 
             SerializedProperty hasFeedOverride = choice.FindPropertyRelative("hasFeedOverride");
             EditorGUILayout.PropertyField(hasFeedOverride, new GUIContent("Feed Yönlendir (Militarizm)"));
@@ -384,6 +387,7 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("dealRewardRatio").floatValue = 0f;
         choice.FindPropertyRelative("blocksEvents").boolValue = false;
         choice.FindPropertyRelative("freezesFeed").boolValue = false;
+        choice.FindPropertyRelative("slowsFeed").boolValue = false;
         choice.FindPropertyRelative("hasFeedOverride").boolValue = false;
         choice.FindPropertyRelative("feedOverrideRatio").floatValue = 0f;
         choice.FindPropertyRelative("feedOverrideDuration").floatValue = 0f;

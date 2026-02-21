@@ -253,6 +253,10 @@ public class WarForOilManager : MonoBehaviour
         if (choice.freezesFeed && SocialMediaManager.Instance != null)
             SocialMediaManager.Instance.TryFreezeFeed();
 
+        //feed yavaşlatma
+        if (choice.slowsFeed && SocialMediaManager.Instance != null)
+            SocialMediaManager.Instance.TrySlowFeed();
+
         //feed yönlendirme (her zaman Militarizm konusuna yönlendirir)
         if (choice.hasFeedOverride && SocialMediaManager.Instance != null)
             SocialMediaManager.Instance.SetEventOverride(TopicType.Militarizm, choice.feedOverrideRatio, choice.feedOverrideDuration);
