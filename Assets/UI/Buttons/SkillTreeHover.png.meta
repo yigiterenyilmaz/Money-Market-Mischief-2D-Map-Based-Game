@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 2c68f0faabc920444a2ad2eba813d839
+guid: 254d2b868d369214d89613ce7384ff1b
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 3632137511935956931
-    second: ButtonDefault 1_0
+      213: -5904536653236030488
+    second: SkillTreeHover_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,7 +100,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ButtonDefault 1_0
+      name: SkillTreeHover_0
       rect:
         serializedVersion: 2
         x: 0
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 3c7505eb2d1f76230800000000000000
-      internalID: 3632137511935956931
+      spriteID: 8e3b79c823fde0ea0800000000000000
+      internalID: -5904536653236030488
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ButtonDefault 1_0: 3632137511935956931
+      SkillTreeHover_0: -5904536653236030488
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
