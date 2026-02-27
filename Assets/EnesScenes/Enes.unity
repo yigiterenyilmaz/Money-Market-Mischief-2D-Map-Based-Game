@@ -255,7 +255,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 4450646308301582934, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       propertyPath: fogStart
-      value: 0.678
+      value: 0.774
       objectReference: {fileID: 0}
     - target: {fileID: 4450646308301582934, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       propertyPath: biome1Ratio
@@ -275,7 +275,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4450646308301582934, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       propertyPath: cornerRadius
-      value: 0.25
+      value: 0.652
       objectReference: {fileID: 0}
     - target: {fileID: 4450646308301582934, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       propertyPath: biome4Color.b
@@ -295,11 +295,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4450646308301582934, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       propertyPath: biome3MaxRatio
-      value: 0.309
+      value: 0.209
       objectReference: {fileID: 0}
     - target: {fileID: 4450646308301582934, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       propertyPath: biome4MaxRatio
-      value: 0.209
+      value: 0.309
       objectReference: {fileID: 0}
     - target: {fileID: 4450646308301582934, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       propertyPath: minSpawnThreshold
@@ -9957,8 +9957,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bfa8aed3e4a23de4c830d90cafb5a698, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapDecorPlacer
-  cellSize: 14
-  coverage: 0.55
+  cellSize: 17
+  coverage: 0.719
   pixelsPerUnit: 100
   spriteZ: -0.5
 --- !u!114 &1710072559
@@ -9978,6 +9978,9 @@ MonoBehaviour:
   settings: {fileID: 11400000, guid: a6071283a4cab464abb307b253fbd4b6, type: 2}
   waterDepthRange: 60
   waterDepthSteps: 6
+  transitionWidth: 24
+  transitionSteps: 4
+  intraRegionWidth: 0.741
 --- !u!114 &1710072560
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9991,7 +9994,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapDecorPlacer
   cellSize: 14
-  coverage: 0.55
+  coverage: 0.389
   pixelsPerUnit: 100
   spriteZ: -0.5
 --- !u!1 &1711406226
@@ -12102,19 +12105,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1410628722910536029, guid: 4b6bc07ee93e983419d0e5694665c043, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 214.08
+      value: 174.9107
       objectReference: {fileID: 0}
     - target: {fileID: 1410628722910536029, guid: 4b6bc07ee93e983419d0e5694665c043, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 214.08
+      value: 174.9107
       objectReference: {fileID: 0}
     - target: {fileID: 1410628722910536029, guid: 4b6bc07ee93e983419d0e5694665c043, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: -852.96
+      value: -872.5447
       objectReference: {fileID: 0}
     - target: {fileID: 1410628722910536029, guid: 4b6bc07ee93e983419d0e5694665c043, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 432.96002
+      value: 452.54468
       objectReference: {fileID: 0}
     - target: {fileID: 1417290776251380893, guid: 4b6bc07ee93e983419d0e5694665c043, type: 3}
       propertyPath: m_SizeDelta.x

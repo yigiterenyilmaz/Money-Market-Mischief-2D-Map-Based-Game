@@ -12,20 +12,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 80544689232b37745b9861d9ea0767c1, type: 3}
   m_Name: BiomePaintSettings
   m_EditorClassIdentifier: Assembly-CSharp::BiomePaintSettings
-  waterDeep: {r: 0.05, g: 0.18, b: 0.52, a: 1}
-  waterShallow: {r: 0.12, g: 0.42, b: 0.72, a: 1}
-  fogColor: {r: 0.7, g: 0.74, b: 0.8, a: 1}
-  forestDark: {r: 0.1, g: 0.38, b: 0.08, a: 1}
-  forestLight: {r: 0.28, g: 0.62, b: 0.18, a: 1}
-  desertShadow: {r: 0.6, g: 0.46, b: 0.22, a: 1}
-  desertHighlight: {r: 0.85, g: 0.74, b: 0.42, a: 1}
-  desertCrack: {r: 0.35, g: 0.24, b: 0.1, a: 1}
-  mountainDark: {r: 0.22, g: 0.22, b: 0.24, a: 1}
-  mountainLight: {r: 0.52, g: 0.52, b: 0.54, a: 1}
-  mountainRidge: {r: 0.85, g: 0.84, b: 0.8, a: 1}
-  plainsDark: {r: 0.22, g: 0.55, b: 0.28, a: 1}
-  plainsLight: {r: 0.45, g: 0.75, b: 0.38, a: 1}
-  forestDecor: []
-  desertDecor: []
-  mountainDecor: []
-  plainsDecor: []
+  waterDeep: {r: 0.121568635, g: 0.14509805, b: 0.27058825, a: 1}
+  waterShallow: {r: 0.2901961, g: 0.34117648, b: 0.45882356, a: 1}
+  fogColor: {r: 0.5176471, g: 0.6117647, b: 0.7058824, a: 1}
+  urbanDark: {r: 0.16078432, g: 0.29411766, b: 0.20392159, a: 1}
+  urbanLight: {r: 0.26666668, g: 0.4431373, b: 0.24705884, a: 1}
+  agriculturalDark: {r: 0.37254903, g: 0.59607846, b: 0.28627452, a: 1}
+  agriculturalLight: {r: 0.28235295, g: 0.46274513, b: 0.26666668, a: 1}
+  citiesDark: {r: 0.3187549, g: 0.4490565, b: 0.297394, a: 1}
+  citiesLight: {r: 0.38739765, g: 0.5471698, b: 0.35411176, a: 1}
+  industrialDark: {r: 0.2899468, g: 0.29803923, b: 0.18039216, a: 1}
+  industrialLight: {r: 0.42796475, g: 0.45882353, b: 0.2784314, a: 1}
+  industrialCrack: {r: 0.3056603, g: 0.21944104, b: 0.13322175, a: 1}
+  urbanDecor:
+  - {fileID: 6892458850344700614, guid: 865d3997a8a283c4c8a795ad2562777c, type: 3}
+  agriculturalDecor:
+  - {fileID: 635046441581133840, guid: b1ffc874fca436d4590498f787adb33c, type: 3}
+  citiesDecor:
+  - {fileID: -801732023309214844, guid: 63fd3ac0cb92cb840956dc756b24acb3, type: 3}
+  industrialDecor:
+  - {fileID: 3632137511935956931, guid: 2c68f0faabc920444a2ad2eba813d839, type: 3}

@@ -14,8 +14,12 @@ public class MapPainter : MonoBehaviour
     [Range(2, 6)]  public int waterDepthSteps = 4;
 
     [Header("Region Transitions")]
-    [Tooltip("How many tiles wide the dither transition band is between two regions")]
-    [Range(1, 20)] public int transitionWidth = 8;
+    [Tooltip("Tile width of the transition band between two different regions")]
+    [Range(1, 30)]  public int transitionWidth = 8;
+    [Tooltip("Number of discrete color steps in the region transition")]
+    [Range(2, 10)]  public int transitionSteps = 4;
+    [Tooltip("0 = hard snap between dark/light within a region, 1 = full gradient")]
+    [Range(0f, 1f)] public float intraRegionWidth = 0.30f;
 
     private MapDecorPlacer decorPlacer;
     private Texture2D mapTexture;
@@ -156,25 +160,25 @@ public class MapPainter : MonoBehaviour
 
     Color PaintLandWithTransition(int x, int y, float seed)
     {
-        int   myBiome = mapGenerator.GetBiome(x, y);
-        float d       = borderDist[x, y];
+        int   myBiome    = mapGenerator.GetBiome(x, y);
+        float d          = borderDist[x, y];
+        int   otherBiome = nearestOther[x, y];
 
-        if (d >= 1f || nearestOther[x, y] == 0)
+        if (d >= 1f || otherBiome == 0)
             return GetBiomeColor(myBiome, x, y, seed);
 
-        // Only the side with lower biome ID drives the transition
-        // This ensures only one region dithers, not both
-        int otherBiome = nearestOther[x, y];
+        // Only the lower-ID biome drives the transition to avoid double bands
         if (myBiome > otherBiome)
             return GetBiomeColor(myBiome, x, y, seed);
 
+        // Warp t with noise so the border line is irregular, not a perfect ring
         float warp = Perlin(x, y, seed + 3000f, 0.05f) * 0.4f - 0.2f;
         float t    = Mathf.Clamp01(d + warp);
 
         Color myColor    = GetBiomeColor(myBiome,    x, y, seed);
         Color otherColor = GetBiomeColor(otherBiome, x, y, seed);
 
-        return DitherTransition(otherColor, myColor, t, x, y, seed);
+        return Color.Lerp(otherColor, myColor, t);
     }
 
     Color GetBiomeColor(int biome, int x, int y, float seed)
@@ -193,48 +197,64 @@ public class MapPainter : MonoBehaviour
     // BIOME PAINT METHODS
     // -------------------------------------------------------------------------
 
-    // Urban — untouched nature, majority base of the country
     Color PaintUrban(int x, int y, float seed)
     {
-        float wx = x + Perlin(x, y, seed + 10f,  0.015f) * 25f;
-        float wy = y + Perlin(x, y, seed + 20f,  0.015f) * 25f;
-        float n  = Mathf.PerlinNoise(wx * 0.03f + seed, wy * 0.03f + seed);
-        float t  = Mathf.InverseLerp(0.40f, 0.60f, n);
-        return DitherTransition(settings.urbanDark, settings.urbanLight, t, x, y, seed);
+        // Layer 1: large landmass-scale variation
+        float n1 = Mathf.PerlinNoise(x * 0.018f + seed,        y * 0.018f + seed);
+        // Layer 2: medium formations — hills, clearings
+        float n2 = Mathf.PerlinNoise(x * 0.045f + seed + 40f,  y * 0.045f + seed + 40f) * 0.5f;
+        // Layer 3: small surface detail — rocks, undergrowth
+        float n3 = Mathf.PerlinNoise(x * 0.11f  + seed + 80f,  y * 0.11f  + seed + 80f) * 0.25f;
+
+        float n = (n1 + n2 + n3) / 1.75f;
+
+        // Hard threshold — no smooth blend, snaps between dark and light
+        // Multiple thresholds create distinct natural bands
+        if (n < 0.35f) return settings.urbanDark;
+        if (n < 0.42f) return Color.Lerp(settings.urbanDark,  settings.urbanLight, 0.33f);
+        if (n < 0.52f) return settings.urbanLight;
+        if (n < 0.60f) return Color.Lerp(settings.urbanDark,  settings.urbanLight, 0.66f);
+        return settings.urbanDark;
     }
 
-    // Agricultural — richer, livelier green than urban
     Color PaintAgricultural(int x, int y, float seed)
     {
-        float wx = x + Perlin(x, y, seed + 110f, 0.015f) * 25f;
-        float wy = y + Perlin(x, y, seed + 120f, 0.015f) * 25f;
-        float n  = Mathf.PerlinNoise(wx * 0.03f + seed + 100f, wy * 0.03f + seed + 100f);
-        float t  = Mathf.InverseLerp(0.40f, 0.60f, n);
-        return DitherTransition(settings.agriculturalDark, settings.agriculturalLight, t, x, y, seed);
+        float wx   = x + Perlin(x, y, seed + 110f, 0.015f) * 25f;
+        float wy   = y + Perlin(x, y, seed + 120f, 0.015f) * 25f;
+        float n    = Mathf.PerlinNoise(wx * 0.03f + seed + 100f, wy * 0.03f + seed + 100f);
+        float half = intraRegionWidth * 0.5f;
+        float t    = Mathf.InverseLerp(0.5f - half, 0.5f + half, n);
+        t = Mathf.Floor(t * transitionSteps) / (transitionSteps - 1);
+        t = Mathf.Clamp01(t);
+        return Color.Lerp(settings.agriculturalDark, settings.agriculturalLight, t);
     }
 
-    // Cities — pale concrete tones
     Color PaintCities(int x, int y, float seed)
     {
-        float wx = x + Perlin(x, y, seed + 310f, 0.015f) * 25f;
-        float wy = y + Perlin(x, y, seed + 320f, 0.015f) * 25f;
-        float n  = Mathf.PerlinNoise(wx * 0.03f + seed + 300f, wy * 0.03f + seed + 300f);
-        float t  = Mathf.InverseLerp(0.40f, 0.60f, n);
-        return DitherTransition(settings.citiesDark, settings.citiesLight, t, x, y, seed);
+        float wx   = x + Perlin(x, y, seed + 310f, 0.015f) * 25f;
+        float wy   = y + Perlin(x, y, seed + 320f, 0.015f) * 25f;
+        float n    = Mathf.PerlinNoise(wx * 0.03f + seed + 300f, wy * 0.03f + seed + 300f);
+        float half = intraRegionWidth * 0.5f;
+        float t    = Mathf.InverseLerp(0.5f - half, 0.5f + half, n);
+        t = Mathf.Floor(t * transitionSteps) / (transitionSteps - 1);
+        t = Mathf.Clamp01(t);
+        return Color.Lerp(settings.citiesDark, settings.citiesLight, t);
     }
 
-    // Industrial — cracked dark earth
     Color PaintIndustrial(int x, int y, float seed)
     {
-        float wx = x + Perlin(x, y, seed + 610f, 0.015f) * 25f;
-        float wy = y + Perlin(x, y, seed + 620f, 0.015f) * 25f;
-        float n  = Mathf.PerlinNoise(wx * 0.03f + seed + 600f, wy * 0.03f + seed + 600f);
+        float wx   = x + Perlin(x, y, seed + 610f, 0.015f) * 25f;
+        float wy   = y + Perlin(x, y, seed + 620f, 0.015f) * 25f;
+        float n    = Mathf.PerlinNoise(wx * 0.03f + seed + 600f, wy * 0.03f + seed + 600f);
 
         float crack = Mathf.PerlinNoise(x * 0.06f + seed + 700f, y * 0.06f + seed + 700f);
         if (crack > 0.76f) return settings.industrialCrack;
 
-        float t = Mathf.InverseLerp(0.40f, 0.60f, n);
-        return DitherTransition(settings.industrialDark, settings.industrialLight, t, x, y, seed);
+        float half = intraRegionWidth * 0.5f;
+        float t    = Mathf.InverseLerp(0.5f - half, 0.5f + half, n);
+        t = Mathf.Floor(t * transitionSteps) / (transitionSteps - 1);
+        t = Mathf.Clamp01(t);
+        return Color.Lerp(settings.industrialDark, settings.industrialLight, t);
     }
 
     // -------------------------------------------------------------------------
@@ -293,28 +313,8 @@ public class MapPainter : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // DITHER
+    // HELPERS
     // -------------------------------------------------------------------------
-
-    Color DitherTransition(Color a, Color b, float t, int x, int y, float seed)
-    {
-        t = Mathf.Clamp01(t);
-        float bayerThreshold = BayerMatrix(x % 4, y % 4) / 16f;
-        float noise          = Perlin(x, y, seed + 5000f, 0.08f) * 0.3f - 0.15f;
-        float threshold      = Mathf.Clamp01(bayerThreshold + noise);
-        return t > threshold ? b : a;
-    }
-
-    static int BayerMatrix(int x, int y)
-    {
-        int[,] bayer4 = {
-            {  0,  8,  2, 10 },
-            { 12,  4, 14,  6 },
-            {  3, 11,  1,  9 },
-            { 15,  7, 13,  5 }
-        };
-        return bayer4[y, x];
-    }
 
     static float Perlin(int x, int y, float seed, float scale)
         => Mathf.PerlinNoise(x * scale + seed, y * scale + seed);
