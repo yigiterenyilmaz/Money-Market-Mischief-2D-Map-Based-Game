@@ -16,8 +16,8 @@ public class WarForOilEvent : ScriptableObject
     [FormerlySerializedAs("skillNote")]
     [TextArea(3, 10)] public string eventNote; //geliştiriciler için event açıklama notu, oyuna etkisi yok
 
-    public float minWarTime = 0f; //bu event savaş başladıktan en az kaç saniye sonra gelebilir
-    public float maxWarTime = -1f; //bu event savaş başladıktan en geç kaç saniye sonra gelebilir (-1 = sınırsız)
+    [Range(0f, 1f)] public float minWarTime = 0f; //savaş süresinin yüzdesi olarak en erken tetiklenme (0.2 = %20, 300sn savaşta 60sn)
+    [Range(-1f, 1f)] public float maxWarTime = -1f; //savaş süresinin yüzdesi olarak en geç tetiklenme (-1 = sınırsız, 0.8 = %80)
     public float decisionTime = 10f; //karar süresi (saniye)
     public bool isRepeatable; //aynı savaşta tekrar tetiklenebilir mi
     public bool isUnlimitedRepeat; //sınırsız tekrar (isRepeatable true ise)
@@ -80,9 +80,13 @@ public class WarForOilEventChoice
     //feed etkileri
     public bool freezesFeed; //seçilince sosyal medya feed'ini dondurur (SocialMediaManager.TryFreezeFeed)
     public bool slowsFeed; //seçilince sosyal medya feed'ini yavaşlatır (SocialMediaManager.TrySlowFeed)
-    public bool hasFeedOverride; //feed'i Militarizm konusuna yönlendirir (SocialMediaManager.SetEventOverride)
+    public bool hasFeedOverride; //feed'i belirli bir konuya yönlendirir (SocialMediaManager.SetEventOverride)
+    public TopicType feedOverrideTopic; //yönlendirilecek konu
     [Range(0f, 1f)] public float feedOverrideRatio; //yönlendirme oranı (0-1, örn. 0.8 = %80)
-    public float feedOverrideDuration; //yönlendirme süresi (saniye)
+    public bool hasCounterFeedTopic; //2. konu — istenmeyen konuları bastırmak için feed'e eklenir
+    public TopicType counterFeedTopic; //counter konu
+    [Range(0f, 1f)] public float counterFeedRatio; //counter konu oranı (0-1)
+    public float feedOverrideDuration; //yönlendirme süresi (saniye, her iki topic için ortak)
 
     //diğer sonuçlar (Editor tarafından foldout içinde çizilir)
     public bool endsWar; //bu seçenek savaşı bitirir mi
@@ -93,6 +97,7 @@ public class WarForOilEventChoice
     public float dealDelay; //anlaşma kaç saniye sonra savaşı bitirir (0 = anında)
     [Range(0f, 1f)] public float dealRewardRatio; //normal kazanımın bu oranı garanti verilir (0.8 = %80)
     public bool blocksEvents; //seçilirse savaş sonuna kadar yeni event gelmez
+    [Range(0, 10)] public int eventBlockCycles; //seçilirse bu kadar event dönemi boyunca event gelmez (0 = etkisiz)
     public bool blocksCeasefire; //seçilirse savaş sonuna kadar ateşkes yapılamaz
     public bool blocksEventGroup; //seçilirse belirtilen gruptaki tüm eventler bir daha tetiklenmez
     public ScriptableObject blockedGroup; //engellenecek grup (WTETWCEventGroup veya OFPCEventGroup sürüklenebilir)

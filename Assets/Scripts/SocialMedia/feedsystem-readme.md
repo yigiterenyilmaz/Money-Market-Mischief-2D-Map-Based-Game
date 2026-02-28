@@ -39,7 +39,7 @@ Oyun boyunca akan sosyal medya yorumlarını yöneten sistem.
 - Ancak hassas konuda yapılan manipülasyonlar daha etkili olacak
 
 ## Topic'ler
-Vergi, Politika, Skandal, Borsa, Teknoloji, Emlak, Bankacılık, Sosyete, Spor, Genel
+Tax, Politics, Scandal, StockMarket, Technology, RealEstate, Banking, Celebrity, Sports, General, Militarism, WarJustification, AntiWarSpeech
 
 ## Özet
 ```

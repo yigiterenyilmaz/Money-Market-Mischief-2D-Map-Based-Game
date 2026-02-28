@@ -90,7 +90,7 @@ Oyunda sürekli akan bir sosyal medya feed'i var. Bu feed oyuncudan bağımsız 
 
 ### Feed Nedir?
 
-Feed, oyun ekranında sürekli akan bir yorum akışıdır. Her yorum bir "konu" (topic) hakkındadır: Vergi, Politika, Skandal, Borsa, Teknoloji, Emlak, Bankacılık, Sosyete, Spor veya Genel. Yorumlar belirli aralıklarla otomatik olarak düşer ve oyuncu bunları okuyarak oyundaki durumu anlar.
+Feed, oyun ekranında sürekli akan bir yorum akışıdır. Her yorum bir "konu" (topic) hakkındadır: Tax, Politics, Scandal, StockMarket, Technology, RealEstate, Banking, Celebrity, Sports, General, Militarism, WarJustification, AntiWarSpeech. Yorumlar belirli aralıklarla otomatik olarak düşer ve oyuncu bunları okuyarak oyundaki durumu anlar.
 
 Konular `TopicType` enum'ında tanımlı, yorumlar `SocialMediaPost` olarak tutulur.
 

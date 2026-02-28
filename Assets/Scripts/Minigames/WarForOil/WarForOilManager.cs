@@ -35,6 +35,7 @@ public class WarForOilManager : MonoBehaviour
     private int accumulatedCostModifier;
     private float rewardMultiplier; //baseRewardReduction'lar sonucu biriken ödül çarpanı (1.0'dan başlar)
     private bool eventsBlocked; //bir choice eventleri engelledi mi
+    private int remainingBlockCycles; //geçici event engeli — kalan dönem sayısı
     private bool ceasefireBlocked; //bir choice ateşkesi engelledi mi
     private bool pendingDeal; //anlaşmayla bitirme aktif mi
     private float dealRewardRatio; //anlaşma ödül oranı
@@ -279,9 +280,14 @@ public class WarForOilManager : MonoBehaviour
         if (choice.slowsFeed && SocialMediaManager.Instance != null)
             SocialMediaManager.Instance.TrySlowFeed();
 
-        //feed yönlendirme (her zaman Militarizm konusuna yönlendirir)
+        //feed yönlendirme
         if (choice.hasFeedOverride && SocialMediaManager.Instance != null)
-            SocialMediaManager.Instance.SetEventOverride(TopicType.Militarizm, choice.feedOverrideRatio, choice.feedOverrideDuration);
+        {
+            if (choice.hasCounterFeedTopic)
+                SocialMediaManager.Instance.SetEventOverride(choice.feedOverrideTopic, choice.feedOverrideRatio, choice.counterFeedTopic, choice.counterFeedRatio, choice.feedOverrideDuration);
+            else
+                SocialMediaManager.Instance.SetEventOverride(choice.feedOverrideTopic, choice.feedOverrideRatio, choice.feedOverrideDuration);
+        }
 
         //supportStat güncelle
         supportStat = Mathf.Clamp(supportStat + choice.supportModifier, 0f, 100f);
@@ -443,6 +449,10 @@ public class WarForOilManager : MonoBehaviour
         //event engelleme (blocksEvents, endsWar veya anlaşma seçildiyse artık event gelmez)
         if (choice.blocksEvents || choice.endsWar || choice.endsWarWithDeal)
             eventsBlocked = true;
+
+        //geçici event engeli — belirli dönem boyunca event gelmez
+        if (choice.eventBlockCycles > 0)
+            remainingBlockCycles = choice.eventBlockCycles;
 
         //ateşkes engelleme
         if (choice.blocksCeasefire)
@@ -751,7 +761,16 @@ public class WarForOilManager : MonoBehaviour
         if (eventCheckTimer >= database.eventInterval)
         {
             eventCheckTimer = 0f;
-            TryTriggerWarEvent();
+
+            //geçici event engeli aktifse dönem say ve atla
+            if (remainingBlockCycles > 0)
+            {
+                remainingBlockCycles--;
+            }
+            else
+            {
+                TryTriggerWarEvent();
+            }
 
             //event tetiklendiyse bu frame'de savaş sonucu hesaplama
             if (currentState != WarForOilState.WarProcess) return;
@@ -1919,8 +1938,8 @@ public class WarForOilManager : MonoBehaviour
             for (int i = 0; i < eventPool.Count; i++)
             {
                 WarForOilEvent evt = eventPool[i];
-                if (warTimer < evt.minWarTime) continue;
-                if (evt.maxWarTime >= 0f && warTimer > evt.maxWarTime) continue;
+                if (warTimer < evt.minWarTime * database.warDuration) continue;
+                if (evt.maxWarTime >= 0f && warTimer > evt.maxWarTime * database.warDuration) continue;
                 if (dismissedEventIds.Contains(evt.id)) continue;
                 if (IsBlockedByGroup(evt)) continue;
 
@@ -1938,8 +1957,8 @@ public class WarForOilManager : MonoBehaviour
             for (int i = 0; i < database.protestEvents.Count; i++)
             {
                 WarForOilEvent evt = database.protestEvents[i];
-                if (warTimer < evt.minWarTime) continue;
-                if (evt.maxWarTime >= 0f && warTimer > evt.maxWarTime) continue;
+                if (warTimer < evt.minWarTime * database.warDuration) continue;
+                if (evt.maxWarTime >= 0f && warTimer > evt.maxWarTime * database.warDuration) continue;
                 if (dismissedEventIds.Contains(evt.id)) continue;
                 if (IsBlockedByGroup(evt)) continue;
 
@@ -1958,8 +1977,8 @@ public class WarForOilManager : MonoBehaviour
             for (int i = 0; i < mediaPursuitPool.Count; i++)
             {
                 WarForOilEvent evt = mediaPursuitPool[i];
-                if (warTimer < evt.minWarTime) continue;
-                if (evt.maxWarTime >= 0f && warTimer > evt.maxWarTime) continue;
+                if (warTimer < evt.minWarTime * database.warDuration) continue;
+                if (evt.maxWarTime >= 0f && warTimer > evt.maxWarTime * database.warDuration) continue;
                 if (dismissedEventIds.Contains(evt.id)) continue;
                 if (IsBlockedByGroup(evt)) continue;
 

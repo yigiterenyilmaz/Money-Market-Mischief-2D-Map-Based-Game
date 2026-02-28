@@ -15,6 +15,7 @@ public class WarForOilEventEditor : Editor
     private Dictionary<int, bool> vandalismFoldouts = new Dictionary<int, bool>();
     private Dictionary<int, bool> mediaPursuitFoldouts = new Dictionary<int, bool>();
     private Dictionary<int, bool> feedFoldouts = new Dictionary<int, bool>();
+    private Dictionary<int, bool> rewardFoldouts = new Dictionary<int, bool>();
     private bool chainFoldout;
 
     public override void OnInspectorGUI()
@@ -275,14 +276,75 @@ public class WarForOilEventEditor : Editor
                 EditorGUI.indentLevel--;
             }
 
-            SerializedProperty reducesReward = choice.FindPropertyRelative("reducesReward");
-            EditorGUILayout.PropertyField(reducesReward, new GUIContent("Ödül Düşür"));
-            if (reducesReward.boolValue)
+            //ödül düşür — alt foldout
+            if (!rewardFoldouts.ContainsKey(index))
+                rewardFoldouts[index] = false;
+            rewardFoldouts[index] = EditorGUILayout.Foldout(
+                rewardFoldouts[index], "Ödül Düşür", true);
+
+            if (rewardFoldouts[index])
             {
                 EditorGUI.indentLevel++;
-                EditorGUILayout.PropertyField(
-                    choice.FindPropertyRelative("baseRewardReduction"),
-                    new GUIContent("Oran"));
+
+                //direkt ödül düşürme
+                SerializedProperty reducesReward = choice.FindPropertyRelative("reducesReward");
+                EditorGUILayout.PropertyField(reducesReward, new GUIContent("Ödül Düşür"));
+                if (reducesReward.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("baseRewardReduction"),
+                        new GUIContent("Oran"));
+                    EditorGUI.indentLevel--;
+                }
+
+                //olasılıklı ödül düşürme
+                SerializedProperty hasProbReward = choice.FindPropertyRelative("hasProbabilisticRewardReduction");
+                EditorGUILayout.PropertyField(hasProbReward, new GUIContent("Olasılıklı Ödül Düşür"));
+                if (hasProbReward.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+
+                    SerializedProperty probRetrigger = choice.FindPropertyRelative("probRetriggerChance");
+                    SerializedProperty probReduction = choice.FindPropertyRelative("probRewardReductionChance");
+
+                    //tekrar tetiklenme şansı
+                    probRetrigger.isExpanded = EditorGUILayout.Foldout(probRetrigger.isExpanded, "Tekrar Tetiklenme Şansı", true);
+                    if (probRetrigger.isExpanded)
+                    {
+                        EditorGUI.indentLevel++;
+                        EditorGUILayout.Slider(probRetrigger, 0f, 1f, GUIContent.none);
+                        EditorGUI.indentLevel--;
+                    }
+
+                    //ödül düşme şansı
+                    probReduction.isExpanded = EditorGUILayout.Foldout(probReduction.isExpanded, "Ödül Düşme Şansı", true);
+                    if (probReduction.isExpanded)
+                    {
+                        EditorGUI.indentLevel++;
+                        EditorGUILayout.Slider(probReduction, 0f, 1f, GUIContent.none);
+                        EditorGUI.indentLevel--;
+                    }
+
+                    float nothingChance = 1f - probRetrigger.floatValue - probReduction.floatValue;
+                    if (nothingChance < 0f) nothingChance = 0f;
+                    EditorGUILayout.HelpBox(
+                        $"Hiçbir şey olmama: %{nothingChance * 100f:F0}",
+                        MessageType.Info);
+
+                    //ödül düşme miktarı
+                    SerializedProperty probAmount = choice.FindPropertyRelative("probRewardReductionAmount");
+                    probAmount.isExpanded = EditorGUILayout.Foldout(probAmount.isExpanded, "Düşme Miktarı", true);
+                    if (probAmount.isExpanded)
+                    {
+                        EditorGUI.indentLevel++;
+                        EditorGUILayout.Slider(probAmount, 0f, 1f, GUIContent.none);
+                        EditorGUI.indentLevel--;
+                    }
+
+                    EditorGUI.indentLevel--;
+                }
+
                 EditorGUI.indentLevel--;
             }
 
@@ -303,6 +365,9 @@ public class WarForOilEventEditor : Editor
             EditorGUILayout.PropertyField(
                 choice.FindPropertyRelative("blocksEvents"),
                 new GUIContent("Event Engelle"));
+            EditorGUILayout.IntSlider(
+                choice.FindPropertyRelative("eventBlockCycles"),
+                0, 10, new GUIContent("Event Dondur (Dönem)"));
             EditorGUILayout.PropertyField(
                 choice.FindPropertyRelative("blocksCeasefire"),
                 new GUIContent("Ateşkes Engelle"));
@@ -314,52 +379,6 @@ public class WarForOilEventEditor : Editor
                 EditorGUILayout.PropertyField(
                     choice.FindPropertyRelative("blockedGroup"),
                     new GUIContent("Engellenecek Grup"));
-                EditorGUI.indentLevel--;
-            }
-
-            SerializedProperty hasProbReward = choice.FindPropertyRelative("hasProbabilisticRewardReduction");
-            EditorGUILayout.PropertyField(hasProbReward, new GUIContent("Olasılıklı Ödül Düşür"));
-            if (hasProbReward.boolValue)
-            {
-                EditorGUI.indentLevel++;
-
-                SerializedProperty probRetrigger = choice.FindPropertyRelative("probRetriggerChance");
-                SerializedProperty probReduction = choice.FindPropertyRelative("probRewardReductionChance");
-
-                //tekrar tetiklenme şansı
-                probRetrigger.isExpanded = EditorGUILayout.Foldout(probRetrigger.isExpanded, "Tekrar Tetiklenme Şansı", true);
-                if (probRetrigger.isExpanded)
-                {
-                    EditorGUI.indentLevel++;
-                    EditorGUILayout.Slider(probRetrigger, 0f, 1f, GUIContent.none);
-                    EditorGUI.indentLevel--;
-                }
-
-                //ödül düşme şansı
-                probReduction.isExpanded = EditorGUILayout.Foldout(probReduction.isExpanded, "Ödül Düşme Şansı", true);
-                if (probReduction.isExpanded)
-                {
-                    EditorGUI.indentLevel++;
-                    EditorGUILayout.Slider(probReduction, 0f, 1f, GUIContent.none);
-                    EditorGUI.indentLevel--;
-                }
-
-                float nothingChance = 1f - probRetrigger.floatValue - probReduction.floatValue;
-                if (nothingChance < 0f) nothingChance = 0f;
-                EditorGUILayout.HelpBox(
-                    $"Hiçbir şey olmama: %{nothingChance * 100f:F0}",
-                    MessageType.Info);
-
-                //ödül düşme miktarı
-                SerializedProperty probAmount = choice.FindPropertyRelative("probRewardReductionAmount");
-                probAmount.isExpanded = EditorGUILayout.Foldout(probAmount.isExpanded, "Düşme Miktarı", true);
-                if (probAmount.isExpanded)
-                {
-                    EditorGUI.indentLevel++;
-                    EditorGUILayout.Slider(probAmount, 0f, 1f, GUIContent.none);
-                    EditorGUI.indentLevel--;
-                }
-
                 EditorGUI.indentLevel--;
             }
 
@@ -432,13 +451,31 @@ public class WarForOilEventEditor : Editor
                 new GUIContent("Feed Yavaşlat"));
 
             SerializedProperty hasFeedOverride = choice.FindPropertyRelative("hasFeedOverride");
-            EditorGUILayout.PropertyField(hasFeedOverride, new GUIContent("Feed Yönlendir (Militarizm)"));
+            EditorGUILayout.PropertyField(hasFeedOverride, new GUIContent("Feed Yönlendir"));
             if (hasFeedOverride.boolValue)
             {
                 EditorGUI.indentLevel++;
                 EditorGUILayout.PropertyField(
+                    choice.FindPropertyRelative("feedOverrideTopic"),
+                    new GUIContent("Konu"));
+                EditorGUILayout.PropertyField(
                     choice.FindPropertyRelative("feedOverrideRatio"),
                     new GUIContent("Oran"));
+
+                SerializedProperty hasCounter = choice.FindPropertyRelative("hasCounterFeedTopic");
+                EditorGUILayout.PropertyField(hasCounter, new GUIContent("Counter Topic"));
+                if (hasCounter.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("counterFeedTopic"),
+                        new GUIContent("Konu"));
+                    SerializedProperty counterRatio = choice.FindPropertyRelative("counterFeedRatio");
+                    float maxCounter = 1f - choice.FindPropertyRelative("feedOverrideRatio").floatValue;
+                    EditorGUILayout.Slider(counterRatio, 0f, maxCounter, new GUIContent("Oran"));
+                    EditorGUI.indentLevel--;
+                }
+
                 EditorGUILayout.PropertyField(
                     choice.FindPropertyRelative("feedOverrideDuration"),
                     new GUIContent("Süre (sn)"));
@@ -614,6 +651,7 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("dealDelay").floatValue = 0f;
         choice.FindPropertyRelative("dealRewardRatio").floatValue = 0f;
         choice.FindPropertyRelative("blocksEvents").boolValue = false;
+        choice.FindPropertyRelative("eventBlockCycles").intValue = 0;
         choice.FindPropertyRelative("blocksCeasefire").boolValue = false;
         choice.FindPropertyRelative("blocksEventGroup").boolValue = false;
         choice.FindPropertyRelative("blockedGroup").objectReferenceValue = null;
@@ -628,7 +666,11 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("freezesFeed").boolValue = false;
         choice.FindPropertyRelative("slowsFeed").boolValue = false;
         choice.FindPropertyRelative("hasFeedOverride").boolValue = false;
+        choice.FindPropertyRelative("feedOverrideTopic").enumValueIndex = 0;
         choice.FindPropertyRelative("feedOverrideRatio").floatValue = 0f;
+        choice.FindPropertyRelative("hasCounterFeedTopic").boolValue = false;
+        choice.FindPropertyRelative("counterFeedTopic").enumValueIndex = 0;
+        choice.FindPropertyRelative("counterFeedRatio").floatValue = 0f;
         choice.FindPropertyRelative("feedOverrideDuration").floatValue = 0f;
         choice.FindPropertyRelative("continuesChain").boolValue = false;
         choice.FindPropertyRelative("isChainRefusal").boolValue = false;

@@ -14,4 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OFPCEventGroup
   id: 
   description: 
-  members: []
+  members:
+  - {fileID: 11400000, guid: cf0d445cb95656b4b96531f9603eb13a, type: 2}
+  - {fileID: 11400000, guid: e01b81f87d3f42145bf19689cee982d5, type: 2}

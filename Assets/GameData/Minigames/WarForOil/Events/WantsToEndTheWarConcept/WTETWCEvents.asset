@@ -14,5 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WTETWCEventGroup
   id: 
   description: 
-  members: []
-  maxTriggerCount: -1
+  members:
+  - warEvent: {fileID: 11400000, guid: 331b7e45d631938468700ae16b8a7541, type: 2}
+    weightLevel: 2
+  - warEvent: {fileID: 11400000, guid: d5766e0beea51aa45bc7cace452f768f, type: 2}
+    weightLevel: 2
+  - warEvent: {fileID: 11400000, guid: 5a36fee3d4f17ea45b99637185b66d9e, type: 2}
+    weightLevel: 1
+  maxTriggerCount: 2

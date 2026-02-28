@@ -34,7 +34,7 @@ MonoBehaviour:
     sonraki eventte protest ba\u015Flama ihtimali %30 artar\n\n\nbe\u015Finci se\xE7enek
     r\xFC\u015Fvetlemektir \"b\xFCy\xFCk ihtimalle\" ve daha az \u015F\xFCpheyle
     ikna eder"
-  minWarTime: 90
+  minWarTime: 0.3
   decisionTime: 30
   isRepeatable: 0
   isUnlimitedRepeat: 0

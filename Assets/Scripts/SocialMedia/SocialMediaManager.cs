@@ -59,6 +59,9 @@ public class SocialMediaManager : MonoBehaviour
     private bool hasOverride = false;
     private TopicType overrideTopic;
     private float overrideRatio;
+    private bool hasCounterTopic = false;
+    private TopicType counterTopic;
+    private float counterRatio;
     private float overrideTimer = 0f;
     private float overrideDuration;
 
@@ -238,6 +241,23 @@ public class SocialMediaManager : MonoBehaviour
         hasOverride = true;
         overrideTopic = topic;
         overrideRatio = Mathf.Clamp01(ratio);
+        hasCounterTopic = false;
+        overrideDuration = duration;
+        overrideTimer = 0f;
+
+        OnOverrideStarted?.Invoke(overrideTopic, overrideDuration);
+    }
+
+    //event choice ile feed'i override eder + counter topic ekler
+    public void SetEventOverride(TopicType topic, float ratio, TopicType counter, float cRatio, float duration)
+    {
+        hasOverride = true;
+        overrideTopic = topic;
+        overrideRatio = Mathf.Clamp01(ratio);
+        hasCounterTopic = true;
+        counterTopic = counter;
+        //counter ratio, ana ratio ile toplamı 1'i geçmeyecek şekilde sınırlanır
+        counterRatio = Mathf.Clamp(cRatio, 0f, 1f - overrideRatio);
         overrideDuration = duration;
         overrideTimer = 0f;
 
@@ -247,6 +267,7 @@ public class SocialMediaManager : MonoBehaviour
     private void EndOverride()
     {
         hasOverride = false;
+        hasCounterTopic = false;
         overrideTimer = 0f;
         OnOverrideEnded?.Invoke();
     }
@@ -424,10 +445,20 @@ public class SocialMediaManager : MonoBehaviour
             activeRatio = naturalTrendRatio;
         }
 
-        //aktif topic'ten mi yoksa diğerlerinden mi?
-        bool useActiveTopic = UnityEngine.Random.value < activeRatio;
+        //aktif topic'ten mi, counter topic'ten mi, yoksa diğerlerinden mi?
+        float roll = UnityEngine.Random.value;
+        TopicType? selectedTopic = null;
 
-        List<SocialMediaPost> eligiblePosts = GetEligiblePosts(useActiveTopic ? activeTopic : (TopicType?)null);
+        if (roll < activeRatio)
+        {
+            selectedTopic = activeTopic;
+        }
+        else if (hasOverride && hasCounterTopic && roll < activeRatio + counterRatio)
+        {
+            selectedTopic = counterTopic;
+        }
+
+        List<SocialMediaPost> eligiblePosts = GetEligiblePosts(selectedTopic);
 
         if (eligiblePosts.Count == 0)
         {

@@ -12,17 +12,197 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
   m_Name: ReduceTheSupportEvent
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
-  id: 
-  displayName: 
-  description: 
+  id: wfo_ofpc_02
+  displayName: Reduce War Support Offer
+  description: 'The opposing country offers you a sum of money to reduce your country''s
+    support for the war.
+
+    The proposal aims to temporarily cut your military
+    and logistical contribution.
+
+    Your decision may shift the balance of the
+    conflict in the short term.
+
+    This move could give the enemy time to recover.'
   devNote: 
-  eventNote: 
-  minWarTime: 0
+  eventNote: "d\xFC\u015Fman \xFClke para kar\u015F\u0131l\u0131\u011F\u0131nda kendi
+    \xFClkemize deste\u011Fi k\u0131smam\u0131z\u0131 teklif eder kabul edilirse
+    ele ke\u015F para ge\xE7er ancak siyasi n\xFCfuz ve itibar kaybederiz \u015F\xFCphe
+    art\u0131\u015F\u0131 olur\n\nveya d\xFCzg\xFCnce reddedip sava\u015Fa devam
+    ederiz \n\nveya teklifi if\u015Fa ederiz ancak daha sonra ate\u015Fkes istemenin
+    \xF6n\xFC kapan\u0131r(eventlerle ate\u015Fkese ba\u011Flanmak hala m\xFCmk\xFCn)"
+  minWarTime: 0.1
+  maxWarTime: 0.37
   decisionTime: 10
-  isRepeatable: 0
-  isUnlimitedRepeat: 0
+  isRepeatable: 1
+  isUnlimitedRepeat: 1
   maxRepeatCount: 1
-  choices: []
+  choices:
+  - displayName: Accept the Money
+    description: You take the money and temporarily reduce support; your country
+      struggles while the enemy recovers.
+    supportModifier: -11
+    suspicionModifier: 4
+    reputationModifier: -2
+    politicalInfluenceModifier: -5
+    costModifier: 0
+    wealthModifier: 100000
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills: []
+    statConditions: []
+  - displayName: Reject
+    description: You reject the offer and maintain support; the war balance remains
+      unchanged.
+    supportModifier: 4
+    suspicionModifier: 0
+    reputationModifier: 1
+    politicalInfluenceModifier: 1
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills: []
+    statConditions: []
+  - displayName: Reject and Expose
+    description: You reject the offer and reveal it publicly; war support increases
+      and the option to request a ceasefire is permanently closed.
+    supportModifier: 4
+    suspicionModifier: 0
+    reputationModifier: 2
+    politicalInfluenceModifier: 2
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    blocksCeasefire: 1
+    blocksEventGroup: 1
+    blockedGroup: {fileID: 11400000, guid: 174af44c597cf1d46942126c7fcb0074, type: 2}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills: []
+    statConditions: []
   defaultChoiceIndex: -1
   isVandalismEvent: 0
   vandalismLevelOnTrigger: 0

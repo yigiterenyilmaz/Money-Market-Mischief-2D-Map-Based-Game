@@ -1,14 +1,16 @@
 public enum TopicType
 {
-    Vergi,
-    Politika,
-    Skandal,
-    Borsa,
-    Teknoloji,
-    Emlak,
-    Bankacilik,
-    Sosyete,
-    Spor,
-    Genel,
-    Militarizm
+    Tax,
+    Politics,
+    Scandal,
+    StockMarket,
+    Technology,
+    RealEstate,
+    Banking,
+    Celebrity,
+    Sports,
+    General,
+    Militarism,
+    WarJustification,
+    AntiWarSpeech
 }

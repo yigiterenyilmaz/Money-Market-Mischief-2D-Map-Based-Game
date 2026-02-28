@@ -187,8 +187,8 @@ Savas sirasinda tetiklenen karar olaylari. Ayni event sinifi normal eventler, zi
 | `displayName` | Event basligi |
 | `description` | Event aciklamasi (TextArea) |
 | `devNote` | Sadece Inspector'da gorunen gelistirici notu (oyuna etkisi yok) |
-| `minWarTime` | Bu event savas basladiginda en az kac saniye sonra gelebilir |
-| `maxWarTime` | Bu event savas basladiginda en gec kac saniye sonra gelebilir (-1 = sinirsiz) |
+| `minWarTime` | Savas suresinin yuzdesi olarak en erken tetiklenme (0-1, orn. 0.2 = %20, 300sn savasta 60sn) |
+| `maxWarTime` | Savas suresinin yuzdesi olarak en gec tetiklenme (-1 = sinirsiz, 0-1 arasi yuzde) |
 | `decisionTime` | Karar suresi (varsayilan 10 sn) |
 | `isRepeatable` | Ayni savasta tekrar tetiklenebilir mi |
 | `isUnlimitedRepeat` | Sinirsiz tekrar (isRepeatable true ise, maxRepeatCount yok sayilir) |
@@ -251,6 +251,7 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `dealDelay` | Anlasma kac saniye sonra savasi bitirir |
 | `dealRewardRatio` | Normal kazanimin bu orani garanti verilir (0.8 = %80) |
 | `blocksEvents` | Secilirse savas sonuna kadar yeni event gelmez |
+| `eventBlockCycles` | Gecici event engeli — bu kadar event donemi boyunca event gelmez (0-10, 0=etkisiz) |
 | `blocksCeasefire` | Secilirse savas sonuna kadar oyuncunun ateskes butonu engellenir |
 | `blocksEventGroup` | Secilirse bu event'in ait oldugu gruptaki (OFPC/WTETWC) tum eventler bir daha tetiklenmez |
 | `hasProbabilisticWarEnd` | Olasilik bazli savas bitirme (3 sonuc: savas biter / event yok olur / tekrar tetiklenir) |
@@ -264,9 +265,13 @@ Event icindeki tek bir secenek. Serializable sinif.
 | **Feed Sonuclari** (foldout) | |
 | `freezesFeed` | Secilince sosyal medya feed'ini dondurur (SocialMediaManager.TryFreezeFeed) |
 | `slowsFeed` | Secilince sosyal medya feed'ini yavaslatir (SocialMediaManager.TrySlowFeed) |
-| `hasFeedOverride` | Feed'i Militarizm konusuna yonlendirir (SocialMediaManager.SetEventOverride) |
+| `hasFeedOverride` | Feed'i belirli bir konuya yonlendirir (SocialMediaManager.SetEventOverride) |
+| `feedOverrideTopic` | Yonlendirilecek konu (TopicType enum) |
 | `feedOverrideRatio` | Yonlendirme orani (0-1, orn. 0.8 = %80) |
-| `feedOverrideDuration` | Yonlendirme suresi (saniye) |
+| `hasCounterFeedTopic` | 2. konu ekler — istenmeyen konulari bastirmak icin |
+| `counterFeedTopic` | Counter konu (TopicType enum) |
+| `counterFeedRatio` | Counter konu orani (0-1) |
+| `feedOverrideDuration` | Yonlendirme suresi (saniye, her iki topic icin ortak) |
 | **Zincir Flagleri** (foldout) | |
 | `continuesChain` | Zinciri devam ettirir (fonlama) |
 | `isChainRefusal` | Zincirde reddetme sayacini artirir |
