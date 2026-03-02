@@ -12,6 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 80544689232b37745b9861d9ea0767c1, type: 3}
   m_Name: BiomePaintSettings
   m_EditorClassIdentifier: Assembly-CSharp::BiomePaintSettings
+  beachDark: {r: 0.72, g: 0.62, b: 0.38, a: 1}
+  beachLight: {r: 0.86, g: 0.78, b: 0.52, a: 1}
   waterDeep: {r: 0.121568635, g: 0.14509805, b: 0.27058825, a: 1}
   waterShallow: {r: 0.2901961, g: 0.34117648, b: 0.45882356, a: 1}
   fogColor: {r: 0.5176471, g: 0.6117647, b: 0.7058824, a: 1}
@@ -25,10 +27,9 @@ MonoBehaviour:
   industrialLight: {r: 0.42796475, g: 0.45882353, b: 0.2784314, a: 1}
   industrialCrack: {r: 0.3056603, g: 0.21944104, b: 0.13322175, a: 1}
   urbanDecor:
-  - {fileID: 6892458850344700614, guid: 865d3997a8a283c4c8a795ad2562777c, type: 3}
-  agriculturalDecor:
-  - {fileID: 635046441581133840, guid: b1ffc874fca436d4590498f787adb33c, type: 3}
+  - {fileID: 7944620761231817343, guid: 2102a7978623df343a343c25ecaa185c, type: 3}
+  agriculturalDecor: []
   citiesDecor:
-  - {fileID: -801732023309214844, guid: 63fd3ac0cb92cb840956dc756b24acb3, type: 3}
-  industrialDecor:
-  - {fileID: 3632137511935956931, guid: 2c68f0faabc920444a2ad2eba813d839, type: 3}
+  - {fileID: 1414139173100871430, guid: 2e14e007b7a7427468dae8b7dd166528, type: 3}
+  - {fileID: 4037621421494769097, guid: 42256e3a290a09741a0d10a71df2efd5, type: 3}
+  industrialDecor: []

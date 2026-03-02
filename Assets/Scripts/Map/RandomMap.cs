@@ -11,13 +11,13 @@ public class MapGenerator : MonoBehaviour
     [Range(0.25f, 0.45f)]
     public float islandSize = 0.35f;
     [Range(4, 10)]
-    public int basePoints = 7;              // more points = more complex shape
+    public int basePoints = 7;
     [Range(3, 7)]
-    public int subdivisions = 5;            // more = more detailed coastline
+    public int subdivisions = 5;
     [Range(0.3f, 0.7f)]
-    public float roughness = 0.5f;          // coastline jaggedness
+    public float roughness = 0.5f;
     [Range(0f, 0.5f)]
-    public float stretchVariation = 0.3f;   // how elongated/irregular
+    public float stretchVariation = 0.3f;
 
     [Header("Organic Details")]
     public bool addPeninsulas = true;
@@ -35,33 +35,32 @@ public class MapGenerator : MonoBehaviour
     [Header("Fog")]
     public bool useFog = true;
     [Range(0.5f, 0.95f)]
-    public float fogStart = 0.8f;           // where fog begins (0 = center, 1 = edge)
+    public float fogStart = 0.8f;
     [Range(0f, 1f)]
-    public float cornerRadius = 0.5f;       // 0 = rectangle, 1 = ellipse
-    
+    public float cornerRadius = 0.5f;
+
     [Header("Colors")]
     public Color waterColor = new Color(0.1f, 0.3f, 0.8f);
     public Color fogColor = new Color(0.7f, 0.75f, 0.8f);
 
     [Header("Biomes")]
-    public Color biome1Color = new Color(0.2f, 0.6f, 0.2f);   // Forest (green)
-    public Color biome2Color = new Color(0.85f, 0.75f, 0.4f); // Desert (yellow)
-    public Color biome3Color = new Color(0.4f, 0.4f, 0.45f);  // Mountains (gray)
-    public Color biome4Color = new Color(0.3f, 0.7f, 0.5f);   // Plains (light green)
+    public Color biome1Color = new Color(0.2f, 0.6f, 0.2f);
+    public Color biome2Color = new Color(0.85f, 0.75f, 0.4f);
+    public Color biome3Color = new Color(0.4f, 0.4f, 0.45f);
+    public Color biome4Color = new Color(0.3f, 0.7f, 0.5f);
 
     [Header("Biome Spawn Settings")]
-    [Range(0f, 1f)] public float biome2MaxRatio = 0.2f;  // Desert - spawns 0% to 20%
-    [Range(0f, 1f)] public float biome3MaxRatio = 0.2f;  // Mountains - spawns 0% to 20%
-    [Range(0f, 1f)] public float biome4MaxRatio = 0.3f;  // Plains - spawns 0% to 30%
+    [Range(0f, 1f)] public float biome2MaxRatio = 0.2f;
+    [Range(0f, 1f)] public float biome3MaxRatio = 0.2f;
+    [Range(0f, 1f)] public float biome4MaxRatio = 0.3f;
 
     [Header("Spawn Threshold")]
-    [Range(0f, 0.2f)] public float minSpawnThreshold = 0.03f;  // Below this, biome won't spawn
+    [Range(0f, 0.2f)] public float minSpawnThreshold = 0.03f;
 
-    // Public getters for actual ratios (for skill system)
-    public float ForestRatio { get; private set; }
-    public float DesertRatio { get; private set; }
+    public float ForestRatio   { get; private set; }
+    public float DesertRatio   { get; private set; }
     public float MountainRatio { get; private set; }
-    public float PlainsRatio { get; private set; }
+    public float PlainsRatio   { get; private set; }
 
     [Header("Cleanup")]
     public bool fillSmallLakes = true;
@@ -73,7 +72,7 @@ public class MapGenerator : MonoBehaviour
     public System.Action OnMapGenerated;
 
     private bool[,] landMap;
-    private int[,] biomeMap;  // 0 = water, 1-4 = biomes
+    private int[,] biomeMap;
     private float[,] fogMap;
     private Texture2D mapTexture;
     private int totalLandTiles;
@@ -87,92 +86,68 @@ public class MapGenerator : MonoBehaviour
         GenerateMap();
     }
 
+    [ContextMenu("Regenerate Map")]
+    public void Regenerate()
+    {
+        GenerateMap();
+    }
+
     public void GenerateMap()
     {
-        landMap = new bool[width, height];
+        landMap  = new bool[width, height];
         biomeMap = new int[width, height];
-        fogMap = new float[width, height];
+        fogMap   = new float[width, height];
 
-        // Generate main island
-        Vector2 center = new Vector2(width / 2f, height / 2f);
-        float baseRadius = Mathf.Min(width, height) * islandSize;
-        
-        // Random stretch for organic shape
-        float stretchX = 1f + Random.Range(-stretchVariation, stretchVariation);
-        float stretchY = 1f + Random.Range(-stretchVariation, stretchVariation);
-        float rotation = Random.Range(0f, Mathf.PI * 2f);
+        Vector2 center     = new Vector2(width / 2f, height / 2f);
+        float baseRadius   = Mathf.Min(width, height) * islandSize;
+        float stretchX     = 1f + Random.Range(-stretchVariation, stretchVariation);
+        float stretchY     = 1f + Random.Range(-stretchVariation, stretchVariation);
+        float rotation     = Random.Range(0f, Mathf.PI * 2f);
 
         List<Vector2> mainPoly = GenerateDetailedPolygon(center, baseRadius, stretchX, stretchY, rotation);
         FillPolygon(mainPoly);
 
-        // Add peninsulas (land jutting out)
         if (addPeninsulas)
-        {
             for (int i = 0; i < peninsulaCount; i++)
-            {
                 AddPeninsula(center, baseRadius);
-            }
-        }
 
-        // Add bays (water cutting in)
         if (addBays)
-        {
             for (int i = 0; i < bayCount; i++)
-            {
                 AddBay(center, baseRadius);
-            }
-        }
 
-        // Cleanup
         if (fillSmallLakes)
             FillSmallLakes();
 
-        // Generate biomes on land
         GenerateBiomes();
 
-        // Generate fog
         if (useFog)
             GenerateFog();
 
-        // Calculate actual ratios
         CalculateBiomeRatios();
 
         mapTexture = CreateTexture();
         ApplyTexture();
-        
     }
 
     List<Vector2> GenerateDetailedPolygon(Vector2 center, float radius, float stretchX, float stretchY, float rotation)
     {
         List<Vector2> polygon = new List<Vector2>();
-
-        // Create base polygon with varied radii
-        float angleStep = (Mathf.PI * 2f) / basePoints;
+        float angleStep  = (Mathf.PI * 2f) / basePoints;
         float startAngle = Random.Range(0f, Mathf.PI * 2f);
 
         for (int i = 0; i < basePoints; i++)
         {
             float angle = startAngle + i * angleStep;
-            
-            // Vary radius significantly for each point
             float r = radius * Random.Range(0.7f, 1.3f);
-            
-            // Apply stretch
             float x = Mathf.Cos(angle) * r * stretchX;
             float y = Mathf.Sin(angle) * r * stretchY;
-            
-            // Apply rotation
             float rx = x * Mathf.Cos(rotation) - y * Mathf.Sin(rotation);
             float ry = x * Mathf.Sin(rotation) + y * Mathf.Cos(rotation);
-            
             polygon.Add(new Vector2(center.x + rx, center.y + ry));
         }
 
-        // Midpoint displacement for detailed coastline
         for (int s = 0; s < subdivisions; s++)
-        {
             polygon = SubdividePolygon(polygon, roughness * Mathf.Pow(0.55f, s));
-        }
 
         return polygon;
     }
@@ -180,68 +155,45 @@ public class MapGenerator : MonoBehaviour
     List<Vector2> SubdividePolygon(List<Vector2> polygon, float displacement)
     {
         List<Vector2> newPoly = new List<Vector2>();
-
         for (int i = 0; i < polygon.Count; i++)
         {
             Vector2 current = polygon[i];
-            Vector2 next = polygon[(i + 1) % polygon.Count];
-
+            Vector2 next    = polygon[(i + 1) % polygon.Count];
             newPoly.Add(current);
-
-            // Midpoint with perpendicular displacement
-            Vector2 mid = (current + next) / 2f;
-            Vector2 dir = next - current;
+            Vector2 mid  = (current + next) / 2f;
+            Vector2 dir  = next - current;
             Vector2 perp = new Vector2(-dir.y, dir.x).normalized;
-
-            // Randomize displacement with bias toward outward
-            float disp = dir.magnitude * displacement * Random.Range(-0.8f, 1f);
+            float disp   = dir.magnitude * displacement * Random.Range(-0.8f, 1f);
             mid += perp * disp;
-
             newPoly.Add(mid);
         }
-
         return newPoly;
     }
 
     void AddPeninsula(Vector2 islandCenter, float islandRadius)
     {
-        // Pick random angle from center
-        float angle = Random.Range(0f, Mathf.PI * 2f);
-        
-        // Start from edge of island
+        float angle         = Random.Range(0f, Mathf.PI * 2f);
         float distFromCenter = islandRadius * Random.Range(0.6f, 0.9f);
-        Vector2 basePos = islandCenter + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distFromCenter;
-        
-        // Peninsula extends outward
-        float penRadius = islandRadius * peninsulaSize * Random.Range(0.7f, 1.3f);
-        Vector2 penCenter = basePos + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * penRadius * 0.5f;
-        
-        // Create elongated peninsula
-        List<Vector2> penPoly = GenerateDetailedPolygon(penCenter, penRadius, 
-            1f + Random.Range(0.3f, 0.8f), // stretch along length
-            Random.Range(0.4f, 0.7f),       // narrow width
+        Vector2 basePos     = islandCenter + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distFromCenter;
+        float penRadius     = islandRadius * peninsulaSize * Random.Range(0.7f, 1.3f);
+        Vector2 penCenter   = basePos + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * penRadius * 0.5f;
+        List<Vector2> penPoly = GenerateDetailedPolygon(penCenter, penRadius,
+            1f + Random.Range(0.3f, 0.8f),
+            Random.Range(0.4f, 0.7f),
             angle);
-        
         FillPolygon(penPoly);
     }
 
     void AddBay(Vector2 islandCenter, float islandRadius)
     {
-        // Pick random angle
-        float angle = Random.Range(0f, Mathf.PI * 2f);
-        
-        // Position bay at island edge
+        float angle          = Random.Range(0f, Mathf.PI * 2f);
         float distFromCenter = islandRadius * Random.Range(0.5f, 0.8f);
-        Vector2 bayCenter = islandCenter + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distFromCenter;
-        
-        float bayRadius = islandRadius * baySize * Random.Range(0.8f, 1.2f);
-        
-        // Create bay shape and carve it out
-        List<Vector2> bayPoly = GenerateDetailedPolygon(bayCenter, bayRadius, 
+        Vector2 bayCenter    = islandCenter + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distFromCenter;
+        float bayRadius      = islandRadius * baySize * Random.Range(0.8f, 1.2f);
+        List<Vector2> bayPoly = GenerateDetailedPolygon(bayCenter, bayRadius,
             Random.Range(0.6f, 1f),
             Random.Range(0.6f, 1f),
             Random.Range(0f, Mathf.PI * 2f));
-        
         CarveBay(bayPoly);
     }
 
@@ -249,97 +201,60 @@ public class MapGenerator : MonoBehaviour
     {
         float minX = float.MaxValue, maxX = float.MinValue;
         float minY = float.MaxValue, maxY = float.MinValue;
-
-        foreach (var p in polygon)
-        {
-            minX = Mathf.Min(minX, p.x);
-            maxX = Mathf.Max(maxX, p.x);
-            minY = Mathf.Min(minY, p.y);
-            maxY = Mathf.Max(maxY, p.y);
-        }
+        foreach (var p in polygon) { minX = Mathf.Min(minX, p.x); maxX = Mathf.Max(maxX, p.x); minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y); }
 
         int startX = Mathf.Max(0, Mathf.FloorToInt(minX));
-        int endX = Mathf.Min(width - 1, Mathf.CeilToInt(maxX));
+        int endX   = Mathf.Min(width  - 1, Mathf.CeilToInt(maxX));
         int startY = Mathf.Max(0, Mathf.FloorToInt(minY));
-        int endY = Mathf.Min(height - 1, Mathf.CeilToInt(maxY));
+        int endY   = Mathf.Min(height - 1, Mathf.CeilToInt(maxY));
 
         for (int y = startY; y <= endY; y++)
         {
             List<float> intersections = new List<float>();
-
             for (int i = 0; i < polygon.Count; i++)
             {
                 Vector2 p1 = polygon[i];
                 Vector2 p2 = polygon[(i + 1) % polygon.Count];
-
                 if ((p1.y <= y && p2.y > y) || (p2.y <= y && p1.y > y))
-                {
-                    float x = p1.x + (y - p1.y) / (p2.y - p1.y) * (p2.x - p1.x);
-                    intersections.Add(x);
-                }
+                    intersections.Add(p1.x + (y - p1.y) / (p2.y - p1.y) * (p2.x - p1.x));
             }
-
             intersections.Sort();
-
             for (int i = 0; i < intersections.Count - 1; i += 2)
             {
                 int x1 = Mathf.Max(0, Mathf.CeilToInt(intersections[i]));
                 int x2 = Mathf.Min(width - 1, Mathf.FloorToInt(intersections[i + 1]));
-
-                for (int x = x1; x <= x2; x++)
-                {
-                    landMap[x, y] = true;
-                }
+                for (int x = x1; x <= x2; x++) landMap[x, y] = true;
             }
         }
     }
 
     void CarveBay(List<Vector2> polygon)
     {
-        // Same as FillPolygon but sets to false (water)
         float minX = float.MaxValue, maxX = float.MinValue;
         float minY = float.MaxValue, maxY = float.MinValue;
-
-        foreach (var p in polygon)
-        {
-            minX = Mathf.Min(minX, p.x);
-            maxX = Mathf.Max(maxX, p.x);
-            minY = Mathf.Min(minY, p.y);
-            maxY = Mathf.Max(maxY, p.y);
-        }
+        foreach (var p in polygon) { minX = Mathf.Min(minX, p.x); maxX = Mathf.Max(maxX, p.x); minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y); }
 
         int startX = Mathf.Max(0, Mathf.FloorToInt(minX));
-        int endX = Mathf.Min(width - 1, Mathf.CeilToInt(maxX));
+        int endX   = Mathf.Min(width  - 1, Mathf.CeilToInt(maxX));
         int startY = Mathf.Max(0, Mathf.FloorToInt(minY));
-        int endY = Mathf.Min(height - 1, Mathf.CeilToInt(maxY));
+        int endY   = Mathf.Min(height - 1, Mathf.CeilToInt(maxY));
 
         for (int y = startY; y <= endY; y++)
         {
             List<float> intersections = new List<float>();
-
             for (int i = 0; i < polygon.Count; i++)
             {
                 Vector2 p1 = polygon[i];
                 Vector2 p2 = polygon[(i + 1) % polygon.Count];
-
                 if ((p1.y <= y && p2.y > y) || (p2.y <= y && p1.y > y))
-                {
-                    float x = p1.x + (y - p1.y) / (p2.y - p1.y) * (p2.x - p1.x);
-                    intersections.Add(x);
-                }
+                    intersections.Add(p1.x + (y - p1.y) / (p2.y - p1.y) * (p2.x - p1.x));
             }
-
             intersections.Sort();
-
             for (int i = 0; i < intersections.Count - 1; i += 2)
             {
                 int x1 = Mathf.Max(0, Mathf.CeilToInt(intersections[i]));
                 int x2 = Mathf.Min(width - 1, Mathf.FloorToInt(intersections[i + 1]));
-
-                for (int x = x1; x <= x2; x++)
-                {
-                    landMap[x, y] = false;
-                }
+                for (int x = x1; x <= x2; x++) landMap[x, y] = false;
             }
         }
     }
@@ -347,24 +262,15 @@ public class MapGenerator : MonoBehaviour
     void FillSmallLakes()
     {
         bool[,] visited = new bool[width, height];
-
         for (int x = 0; x < width; x++)
-        {
             for (int y = 0; y < height; y++)
-            {
                 if (!landMap[x, y] && !visited[x, y])
                 {
                     List<Vector2Int> lake = new List<Vector2Int>();
                     bool touchesEdge = FloodFillWater(x, y, visited, lake);
-
                     if (!touchesEdge && lake.Count < minLakeSize)
-                    {
-                        foreach (var pos in lake)
-                            landMap[pos.x, pos.y] = true;
-                    }
+                        foreach (var pos in lake) landMap[pos.x, pos.y] = true;
                 }
-            }
-        }
     }
 
     bool FloodFillWater(int startX, int startY, bool[,] visited, List<Vector2Int> region)
@@ -372,62 +278,46 @@ public class MapGenerator : MonoBehaviour
         bool touchesEdge = false;
         Stack<Vector2Int> stack = new Stack<Vector2Int>();
         stack.Push(new Vector2Int(startX, startY));
-
         while (stack.Count > 0)
         {
             Vector2Int pos = stack.Pop();
             int x = pos.x, y = pos.y;
-
             if (x < 0 || x >= width || y < 0 || y >= height) continue;
             if (visited[x, y] || landMap[x, y]) continue;
-
             visited[x, y] = true;
             region.Add(pos);
-
-            if (x == 0 || x == width - 1 || y == 0 || y == height - 1)
-                touchesEdge = true;
-
+            if (x == 0 || x == width - 1 || y == 0 || y == height - 1) touchesEdge = true;
             stack.Push(new Vector2Int(x + 1, y));
             stack.Push(new Vector2Int(x - 1, y));
             stack.Push(new Vector2Int(x, y + 1));
             stack.Push(new Vector2Int(x, y - 1));
         }
-
         return touchesEdge;
     }
 
     void GenerateFog()
     {
         float noiseOffset = Random.Range(0f, 1000f);
-        
-        float halfW = width / 2f;
+        float halfW = width  / 2f;
         float halfH = height / 2f;
 
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
             {
-                // Normalize coordinates to -1 to 1 range
-                float nx = (x - halfW) / halfW;
-                float ny = (y - halfH) / halfH;
-                
-                // Rounded rectangle distance (Squircle-like)
-                // cornerRadius controls how rounded (0 = rectangle, 1 = ellipse)
-                float power = 2f + (1f - cornerRadius) * 6f;  // 2 = ellipse, 8 = nearly rectangle
-                float dist = Mathf.Pow(Mathf.Abs(nx), power) + Mathf.Pow(Mathf.Abs(ny), power);
+                float nx    = (x - halfW) / halfW;
+                float ny    = (y - halfH) / halfH;
+                float power = 2f + (1f - cornerRadius) * 6f;
+                float dist  = Mathf.Pow(Mathf.Abs(nx), power) + Mathf.Pow(Mathf.Abs(ny), power);
                 dist = Mathf.Pow(dist, 1f / power);
 
-                // Add noise to fog boundary
-                float noise = Mathf.PerlinNoise((x + noiseOffset) / 50f, (y + noiseOffset) / 50f) * 0.06f;
+                float noise        = Mathf.PerlinNoise((x + noiseOffset) / 50f, (y + noiseOffset) / 50f) * 0.06f;
                 float fogThreshold = fogStart + noise;
 
                 if (dist > fogThreshold)
                 {
-                    // Soft gradient using smoothstep
-                    float t = (dist - fogThreshold) / (1f - fogThreshold);
-                    t = Mathf.Clamp01(t);
-                    float fogAmount = t * t * (3f - 2f * t);
-                    fogMap[x, y] = Mathf.Clamp01(fogAmount);
+                    float t = Mathf.Clamp01((dist - fogThreshold) / (1f - fogThreshold));
+                    fogMap[x, y] = Mathf.Clamp01(t * t * (3f - 2f * t));
                 }
                 else
                 {
@@ -437,146 +327,111 @@ public class MapGenerator : MonoBehaviour
         }
     }
 
- void GenerateBiomes()
-{
-    totalLandTiles = 0;
-    List<Vector2Int> landTiles = new List<Vector2Int>();
-    
-    for (int x = 0; x < width; x++) {
-        for (int y = 0; y < height; y++) {
-            if (landMap[x, y]) {
-                landTiles.Add(new Vector2Int(x, y));
-                totalLandTiles++;
-            }
+    void GenerateBiomes()
+    {
+        totalLandTiles = 0;
+        List<Vector2Int> landTiles = new List<Vector2Int>();
+
+        for (int x = 0; x < width; x++)
+            for (int y = 0; y < height; y++)
+                if (landMap[x, y]) { landTiles.Add(new Vector2Int(x, y)); totalLandTiles++; }
+
+        if (totalLandTiles == 0) return;
+
+        float[] maxRatios   = { biome2MaxRatio, biome3MaxRatio, biome4MaxRatio };
+        float[] rolledRatios = new float[3];
+        bool[]  biomeActive  = new bool[3];
+
+        for (int i = 0; i < 3; i++)
+        {
+            rolledRatios[i] = Random.Range(0f, maxRatios[i]);
+            if (rolledRatios[i] < minSpawnThreshold) { rolledRatios[i] = 0f; biomeActive[i] = false; }
+            else biomeActive[i] = true;
         }
-    }
 
-    if (totalLandTiles == 0) return;
+        float totalSecondary = 0f;
+        for (int i = 0; i < 3; i++) totalSecondary += rolledRatios[i];
+        float biome1Ratio = Mathf.Max(0f, 1f - totalSecondary);
 
-    // Step 1: Roll random ratios for secondary biomes (2, 3, 4)
-    float[] maxRatios = { biome2MaxRatio, biome3MaxRatio, biome4MaxRatio };
-    float[] rolledRatios = new float[3];
-    bool[] biomeActive = new bool[3];
+        float[] finalRatios = new float[4];
+        finalRatios[0] = biome1Ratio;
+        for (int i = 0; i < 3; i++) finalRatios[i + 1] = rolledRatios[i];
 
-    for (int i = 0; i < 3; i++) {
-        rolledRatios[i] = Random.Range(0f, maxRatios[i]);
-        
-        if (rolledRatios[i] < minSpawnThreshold) {
-            rolledRatios[i] = 0f;
-            biomeActive[i] = false;
-        } else {
-            biomeActive[i] = true;
-        }
-    }
+        float total = 0f;
+        for (int i = 0; i < 4; i++) total += finalRatios[i];
+        for (int i = 0; i < 4; i++) finalRatios[i] = total > 0 ? finalRatios[i] / total : 0f;
 
-    // Step 2: Calculate biome 1 (background) ratio as remainder
-    float totalSecondary = 0f;
-    for (int i = 0; i < 3; i++) {
-        totalSecondary += rolledRatios[i];
-    }
-    float biome1Ratio = Mathf.Max(0f, 1f - totalSecondary);
-
-    // Step 3: Build final normalized ratios (biome 1 is always active)
-    float[] finalRatios = new float[4];
-    finalRatios[0] = biome1Ratio;
-    for (int i = 0; i < 3; i++) {
-        finalRatios[i + 1] = rolledRatios[i];
-    }
-
-    // Normalize to ensure they sum to 1
-    float total = 0f;
-    for (int i = 0; i < 4; i++) {
-        total += finalRatios[i];
-    }
-    for (int i = 0; i < 4; i++) {
-        finalRatios[i] = total > 0 ? finalRatios[i] / total : 0f;
-    }
-
-    // Step 4: Place seeds for all active biomes
-    List<Vector3> biomeSeeds = new List<Vector3>();
-    int totalSeeds = 12;
-
-    // Biome 1 (background) always gets seeds
-    int biome1Seeds = Mathf.Max(1, Mathf.RoundToInt(totalSeeds * finalRatios[0]));
-    for (int i = 0; i < biome1Seeds; i++) {
-        Vector2Int pos = landTiles[Random.Range(0, landTiles.Count)];
-        biomeSeeds.Add(new Vector3(pos.x, pos.y, 1));
-    }
-
-    // Secondary biomes (2, 3, 4) only if active
-    for (int bType = 2; bType <= 4; bType++) {
-        if (!biomeActive[bType - 2]) continue;
-        
-        int seedCount = Mathf.Max(1, Mathf.RoundToInt(totalSeeds * finalRatios[bType - 1]));
-        for (int i = 0; i < seedCount; i++) {
+        List<Vector3> biomeSeeds = new List<Vector3>();
+        int totalSeeds  = 12;
+        int biome1Seeds = Mathf.Max(1, Mathf.RoundToInt(totalSeeds * finalRatios[0]));
+        for (int i = 0; i < biome1Seeds; i++)
+        {
             Vector2Int pos = landTiles[Random.Range(0, landTiles.Count)];
-            biomeSeeds.Add(new Vector3(pos.x, pos.y, bType));
+            biomeSeeds.Add(new Vector3(pos.x, pos.y, 1));
         }
-    }
 
-    // Step 5: Domain warping for organic borders
-    float warpStrength = 25f;
-    float warpScale = 0.05f;
-    float noiseOffset = Random.Range(0f, 1000f);
-
-    for (int x = 0; x < width; x++) {
-        for (int y = 0; y < height; y++) {
-            if (!landMap[x, y]) {
-                biomeMap[x, y] = 0;
-                continue;
+        for (int bType = 2; bType <= 4; bType++)
+        {
+            if (!biomeActive[bType - 2]) continue;
+            int seedCount = Mathf.Max(1, Mathf.RoundToInt(totalSeeds * finalRatios[bType - 1]));
+            for (int i = 0; i < seedCount; i++)
+            {
+                Vector2Int pos = landTiles[Random.Range(0, landTiles.Count)];
+                biomeSeeds.Add(new Vector3(pos.x, pos.y, bType));
             }
+        }
 
-            float nx = (Mathf.PerlinNoise(x * warpScale + noiseOffset, y * warpScale) - 0.5f) * warpStrength;
-            float ny = (Mathf.PerlinNoise(y * warpScale, x * warpScale + noiseOffset) - 0.5f) * warpStrength;
-            float warpedX = x + nx;
-            float warpedY = y + ny;
+        float warpStrength = 25f;
+        float warpScale    = 0.05f;
+        float noiseOffset  = Random.Range(0f, 1000f);
 
-            float minDist = float.MaxValue;
-            int nearestBiome = 1; // Default to background
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                if (!landMap[x, y]) { biomeMap[x, y] = 0; continue; }
 
-            foreach (var seed in biomeSeeds) {
-                float d = Vector2.Distance(new Vector2(warpedX, warpedY), new Vector2(seed.x, seed.y));
-                if (d < minDist) {
-                    minDist = d;
-                    nearestBiome = (int)seed.z;
+                float nx      = (Mathf.PerlinNoise(x * warpScale + noiseOffset, y * warpScale) - 0.5f) * warpStrength;
+                float ny      = (Mathf.PerlinNoise(y * warpScale, x * warpScale + noiseOffset) - 0.5f) * warpStrength;
+                float warpedX = x + nx;
+                float warpedY = y + ny;
+
+                float minDist     = float.MaxValue;
+                int nearestBiome  = 1;
+
+                foreach (var seed in biomeSeeds)
+                {
+                    float d = Vector2.Distance(new Vector2(warpedX, warpedY), new Vector2(seed.x, seed.y));
+                    if (d < minDist) { minDist = d; nearestBiome = (int)seed.z; }
                 }
-            }
 
-            biomeMap[x, y] = nearestBiome;
-        }
-    }
-
-    // Step 6: Update counts
-    for (int i = 0; i < 4; i++) biomeTileCounts[i] = 0;
-    for (int x = 0; x < width; x++) {
-        for (int y = 0; y < height; y++) {
-            int b = biomeMap[x, y];
-            if (b >= 1 && b <= 4) {
-                biomeTileCounts[b - 1]++;
+                biomeMap[x, y] = nearestBiome;
             }
         }
+
+        for (int i = 0; i < 4; i++) biomeTileCounts[i] = 0;
+        for (int x = 0; x < width; x++)
+            for (int y = 0; y < height; y++)
+            {
+                int b = biomeMap[x, y];
+                if (b >= 1 && b <= 4) biomeTileCounts[b - 1]++;
+            }
+
+        Debug.Log($"Biomes - Forest(BG): {(finalRatios[0]*100):F1}%, " +
+                  $"Desert: {biomeActive[0]} ({(finalRatios[1]*100):F1}%), " +
+                  $"Mountains: {biomeActive[1]} ({(finalRatios[2]*100):F1}%), " +
+                  $"Plains: {biomeActive[2]} ({(finalRatios[3]*100):F1}%)");
     }
 
-    Debug.Log($"Biomes - Forest(BG): {(finalRatios[0]*100):F1}%, " +
-              $"Desert: {biomeActive[0]} ({(finalRatios[1]*100):F1}%), " +
-              $"Mountains: {biomeActive[1]} ({(finalRatios[2]*100):F1}%), " +
-              $"Plains: {biomeActive[2]} ({(finalRatios[3]*100):F1}%)");
-}
     void CalculateBiomeRatios()
     {
-        if (totalLandTiles == 0)
-        {
-            ForestRatio = DesertRatio = MountainRatio = PlainsRatio = 0f;
-            return;
-        }
-
-        ForestRatio = (float)biomeTileCounts[0] / totalLandTiles;
-        DesertRatio = (float)biomeTileCounts[1] / totalLandTiles;
+        if (totalLandTiles == 0) { ForestRatio = DesertRatio = MountainRatio = PlainsRatio = 0f; return; }
+        ForestRatio   = (float)biomeTileCounts[0] / totalLandTiles;
+        DesertRatio   = (float)biomeTileCounts[1] / totalLandTiles;
         MountainRatio = (float)biomeTileCounts[2] / totalLandTiles;
-        PlainsRatio = (float)biomeTileCounts[3] / totalLandTiles;
+        PlainsRatio   = (float)biomeTileCounts[3] / totalLandTiles;
     }
 
-    // Get biome at tile (1-4, or 0 for water)
     public int GetBiome(int x, int y)
     {
         if (x < 0 || x >= width || y < 0 || y >= height) return 0;
@@ -587,30 +442,17 @@ public class MapGenerator : MonoBehaviour
     {
         Texture2D texture = new Texture2D(width, height);
         texture.filterMode = FilterMode.Point;
-
         Color[] biomeColors = { biome1Color, biome2Color, biome3Color, biome4Color };
 
         for (int x = 0; x < width; x++)
-        {
             for (int y = 0; y < height; y++)
             {
-                Color baseColor;
-                
-                int biome = biomeMap[x, y];
-                if (biome >= 1 && biome <= 4)
-                    baseColor = biomeColors[biome - 1];
-                else
-                    baseColor = waterColor;
-                
-                // Blend with fog
+                int biome      = biomeMap[x, y];
+                Color baseColor = (biome >= 1 && biome <= 4) ? biomeColors[biome - 1] : waterColor;
                 if (useFog && fogMap[x, y] > 0)
-                {
                     baseColor = Color.Lerp(baseColor, fogColor, fogMap[x, y]);
-                }
-
                 texture.SetPixel(x, y, baseColor);
             }
-        }
 
         texture.Apply();
         return texture;
@@ -618,24 +460,15 @@ public class MapGenerator : MonoBehaviour
 
     void ApplyTexture()
     {
-        if (mapRenderer == null)
-        {
-           
-            return;
-        }
+        if (mapRenderer == null) return;
+        if (mapRenderer.sprite != null) Destroy(mapRenderer.sprite);
 
-        if (mapRenderer.sprite != null)
-            Destroy(mapRenderer.sprite);
-
-        Sprite sprite = Sprite.Create(
-            mapTexture,
+        Sprite sprite = Sprite.Create(mapTexture,
             new Rect(0, 0, width, height),
-            new Vector2(0.5f, 0.5f),
-            100f
-        );
+            new Vector2(0.5f, 0.5f), 100f);
 
-        sprite.name = "GeneratedMap";
-        mapRenderer.sprite = sprite;
+        sprite.name         = "GeneratedMap";
+        mapRenderer.sprite  = sprite;
         mapRenderer.enabled = true;
 
         OnMapGenerated?.Invoke();
@@ -644,15 +477,14 @@ public class MapGenerator : MonoBehaviour
     public void SetTile(int x, int y, bool isLand, int biome = 1)
     {
         if (x < 0 || x >= width || y < 0 || y >= height) return;
-        landMap[x, y] = isLand;
+        landMap[x, y]  = isLand;
         biomeMap[x, y] = isLand ? Mathf.Clamp(biome, 1, 4) : 0;
-        
+
         Color[] biomeColors = { biome1Color, biome2Color, biome3Color, biome4Color };
         Color baseColor = isLand ? biomeColors[biomeMap[x, y] - 1] : waterColor;
-        
         if (useFog && fogMap[x, y] > 0)
             baseColor = Color.Lerp(baseColor, fogColor, fogMap[x, y]);
-            
+
         mapTexture.SetPixel(x, y, baseColor);
         mapTexture.Apply();
     }
@@ -669,18 +501,6 @@ public class MapGenerator : MonoBehaviour
         return fogMap[x, y];
     }
 
-    public void Regenerate()
-    {
-        GenerateMap();
-    }
-
-    void OnValidate()
-    {
-        width = Mathf.Max(64, width);
-        height = Mathf.Max(64, height);
-    }
-    
-    // Add to MapGenerator.cs
     public int[,] GetBiomeMapCopy()
     {
         int[,] copy = new int[width, height];
@@ -693,5 +513,11 @@ public class MapGenerator : MonoBehaviour
         bool[,] copy = new bool[width, height];
         System.Array.Copy(landMap, copy, landMap.Length);
         return copy;
+    }
+
+    void OnValidate()
+    {
+        width  = Mathf.Max(64, width);
+        height = Mathf.Max(64, height);
     }
 }
