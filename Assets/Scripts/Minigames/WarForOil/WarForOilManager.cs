@@ -42,10 +42,10 @@ public class WarForOilManager : MonoBehaviour
 
     //zincir sistemi
     private bool isInChain; //şu an bir event zincirinde miyiz
-    private WarForOilEvent chainStartEvent; //zincirin baş event'i (config burada)
-    private int chainRefusalCount; //zincirdeki toplam reddetme sayısı
-    private float chainTimer; //sonraki zincir eventine geri sayım
-    private WarForOilEvent pendingChainEvent; //sıradaki zincir eventi (beklemede)
+    private WarForOilEvent chainStartEvent; //zincirin baş event'i (Head referansı)
+    private List<ChainBranch> pendingChainBranches; //sıradaki dallanma seçenekleri
+    private int chainCycleCounter; //3'lü döngüdeki pozisyon (0,1,2)
+    private int chainSlotsRemaining; //bu döngüde kalan chain event sayısı
 
     //rakip işgal sistemi
     private bool isCornerGrabRace; //köşe kapma yarışı aktif mi
@@ -110,8 +110,8 @@ public class WarForOilManager : MonoBehaviour
     public static event Action<WarForOilResult> OnWarResultReady; //sonuç hesaplandı, sonuç ekranını göster
     public static event Action<WarForOilResult> OnWarFinished; //sonuç ekranı kapatıldı, her şey bitti
     public static event Action<List<WarForOilCountry>> OnActiveCountriesChanged; //UI'daki ülke listesi değişti
-    public static event Action OnChainStarted; //zincir başladı (UI savaş timer'ı dondurabilir)
-    public static event Action<string> OnChainEnded; //zincir bitti (sebep: "collapse", "ceasefire", "government_collapse")
+    public static event Action OnChainStarted; //zincir başladı
+    public static event Action OnChainEnded; //zincir bitti (doğal sonlanma veya savaş bitti)
     public static event Action<WarForOilCountry> OnRivalInvasionStarted; //rakip işgal tetiklendi (UI rakip ülkeyi gösterebilir)
     public static event Action OnCornerGrabStarted; //köşe kapma yarışı başladı (anlaşma reddedildi)
     public static event Action<float> OnCornerGrabStatChanged; //köşe kapma stat'ı değişti (0-100)
@@ -159,9 +159,6 @@ public class WarForOilManager : MonoBehaviour
                 break;
             case WarForOilState.EventPhase:
                 UpdateEventPhase();
-                break;
-            case WarForOilState.ChainWaiting:
-                UpdateChainWaiting();
                 break;
         }
     }
@@ -354,56 +351,17 @@ public class WarForOilManager : MonoBehaviour
 
         currentEvent = null;
 
-        //zincir event'i mi kontrol et — zincir seçenekleri normal akışı atlar
-        if (isInChain || resolvedEvent.chainRole == ChainRole.Head)
+        //zincir başlatma — Head event tetiklendiyse ve henüz zincirde değilsek
+        if (!isInChain && resolvedEvent.chainRole == ChainRole.Head)
+            StartChain(resolvedEvent);
+
+        //zincir dallanması — choice'un chainBranches'ını kontrol et
+        if (isInChain)
         {
-            //ilk zincir event'i ise zinciri başlat
-            if (!isInChain)
-                StartChain(resolvedEvent);
-
-            //oyunu devam ettir (event paneli kapandı, oyun çalışsın — sadece savaş timer'ı durur)
-            if (GameManager.Instance != null)
-                GameManager.Instance.ResumeGame();
-
-            //ateşkes seçeneği — zinciri ateşkesle bitir
-            if (choice.triggersCeasefire)
-            {
-                ChainCeasefire();
-                return;
-            }
-
-            //reddetme seçeneği — sayacı artır, threshold kontrol et
-            if (choice.isChainRefusal)
-            {
-                chainRefusalCount++;
-                int maxRefusals = GetMaxRefusalsForCurrentSupport();
-
-                if (chainRefusalCount >= maxRefusals)
-                {
-                    //çok fazla reddedildi — zincir çöker
-                    CollapseChain(false);
-                    return;
-                }
-            }
-
-            //zinciri devam ettir (continuesChain veya isChainRefusal ama henüz çökmedi)
-            if (choice.continuesChain || choice.isChainRefusal)
-            {
-                if (resolvedEvent.nextChainEvent != null)
-                {
-                    //sonraki event var — kuyrukla
-                    QueueNextChainEvent(resolvedEvent.nextChainEvent, resolvedEvent.chainInterval);
-                    return;
-                }
-                else
-                {
-                    //son adım — hükümet düşüşü (ceza yok, sadece skill lock)
-                    CollapseChain(true);
-                    return;
-                }
-            }
-
-            return;
+            if (choice.chainBranches != null && choice.chainBranches.Count > 0)
+                pendingChainBranches = new List<ChainBranch>(choice.chainBranches);
+            else
+                EndChain(); //dallanma yok → chain doğal olarak biter
         }
 
         //rakip işgal teklifi — kabul veya red
@@ -491,6 +449,9 @@ public class WarForOilManager : MonoBehaviour
         if (currentState != WarForOilState.WarProcess) return;
         if (ceasefireBlocked) return;
         if (supportStat < database.ceasefireMinSupport) return;
+
+        //chain aktifse sonlandır (ceza yok)
+        if (isInChain) EndChain();
 
         //ateşkes oranı: 0 (en kötü) → 1 (en iyi)
         float ratio = (supportStat - database.ceasefireMinSupport)
@@ -762,14 +723,50 @@ public class WarForOilManager : MonoBehaviour
         {
             eventCheckTimer = 0f;
 
-            //geçici event engeli aktifse dönem say ve atla
-            if (remainingBlockCycles > 0)
+            if (isInChain)
             {
-                remainingBlockCycles--;
+                //3'lü döngü: chain slotları + random slotları
+                if (chainCycleCounter == 0)
+                {
+                    //yeni döngü başlat — 1 veya 2 chain slotu
+                    chainSlotsRemaining = UnityEngine.Random.value < database.chainDoubleChance ? 2 : 1;
+                }
+
+                //sampling without replacement
+                int slotsLeft = 3 - chainCycleCounter;
+                float chainChance = (float)chainSlotsRemaining / slotsLeft;
+
+                if (UnityEngine.Random.value < chainChance
+                    && pendingChainBranches != null && pendingChainBranches.Count > 0)
+                {
+                    //chain slotu
+                    chainSlotsRemaining--;
+                    TryTriggerChainSlotEvent();
+                }
+                else
+                {
+                    //random slotu — eventBlockCycles sadece random slotları etkiler
+                    if (remainingBlockCycles > 0)
+                        remainingBlockCycles--;
+                    else
+                        TryTriggerWarEvent();
+                }
+
+                chainCycleCounter++;
+                if (chainCycleCounter >= 3)
+                    chainCycleCounter = 0;
             }
             else
             {
-                TryTriggerWarEvent();
+                //zincir dışı normal akış
+                if (remainingBlockCycles > 0)
+                {
+                    remainingBlockCycles--;
+                }
+                else
+                {
+                    TryTriggerWarEvent();
+                }
             }
 
             //event tetiklendiyse bu frame'de savaş sonucu hesaplama
@@ -779,6 +776,8 @@ public class WarForOilManager : MonoBehaviour
         //savaş bitti mi
         if (warTimer >= database.warDuration)
         {
+            //chain aktifse savaş bittiğinde zinciri de sonlandır
+            if (isInChain) EndChain();
             CalculateWarResult();
         }
     }
@@ -834,177 +833,108 @@ public class WarForOilManager : MonoBehaviour
     // ==================== ZİNCİR SİSTEMİ ====================
 
     /// <summary>
-    /// ChainWaiting: sonraki zincir eventine geri sayım (oyun çalışıyor, sadece savaş timer'ı durmuş).
-    /// </summary>
-    private void UpdateChainWaiting()
-    {
-        chainTimer -= Time.deltaTime;
-        if (chainTimer <= 0f && pendingChainEvent != null)
-        {
-            TriggerChainEvent(pendingChainEvent);
-        }
-    }
-
-    /// <summary>
-    /// Zincir eventini tetikler — EventPhase'e geçirir.
-    /// </summary>
-    private void TriggerChainEvent(WarForOilEvent chainEvent)
-    {
-        currentEvent = chainEvent;
-        pendingChainEvent = null;
-
-        currentState = WarForOilState.EventPhase;
-        eventDecisionTimer = chainEvent.decisionTime;
-
-        //event paneli gösterilirken oyunu duraklat
-        if (GameManager.Instance != null)
-            GameManager.Instance.PauseGame();
-
-        ApplyEventVandalismOnTrigger(chainEvent);
-        ApplyEventMediaPursuitOnTrigger(chainEvent);
-        OnWarEventTriggered?.Invoke(chainEvent);
-    }
-
-    /// <summary>
-    /// Zinciri başlatır. İlk event tetiklendikten sonra çağrılır.
+    /// Zinciri başlatır. Head event tetiklendikten sonra çağrılır.
     /// </summary>
     private void StartChain(WarForOilEvent headEvent)
     {
         isInChain = true;
         chainStartEvent = headEvent;
-        chainRefusalCount = 0;
-
-        //zincir boyunca diğer sistemlerin event göstermesini engelle
-        EventCoordinator.LockEvents("WarForOilChain");
+        pendingChainBranches = null;
+        chainCycleCounter = 0;
+        chainSlotsRemaining = 0;
 
         OnChainStarted?.Invoke();
     }
 
     /// <summary>
-    /// Zincirde sonraki eventi kuyruklar (chainInterval sonra tetiklenir).
+    /// Zinciri sonlandırır. Ceza yok, sadece state temizlenir.
+    /// Savaş bittiğinde veya dallanmasız choice seçildiğinde çağrılır.
     /// </summary>
-    private void QueueNextChainEvent(WarForOilEvent nextEvent, float interval)
-    {
-        pendingChainEvent = nextEvent;
-        chainTimer = interval;
-        currentState = WarForOilState.ChainWaiting;
-    }
-
-    /// <summary>
-    /// Support stat'a göre izin verilen max reddetme sayısını döner.
-    /// </summary>
-    private int GetMaxRefusalsForCurrentSupport()
-    {
-        if (chainStartEvent == null || chainStartEvent.refusalThresholds == null)
-            return 1; //fallback
-
-        for (int i = 0; i < chainStartEvent.refusalThresholds.Count; i++)
-        {
-            RefusalThreshold t = chainStartEvent.refusalThresholds[i];
-            if (supportStat >= t.minSupport && supportStat < t.maxSupport)
-                return t.maxRefusals;
-        }
-
-        return 1; //hiçbir aralığa düşmezse fallback
-    }
-
-    /// <summary>
-    /// Zincir çöküşü: skill'leri kilitle + ceza kes + savaşı bitir.
-    /// isGovernmentCollapse true ise ceza kesilmez (son adım = hükümet düşüşü).
-    /// </summary>
-    private void CollapseChain(bool isGovernmentCollapse)
-    {
-        //skill'leri kilitle
-        if (chainStartEvent != null && chainStartEvent.skillsToLock != null && SkillTreeManager.Instance != null)
-        {
-            for (int i = 0; i < chainStartEvent.skillsToLock.Count; i++)
-            {
-                Skill skill = chainStartEvent.skillsToLock[i];
-                if (skill != null)
-                    SkillTreeManager.Instance.RelockSkill(skill.id);
-            }
-        }
-
-        //ceza — hükümet düşüşünde ceza yok
-        if (!isGovernmentCollapse && chainStartEvent != null && chainStartEvent.chainFine > 0f)
-            accumulatedCostModifier += (int)chainStartEvent.chainFine;
-
-        string reason = isGovernmentCollapse ? "government_collapse" : "collapse";
-        EndChain(reason);
-    }
-
-    /// <summary>
-    /// Zincirden ateşkes — ceasefireMinSupport kontrolü yapılmaz.
-    /// </summary>
-    private void ChainCeasefire()
-    {
-        EndChain("ceasefire");
-    }
-
-    /// <summary>
-    /// Zinciri sonlandırır ve savaşı bitirir.
-    /// </summary>
-    private void EndChain(string reason)
+    private void EndChain()
     {
         isInChain = false;
         chainStartEvent = null;
-        pendingChainEvent = null;
+        pendingChainBranches = null;
+        chainCycleCounter = 0;
+        chainSlotsRemaining = 0;
 
-        //event kilidini bırak
-        EventCoordinator.UnlockEvents("WarForOilChain");
+        OnChainEnded?.Invoke();
+    }
 
-        OnChainEnded?.Invoke(reason);
+    /// <summary>
+    /// Chain slotunda pendingChainBranches'tan stat-ağırlıklı seçim yaparak event tetikler.
+    /// Formül: effectiveWeight = baseWeight + GetStatPercent(influenceStat) * statInfluence
+    /// </summary>
+    private void TryTriggerChainSlotEvent()
+    {
+        if (pendingChainBranches == null || pendingChainBranches.Count == 0) return;
 
-        if (reason == "ceasefire")
+        //ağırlıkları hesapla
+        float totalWeight = 0f;
+        float[] weights = new float[pendingChainBranches.Count];
+        for (int i = 0; i < pendingChainBranches.Count; i++)
         {
-            //ateşkes — normal ateşkes formülü ama minSupport kontrolü yok
-            float ratio = supportStat / 100f; //0 support = en kötü, 100 = en iyi
-            float effectiveChainReward = GetEffectiveBaseReward(selectedCountry);
+            float statPercent = GameStatManager.Instance != null
+                ? GameStatManager.Instance.GetStatPercent(pendingChainBranches[i].influenceStat)
+                : 0.5f;
+            float w = pendingChainBranches[i].baseWeight + statPercent * pendingChainBranches[i].statInfluence;
+            if (w < 0f) w = 0f;
+            weights[i] = w;
+            totalWeight += w;
+        }
 
-            float wealthChange = Mathf.Lerp(
-                -database.ceasefirePenalty,
-                effectiveChainReward * rewardMultiplier * database.ceasefireMaxReward,
-                ratio
-            ) - accumulatedCostModifier;
+        WarForOilEvent selected;
 
-            pendingResult = new WarForOilResult();
-            pendingResult.country = selectedCountry;
-            pendingResult.warWon = false;
-            pendingResult.wasCeasefire = true;
-            pendingResult.finalSupportStat = supportStat;
-            pendingResult.finalVandalismLevel = currentVandalismLevel;
-            pendingResult.finalMediaPursuitLevel = currentMediaPursuitLevel;
-            pendingResult.winChance = 0f;
-            pendingResult.wealthChange = wealthChange;
-            pendingResult.suspicionChange = accumulatedSuspicionModifier;
-            pendingResult.politicalInfluenceChange = accumulatedPoliticalInfluenceModifier;
-
-            currentState = WarForOilState.ResultPhase;
-
-            //zaten pause durumda (zincir sırasında), sonuç ekranını göster
-            OnCeasefireResult?.Invoke(pendingResult);
+        if (totalWeight <= 0f)
+        {
+            //tüm ağırlıklar 0 — eşit dağılımlı seç
+            selected = pendingChainBranches[UnityEngine.Random.Range(0, pendingChainBranches.Count)].targetEvent;
         }
         else
         {
-            //collapse veya government_collapse — savaş kaybedildi
-            pendingResult = new WarForOilResult();
-            pendingResult.country = selectedCountry;
-            pendingResult.warWon = false;
-            pendingResult.wasCeasefire = false;
-            pendingResult.wasChainCollapse = true;
-            pendingResult.finalSupportStat = supportStat;
-            pendingResult.finalVandalismLevel = currentVandalismLevel;
-            pendingResult.finalMediaPursuitLevel = currentMediaPursuitLevel;
-            pendingResult.winChance = 0f;
-            pendingResult.wealthChange = -(database.warLossPenalty + accumulatedCostModifier);
-            pendingResult.suspicionChange = database.warLossSuspicionIncrease + accumulatedSuspicionModifier;
-            pendingResult.reputationChange = accumulatedReputationModifier;
-            pendingResult.politicalInfluenceChange = -database.warLossPoliticalPenalty + accumulatedPoliticalInfluenceModifier;
-
-            currentState = WarForOilState.ResultPhase;
-
-            OnWarResultReady?.Invoke(pendingResult);
+            //ağırlıklı rastgele seçim
+            float roll = UnityEngine.Random.value * totalWeight;
+            float cumulative = 0f;
+            selected = pendingChainBranches[pendingChainBranches.Count - 1].targetEvent; //fallback
+            for (int i = 0; i < pendingChainBranches.Count; i++)
+            {
+                cumulative += weights[i];
+                if (roll <= cumulative)
+                {
+                    selected = pendingChainBranches[i].targetEvent;
+                    break;
+                }
+            }
         }
+
+        if (selected == null) return;
+
+        //event'i tetikle
+        TriggerEvent(selected);
+    }
+
+    /// <summary>
+    /// Bir war event'ini tetikler — EventPhase'e geçirir. Chain ve normal event'ler için ortak.
+    /// </summary>
+    private void TriggerEvent(WarForOilEvent evt)
+    {
+        if (evt == null) return;
+
+        currentEvent = evt;
+        eventTriggerCounts.TryGetValue(evt, out int count);
+        eventTriggerCounts[evt] = count + 1;
+
+        EventCoordinator.MarkEventShown();
+
+        currentState = WarForOilState.EventPhase;
+        eventDecisionTimer = evt.decisionTime;
+
+        if (GameManager.Instance != null)
+            GameManager.Instance.PauseGame();
+
+        ApplyEventVandalismOnTrigger(evt);
+        ApplyEventMediaPursuitOnTrigger(evt);
+        OnWarEventTriggered?.Invoke(evt);
     }
 
     // ==================== RAKİP İŞGAL SİSTEMİ ====================
@@ -1195,6 +1125,9 @@ public class WarForOilManager : MonoBehaviour
     private void ProtestForceCeasefire()
     {
         protestActive = false;
+
+        //chain aktifse sonlandır (ceza yok)
+        if (isInChain) EndChain();
 
         //mevcut ateşkes formülü ile sonuç hesapla
         float ratio = (supportStat - database.ceasefireMinSupport)
@@ -1774,6 +1707,7 @@ public class WarForOilManager : MonoBehaviour
         accumulatedCostModifier = 0;
         rewardMultiplier = 1f;
         eventsBlocked = false;
+        remainingBlockCycles = 0;
         ceasefireBlocked = false;
         pendingDeal = false;
         dealRewardRatio = 0f;
@@ -1781,9 +1715,9 @@ public class WarForOilManager : MonoBehaviour
         currentEvent = null;
         isInChain = false;
         chainStartEvent = null;
-        chainRefusalCount = 0;
-        chainTimer = 0f;
-        pendingChainEvent = null;
+        pendingChainBranches = null;
+        chainCycleCounter = 0;
+        chainSlotsRemaining = 0;
         isCornerGrabRace = false;
         rivalInvasionTriggered = false;
         rivalCountry = null;
@@ -1845,7 +1779,7 @@ public class WarForOilManager : MonoBehaviour
         }
 
         //rakip işgal tetikleme kontrolü (henüz tetiklenmemişse ve koşullar uygunsa)
-        if (!rivalInvasionTriggered && !isCornerGrabRace && !isInChain
+        if (!rivalInvasionTriggered && !isCornerGrabRace
             && warTimer >= database.rivalInvasionMinWarTime
             && database.rivalOfferEvent != null)
         {
@@ -1857,7 +1791,7 @@ public class WarForOilManager : MonoBehaviour
         }
 
         //toplum tepkisi faz 1: koşullar uygunsa foreshadow tetikle (bu cycle'da event gösterilmez)
-        if (!protestTriggered && !protestActive && !isInChain
+        if (!protestTriggered && !protestActive
             && warTimer >= database.protestMinWarTime
             && database.protestTriggerEvent != null)
         {
@@ -1894,7 +1828,7 @@ public class WarForOilManager : MonoBehaviour
         }
 
         //medya takibi otomatik tetikleme: şans bazlı, protest'ten bağımsız
-        if (!mediaPursuitTriggered && !isInChain
+        if (!mediaPursuitTriggered
             && warTimer >= database.mediaPursuitMinWarTime
             && database.mediaPursuitTriggerEvent != null)
         {
@@ -1938,6 +1872,7 @@ public class WarForOilManager : MonoBehaviour
             for (int i = 0; i < eventPool.Count; i++)
             {
                 WarForOilEvent evt = eventPool[i];
+                if (isInChain && evt.chainRole == ChainRole.Head) continue; //chain aktifken Head eventler random slotta gelmesin
                 if (warTimer < evt.minWarTime * database.warDuration) continue;
                 if (evt.maxWarTime >= 0f && warTimer > evt.maxWarTime * database.warDuration) continue;
                 if (dismissedEventIds.Contains(evt.id)) continue;
@@ -2091,6 +2026,7 @@ public class WarForOilManager : MonoBehaviour
             pendingResult.winChance = 1f;
             pendingResult.wealthChange = dealReward - accumulatedCostModifier;
             pendingResult.suspicionChange = accumulatedSuspicionModifier;
+            pendingResult.reputationChange = accumulatedReputationModifier;
             pendingResult.politicalInfluenceChange = accumulatedPoliticalInfluenceModifier;
         }
         else
@@ -2131,6 +2067,7 @@ public class WarForOilManager : MonoBehaviour
                 float reward = effectiveBaseReward * rewardMultiplier * rewardRatio * database.supportRewardRatio;
                 pendingResult.wealthChange = reward - accumulatedCostModifier;
                 pendingResult.suspicionChange = accumulatedSuspicionModifier;
+                pendingResult.reputationChange = accumulatedReputationModifier;
                 pendingResult.politicalInfluenceChange = accumulatedPoliticalInfluenceModifier;
             }
             else
@@ -2138,6 +2075,7 @@ public class WarForOilManager : MonoBehaviour
                 //kaybedildi — ceza
                 pendingResult.wealthChange = -(database.warLossPenalty + accumulatedCostModifier);
                 pendingResult.suspicionChange = database.warLossSuspicionIncrease + accumulatedSuspicionModifier;
+                pendingResult.reputationChange = accumulatedReputationModifier;
                 pendingResult.politicalInfluenceChange = -database.warLossPoliticalPenalty + accumulatedPoliticalInfluenceModifier;
             }
         }
@@ -2235,8 +2173,7 @@ public class WarForOilManager : MonoBehaviour
 
     public float GetWarProgress()
     {
-        if (currentState != WarForOilState.WarProcess && currentState != WarForOilState.EventPhase
-            && currentState != WarForOilState.ChainWaiting)
+        if (currentState != WarForOilState.WarProcess && currentState != WarForOilState.EventPhase)
             return 0f;
         return Mathf.Clamp01(warTimer / database.warDuration);
     }
@@ -2252,7 +2189,6 @@ public enum WarForOilState
     PressurePhase,      //yönetime baskı yapılıyor
     WarProcess,         //savaş devam ediyor
     EventPhase,         //event geldi, karar bekleniyor
-    ChainWaiting,       //zincir eventi bekleniyor (chainInterval geri sayımı)
     ResultPhase         //sonuç ekranı gösteriliyor
 }
 
@@ -2266,7 +2202,6 @@ public class WarForOilResult
     public bool warWon;
     public bool wasCeasefire;
     public bool wasDeal; //anlaşmayla mı bitti
-    public bool wasChainCollapse; //zincir çöküşüyle mi bitti
     public bool wasCornerGrabRace; //köşe kapma yarışı mıydı
     public bool wasProtestCeasefire; //toplum tepkisi yüzünden ateşkes mi
     public WarForOilCountry rivalCountry; //rakip ülke (varsa)

@@ -12,18 +12,155 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
   m_Name: ControversialTargets2
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
-  id: 
-  displayName: 
-  description: 
-  devNote: 
-  eventNote: 
-  minWarTime: 0
+  id: wfo_sftdc_03
+  displayName: Hospital Target
+  description: 'The army claims the enemy is positioned inside a hospital building
+    and wants to strike it.
+
+    If carried out, the offensive could accelerate military
+    progress.
+
+    However, the risk of civilian casualties and international backlash
+    is extremely high.
+
+    They request your media support to justify and shape
+    public perception of the operation.'
+  devNote: "feed skilli olu\u015Fturulunca 2. choice i\xE7in \xF6n ko\u015Ful olarak
+    eklenecek"
+  eventNote: "ordu ilerlemesi i\xE7in \xF6nemli oldu\u011Funu d\xFC\u015F\xFCnerek
+    birka\xE7 tane hastane vurmay\u0131 ister\nsenden de istedi\u011Fi bu operasyonun
+    alg\u0131 aya\u011F\u0131n\u0131 \xFCstlenmen\nkabul edip medyada alg\u0131 pompalayarak
+    operasyonu me\u015Frula\u015Ft\u0131rmaya \xE7al\u0131\u015Fabilirsin, itibar\u0131n
+    d\xFC\u015Fer ancak war supportun ciddi oranda artar\nreddedebilirsin, itibar\u0131n
+    artar, siyasi n\xFCfuzun biraz azal\u0131r, war supportun d\xFC\u015Fer. ayr\u0131ca
+    protest tetiklenme ihtimalini de y\xFCzde 20 kadar artt\u0131r\u0131r"
+  minWarTime: 30
   maxWarTime: -1
-  decisionTime: 10
+  decisionTime: 20
   isRepeatable: 0
   isUnlimitedRepeat: 0
   maxRepeatCount: 1
-  choices: []
+  choices:
+  - displayName: Reject
+    description: You refuse to provide media support; the army cancels the operation.
+    supportModifier: -2
+    suspicionModifier: 0
+    reputationModifier: 5.8
+    politicalInfluenceModifier: -1
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideTopic: 0
+    feedOverrideRatio: 0
+    hasCounterFeedTopic: 0
+    counterFeedTopic: 0
+    counterFeedRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    eventBlockCycles: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills: []
+    statConditions: []
+  - displayName: Accept
+    description: You take charge of the media campaign and legitimize the operation;
+      the strike proceeds and military progress accelerates.
+    supportModifier: 8.7
+    suspicionModifier: 2
+    reputationModifier: -9
+    politicalInfluenceModifier: 0.4
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0.2
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 1
+    feedOverrideTopic: 12
+    feedOverrideRatio: 0.629
+    hasCounterFeedTopic: 1
+    counterFeedTopic: 12
+    counterFeedRatio: 0.371
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    eventBlockCycles: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills:
+    - {fileID: 0}
+    statConditions: []
   defaultChoiceIndex: -1
   isVandalismEvent: 0
   vandalismLevelOnTrigger: 0

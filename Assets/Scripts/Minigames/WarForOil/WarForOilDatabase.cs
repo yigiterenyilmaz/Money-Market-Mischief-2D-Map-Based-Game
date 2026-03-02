@@ -22,6 +22,9 @@ public class WarForOilDatabase : ScriptableObject
     public List<WTETWCEventGroup> eventGroups; //event ilişki grupları (ağırlık + karşılıklı dışlama)
     public List<OFPCEventGroup> ofpcEventGroups; //Oil for Peace concept event grupları
 
+    [Header("Zincir")]
+    [Range(0f, 1f)] public float chainDoubleChance = 0.5f; //3'lü döngüde 2 chain slotu çıkma olasılığı (0.5 = %50)
+
     [Header("Savaş Ayarları")]
     public float warDuration = 300f; //savaş süresi (saniye)
     public float eventInterval = 15f; //savaş sırasında event kontrol aralığı (saniye)

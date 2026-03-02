@@ -34,12 +34,7 @@ public class WarForOilEvent : ScriptableObject
     public MediaPursuitLevel mediaPursuitLevelOnTrigger; //tetiklendiğinde atanacak medya takibi seviyesi
 
     [Header("Zincir Ayarları")]
-    public ChainRole chainRole = ChainRole.None; //bu event zincirde mi, rolü ne
-    public WarForOilEvent nextChainEvent; //sonraki zincir eventi (null = zincirin sonu)
-    public float chainInterval = 5f; //sonraki zincir eventine kadar bekleme süresi (saniye)
-    public List<Skill> skillsToLock; //zincir bittiğinde kilitlenecek skill'ler (sadece head event'te ayarlanır)
-    public float chainFine; //zincir çöktüğünde kesilecek para cezası (sadece head event'te)
-    public List<RefusalThreshold> refusalThresholds; //support'a göre kaç reddetmede zincir çöker (sadece head event'te)
+    public ChainRole chainRole = ChainRole.None; //bu event zincirde mi (Head = zincir başlatıcı)
 
     /// <summary>
     /// Şu an seçilebilir olan choice'ların listesini döner.
@@ -114,10 +109,8 @@ public class WarForOilEventChoice
     [Range(0f, 1f)] public float probDismissChance; //event yok olma olasılığı (support=50 için base değer)
     public float probWarEndDelay; //savaş biterse gecikme süresi (saniye)
 
-    //zincir seçenek flagleri (Editor tarafından foldout içinde çizilir)
-    public bool continuesChain; //zinciri devam ettirir (fonlama)
-    public bool isChainRefusal; //zincirde reddetme sayacını artırır
-    public bool triggersCeasefire; //zincirden ateşkes tetikler (minSupport kontrolü yok)
+    //zincir dallanması — choice seçilince sıradaki chain event'in hangi havuzdan geleceğini belirler
+    public List<ChainBranch> chainBranches; //boşsa chain biter, doluysa dallanır
 
     //rakip işgal flagleri (Editor tarafından foldout içinde çizilir)
     public bool acceptsRivalDeal; //rakip işgal anlaşmasını kabul eder
@@ -170,20 +163,20 @@ public class WarForOilEventChoice
 public enum ChainRole
 {
     None,   //normal event, zincir dışı
-    Head,   //zincirin başlangıç event'i (config burada)
-    Link    //ara zincir event'i (sadece bağlantı)
+    Head    //zincirin başlangıç event'i — normal havuzdan tetiklenir, chain sürecini başlatır
 }
 
 /// <summary>
-/// Support aralığına göre zincirde kaç reddetmeye izin verildiğini tanımlar.
-/// Inspector'dan ayarlanır: örn. support 0-30 → 1 ret, 30-60 → 2 ret, 60-100 → 3 ret
+/// Bir choice seçildiğinde sıradaki chain event'in olası hedeflerinden birini tanımlar.
+/// Seçim formülü: effectiveWeight = baseWeight + GameStatManager.GetStatPercent(influenceStat) * statInfluence
 /// </summary>
 [System.Serializable]
-public class RefusalThreshold
+public class ChainBranch
 {
-    public float minSupport; //bu aralığın alt sınırı (dahil)
-    public float maxSupport; //bu aralığın üst sınırı (hariç)
-    public int maxRefusals; //bu aralıkta izin verilen max reddetme sayısı
+    public WarForOilEvent targetEvent;   //dallanmanın hedef eventi
+    public float baseWeight = 1f;        //temel ağırlık
+    public StatType influenceStat;       //hangi stat etkiler
+    public float statInfluence;          //stat'ın ağırlığa etkisi (stat 0-1 normalize, buna çarpılır)
 }
 
 /// <summary>

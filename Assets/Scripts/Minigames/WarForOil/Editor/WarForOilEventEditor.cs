@@ -27,7 +27,7 @@ public class WarForOilEventEditor : Editor
             "choices", "isUnlimitedRepeat", "maxRepeatCount", "defaultChoiceIndex",
             "isVandalismEvent", "vandalismLevelOnTrigger",
             "isMediaPursuitEvent", "mediaPursuitLevelOnTrigger",
-            "chainRole", "nextChainEvent", "chainInterval", "skillsToLock", "chainFine", "refusalThresholds");
+            "chainRole");
 
         //isRepeatable açıksa tekrar seçeneklerini göster
         SerializedProperty isRepeatable = serializedObject.FindProperty("isRepeatable");
@@ -53,48 +53,9 @@ public class WarForOilEventEditor : Editor
 
         EditorGUILayout.Space();
 
-        //zincir ayarları
+        //zincir ayarları — sadece None/Head seçimi, dallanma choice seviyesinde
         SerializedProperty chainRole = serializedObject.FindProperty("chainRole");
         EditorGUILayout.PropertyField(chainRole, new GUIContent("Zincir Rolü"));
-
-        ChainRole role = (ChainRole)chainRole.enumValueIndex;
-
-        if (role == ChainRole.Head)
-        {
-            //head event — tüm zincir config'i + bağlantı
-            EditorGUI.indentLevel++;
-
-            EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("nextChainEvent"),
-                new GUIContent("Sonraki Event"));
-            EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("chainInterval"),
-                new GUIContent("Aralık (sn)"));
-            EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("skillsToLock"),
-                new GUIContent("Kilitlenecek Skill"), true);
-            EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("chainFine"),
-                new GUIContent("Çöküş Cezası"));
-            EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("refusalThresholds"),
-                new GUIContent("Ret Eşikleri"), true);
-
-            EditorGUI.indentLevel--;
-        }
-        else if (role == ChainRole.Link)
-        {
-            //ara zincir event'i — sadece bağlantı alanları
-            EditorGUI.indentLevel++;
-            EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("nextChainEvent"),
-                new GUIContent("Sonraki Event"));
-            EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("chainInterval"),
-                new GUIContent("Aralık (sn)"));
-            EditorGUI.indentLevel--;
-        }
-        //None → hiçbir zincir alanı gösterilmez
 
         EditorGUILayout.Space();
 
@@ -487,24 +448,59 @@ public class WarForOilEventEditor : Editor
 
         EditorGUILayout.Space(2);
 
-        //zincir seçenek flagleri — foldout
+        //zincir dallanması — foldout (chainBranches listesi)
         if (!chainChoiceFoldouts.ContainsKey(index))
             chainChoiceFoldouts[index] = false;
+        SerializedProperty chainBranches = choice.FindPropertyRelative("chainBranches");
         chainChoiceFoldouts[index] = EditorGUILayout.Foldout(
-            chainChoiceFoldouts[index], "Zincir Flagleri", true);
+            chainChoiceFoldouts[index], $"Zincir Dallanması ({chainBranches.arraySize})", true);
 
         if (chainChoiceFoldouts[index])
         {
             EditorGUI.indentLevel++;
-            EditorGUILayout.PropertyField(
-                choice.FindPropertyRelative("continuesChain"),
-                new GUIContent("Devam Ettir"));
-            EditorGUILayout.PropertyField(
-                choice.FindPropertyRelative("isChainRefusal"),
-                new GUIContent("Reddetme"));
-            EditorGUILayout.PropertyField(
-                choice.FindPropertyRelative("triggersCeasefire"),
-                new GUIContent("Ateşkes"));
+
+            for (int b = 0; b < chainBranches.arraySize; b++)
+            {
+                SerializedProperty branch = chainBranches.GetArrayElementAtIndex(b);
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.PropertyField(
+                    branch.FindPropertyRelative("targetEvent"),
+                    new GUIContent($"Hedef {b}"));
+                if (GUILayout.Button("\u2212", GUILayout.Width(20)))
+                {
+                    chainBranches.DeleteArrayElementAtIndex(b);
+                    EditorGUILayout.EndHorizontal();
+                    break;
+                }
+                EditorGUILayout.EndHorizontal();
+
+                if (b < chainBranches.arraySize) //silindiyse atla
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        branch.FindPropertyRelative("baseWeight"),
+                        new GUIContent("Ağırlık"));
+                    EditorGUILayout.PropertyField(
+                        branch.FindPropertyRelative("influenceStat"),
+                        new GUIContent("Etkileyen Stat"));
+                    EditorGUILayout.PropertyField(
+                        branch.FindPropertyRelative("statInfluence"),
+                        new GUIContent("Stat Etkisi"));
+                    EditorGUI.indentLevel--;
+                    EditorGUILayout.Space(2);
+                }
+            }
+
+            if (GUILayout.Button("+ Dal Ekle"))
+            {
+                chainBranches.InsertArrayElementAtIndex(chainBranches.arraySize);
+                SerializedProperty newBranch = chainBranches.GetArrayElementAtIndex(chainBranches.arraySize - 1);
+                newBranch.FindPropertyRelative("targetEvent").objectReferenceValue = null;
+                newBranch.FindPropertyRelative("baseWeight").floatValue = 1f;
+                newBranch.FindPropertyRelative("influenceStat").enumValueIndex = 0;
+                newBranch.FindPropertyRelative("statInfluence").floatValue = 0f;
+            }
+
             EditorGUI.indentLevel--;
         }
 
@@ -672,9 +668,7 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("counterFeedTopic").enumValueIndex = 0;
         choice.FindPropertyRelative("counterFeedRatio").floatValue = 0f;
         choice.FindPropertyRelative("feedOverrideDuration").floatValue = 0f;
-        choice.FindPropertyRelative("continuesChain").boolValue = false;
-        choice.FindPropertyRelative("isChainRefusal").boolValue = false;
-        choice.FindPropertyRelative("triggersCeasefire").boolValue = false;
+        choice.FindPropertyRelative("chainBranches").ClearArray();
         choice.FindPropertyRelative("acceptsRivalDeal").boolValue = false;
         choice.FindPropertyRelative("rejectsRivalDeal").boolValue = false;
         choice.FindPropertyRelative("affectsVandalism").boolValue = false;

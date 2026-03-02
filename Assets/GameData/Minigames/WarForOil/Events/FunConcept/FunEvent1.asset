@@ -12,9 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
   m_Name: FunEvent1
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
-  id: 
-  displayName: 
-  description: 
+  id: wfo_fc_01
+  displayName: Exclusive Invitation
+  description: "Three of the country\u2019s most beautiful and sexy women invite
+    you to a private party.\nThe invitation is likely to attract social and political
+    attention.\nIf you attend, you will step away from direct war management for
+    a period of time.\nYour influence over decisions may temporarily decrease."
   devNote: 
   eventNote: 
   minWarTime: 0
