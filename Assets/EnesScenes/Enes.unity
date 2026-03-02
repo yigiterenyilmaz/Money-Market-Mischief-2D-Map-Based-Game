@@ -9981,20 +9981,20 @@ MonoBehaviour:
   cellSize: 14
   pixelsPerUnit: 100
   spriteZ: -0.5
-  citiesSpawnRate: 10
-  agriculturalSpawnRate: 4
-  urbanSpawnRate: 4
-  industrialSpawnRate: 4
+  citiesSpawnRate: 4
+  agriculturalSpawnRate: 1
+  urbanSpawnRate: 1
+  industrialSpawnRate: 1
   spriteScaleRange: {x: 0.75, y: 1.25}
-  cityShoreBuffer: 3
-  cityRegionBorderBuffer: 5
+  cityShoreBuffer: 10
+  cityRegionBorderBuffer: 11
   citySnapRotation: 0
   overlapRadius: 0.3
   roadNeighbourConnections: 3
-  roadConnectionBias: 0.925
+  roadConnectionBias: 1
   roadConnectionMaxSteps: 500
   roadBranchCount: 6
-  roadBranchBias: 0.952
+  roadBranchBias: 1
   roadBranchMaxSteps: 250
   roadBranchMinDistance: 50
   roadThickness: 1
