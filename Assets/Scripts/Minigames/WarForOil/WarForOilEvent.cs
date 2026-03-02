@@ -110,7 +110,13 @@ public class WarForOilEventChoice
     public float probWarEndDelay; //savaş biterse gecikme süresi (saniye)
 
     //zincir dallanması — choice seçilince sıradaki chain event'in hangi havuzdan geleceğini belirler
+    public ChainInfluenceStat chainInfluenceStat = ChainInfluenceStat.JustLuck; //dallanma seçimini etkileyen stat (JustLuck = stat yok)
+    [Range(0f, 100f)] public float chainThreshold0 = 20f;  //1. eşik (0-t0 = aralık 0)
+    [Range(0f, 100f)] public float chainThreshold1 = 50f;  //2. eşik (t0-t1 = aralık 1)
+    [Range(0f, 100f)] public float chainThreshold2 = 75f;  //3. eşik (t1-t2 = aralık 2, t2-100 = aralık 3)
     public List<ChainBranch> chainBranches; //boşsa chain biter, doluysa dallanır
+    public bool chainCanEnd; //true ise dallanma seçiminde chain'in bitme ihtimali de eklenir
+    public float chainEndWeight = 1f; //chain bitme ağırlığı (dallanma ağırlıklarıyla yarışır)
 
     //rakip işgal flagleri (Editor tarafından foldout içinde çizilir)
     public bool acceptsRivalDeal; //rakip işgal anlaşmasını kabul eder
@@ -167,16 +173,30 @@ public enum ChainRole
 }
 
 /// <summary>
+/// Dallanma stat seçimi. JustLuck seçilirse stat etkisi yok, sadece tek ağırlık kullanılır.
+/// </summary>
+public enum ChainInfluenceStat
+{
+    JustLuck,           //stat etkisi yok, saf olasılık
+    Wealth,             //para stat'ına göre
+    Suspicion,          //şüphe stat'ına göre
+    Reputation,         //itibar stat'ına göre
+    PoliticalInfluence  //politik nüfuz stat'ına göre
+}
+
+/// <summary>
 /// Bir choice seçildiğinde sıradaki chain event'in olası hedeflerinden birini tanımlar.
-/// Seçim formülü: effectiveWeight = baseWeight + GameStatManager.GetStatPercent(influenceStat) * statInfluence
+/// JustLuck: sadece weightRange0 kullanılır.
+/// Stat bazlı: stat'ın mevcut yüzdesine göre 4 aralıktan biri seçilir, o aralığın ağırlığı kullanılır.
 /// </summary>
 [System.Serializable]
 public class ChainBranch
 {
     public WarForOilEvent targetEvent;   //dallanmanın hedef eventi
-    public float baseWeight = 1f;        //temel ağırlık
-    public StatType influenceStat;       //hangi stat etkiler
-    public float statInfluence;          //stat'ın ağırlığa etkisi (stat 0-1 normalize, buna çarpılır)
+    [Range(0f, 1f)] public float weightRange0; //aralık 0 ağırlığı (JustLuck'ta tek ağırlık)
+    [Range(0f, 1f)] public float weightRange1; //aralık 1 ağırlığı
+    [Range(0f, 1f)] public float weightRange2; //aralık 2 ağırlığı
+    [Range(0f, 1f)] public float weightRange3; //aralık 3 ağırlığı
 }
 
 /// <summary>

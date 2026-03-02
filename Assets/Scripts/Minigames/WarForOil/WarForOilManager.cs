@@ -44,8 +44,14 @@ public class WarForOilManager : MonoBehaviour
     private bool isInChain; //şu an bir event zincirinde miyiz
     private WarForOilEvent chainStartEvent; //zincirin baş event'i (Head referansı)
     private List<ChainBranch> pendingChainBranches; //sıradaki dallanma seçenekleri
+    private ChainInfluenceStat pendingChainInfluenceStat; //dallanma seçimini etkileyen stat
+    private float pendingChainThreshold0; //1. eşik
+    private float pendingChainThreshold1; //2. eşik
+    private float pendingChainThreshold2; //3. eşik
     private int chainCycleCounter; //3'lü döngüdeki pozisyon (0,1,2)
     private int chainSlotsRemaining; //bu döngüde kalan chain event sayısı
+    private bool currentEventIsChainEvent; //şu anki event chain slotundan mı geldi (random slot eventleri chain'i bitirmesin)
+    private float pendingChainEndWeight; //dallanma seçiminde chain bitme ağırlığı (0 = bitme yok)
 
     //rakip işgal sistemi
     private bool isCornerGrabRace; //köşe kapma yarışı aktif mi
@@ -355,11 +361,20 @@ public class WarForOilManager : MonoBehaviour
         if (!isInChain && resolvedEvent.chainRole == ChainRole.Head)
             StartChain(resolvedEvent);
 
-        //zincir dallanması — choice'un chainBranches'ını kontrol et
-        if (isInChain)
+        //zincir dallanması — sadece chain'e ait eventlerde kontrol et (Head veya chain slotundan gelen)
+        //random slotta gelen normal eventler chain'i etkilemez
+        if (isInChain && (resolvedEvent.chainRole == ChainRole.Head || currentEventIsChainEvent))
         {
+            currentEventIsChainEvent = false;
             if (choice.chainBranches != null && choice.chainBranches.Count > 0)
+            {
                 pendingChainBranches = new List<ChainBranch>(choice.chainBranches);
+                pendingChainInfluenceStat = choice.chainInfluenceStat;
+                pendingChainThreshold0 = choice.chainThreshold0;
+                pendingChainThreshold1 = choice.chainThreshold1;
+                pendingChainThreshold2 = choice.chainThreshold2;
+                pendingChainEndWeight = choice.chainCanEnd ? choice.chainEndWeight : 0f;
+            }
             else
                 EndChain(); //dallanma yok → chain doğal olarak biter
         }
@@ -840,6 +855,10 @@ public class WarForOilManager : MonoBehaviour
         isInChain = true;
         chainStartEvent = headEvent;
         pendingChainBranches = null;
+        pendingChainInfluenceStat = ChainInfluenceStat.JustLuck;
+        pendingChainThreshold0 = 0f;
+        pendingChainThreshold1 = 0f;
+        pendingChainThreshold2 = 0f;
         chainCycleCounter = 0;
         chainSlotsRemaining = 0;
 
@@ -855,29 +874,45 @@ public class WarForOilManager : MonoBehaviour
         isInChain = false;
         chainStartEvent = null;
         pendingChainBranches = null;
+        pendingChainInfluenceStat = ChainInfluenceStat.JustLuck;
+        pendingChainThreshold0 = 0f;
+        pendingChainThreshold1 = 0f;
+        pendingChainThreshold2 = 0f;
         chainCycleCounter = 0;
         chainSlotsRemaining = 0;
+        currentEventIsChainEvent = false;
+        pendingChainEndWeight = 0f;
 
         OnChainEnded?.Invoke();
     }
 
     /// <summary>
-    /// Chain slotunda pendingChainBranches'tan stat-ağırlıklı seçim yaparak event tetikler.
-    /// Formül: effectiveWeight = baseWeight + GetStatPercent(influenceStat) * statInfluence
+    /// Chain slotunda pendingChainBranches'tan aralık bazlı ağırlıklı seçim yaparak event tetikler.
+    /// Stat bazlı: stat'ın mevcut yüzdesine göre 4 aralıktan biri seçilir, o aralığın ağırlığı kullanılır.
+    /// JustLuck: sadece weightRange0 kullanılır (stat etkisi yok).
     /// </summary>
     private void TryTriggerChainSlotEvent()
     {
         if (pendingChainBranches == null || pendingChainBranches.Count == 0) return;
 
-        //ağırlıkları hesapla
-        float totalWeight = 0f;
+        //hangi aralıkta olduğumuzu belirle
+        int rangeIndex = 0;
+        if (pendingChainInfluenceStat != ChainInfluenceStat.JustLuck)
+        {
+            float statPercent = GetChainStatPercent(pendingChainInfluenceStat) * 100f; //0-100 ölçeğine çevir
+            if (statPercent >= pendingChainThreshold2) rangeIndex = 3;
+            else if (statPercent >= pendingChainThreshold1) rangeIndex = 2;
+            else if (statPercent >= pendingChainThreshold0) rangeIndex = 1;
+            else rangeIndex = 0;
+        }
+
+        //ağırlıkları topla (chain bitme ağırlığı dahil)
+        float endWeight = pendingChainEndWeight > 0f ? pendingChainEndWeight : 0f;
+        float totalWeight = endWeight;
         float[] weights = new float[pendingChainBranches.Count];
         for (int i = 0; i < pendingChainBranches.Count; i++)
         {
-            float statPercent = GameStatManager.Instance != null
-                ? GameStatManager.Instance.GetStatPercent(pendingChainBranches[i].influenceStat)
-                : 0.5f;
-            float w = pendingChainBranches[i].baseWeight + statPercent * pendingChainBranches[i].statInfluence;
+            float w = GetBranchWeight(pendingChainBranches[i], rangeIndex);
             if (w < 0f) w = 0f;
             weights[i] = w;
             totalWeight += w;
@@ -887,14 +922,23 @@ public class WarForOilManager : MonoBehaviour
 
         if (totalWeight <= 0f)
         {
-            //tüm ağırlıklar 0 — eşit dağılımlı seç
+            //tüm ağırlıklar 0 — eşit dağılımlı seç (bitme dahil edilmez)
             selected = pendingChainBranches[UnityEngine.Random.Range(0, pendingChainBranches.Count)].targetEvent;
         }
         else
         {
-            //ağırlıklı rastgele seçim
+            //ağırlıklı rastgele seçim — önce chain bitme kontrolü
             float roll = UnityEngine.Random.value * totalWeight;
-            float cumulative = 0f;
+
+            if (roll < endWeight)
+            {
+                //chain biter
+                EndChain();
+                return;
+            }
+
+            //branch seçimi
+            float cumulative = endWeight;
             selected = pendingChainBranches[pendingChainBranches.Count - 1].targetEvent; //fallback
             for (int i = 0; i < pendingChainBranches.Count; i++)
             {
@@ -909,8 +953,40 @@ public class WarForOilManager : MonoBehaviour
 
         if (selected == null) return;
 
-        //event'i tetikle
+        //event'i tetikle — chain slotundan geldiğini işaretle
+        currentEventIsChainEvent = true;
         TriggerEvent(selected);
+    }
+
+    /// <summary>
+    /// ChainInfluenceStat'ı GameStatManager'dan 0-1 yüzdeye çevirir.
+    /// </summary>
+    private float GetChainStatPercent(ChainInfluenceStat stat)
+    {
+        if (GameStatManager.Instance == null) return 0.5f;
+        switch (stat)
+        {
+            case ChainInfluenceStat.Wealth: return GameStatManager.Instance.GetStatPercent(StatType.Wealth);
+            case ChainInfluenceStat.Suspicion: return GameStatManager.Instance.GetStatPercent(StatType.Suspicion);
+            case ChainInfluenceStat.Reputation: return GameStatManager.Instance.GetStatPercent(StatType.Reputation);
+            case ChainInfluenceStat.PoliticalInfluence: return GameStatManager.Instance.GetStatPercent(StatType.PoliticalInfluence);
+            default: return 0.5f;
+        }
+    }
+
+    /// <summary>
+    /// Branch'in belirtilen aralık için ağırlığını döner. JustLuck'ta (rangeIndex=0) weightRange0 kullanılır.
+    /// </summary>
+    private float GetBranchWeight(ChainBranch branch, int rangeIndex)
+    {
+        switch (rangeIndex)
+        {
+            case 0: return branch.weightRange0;
+            case 1: return branch.weightRange1;
+            case 2: return branch.weightRange2;
+            case 3: return branch.weightRange3;
+            default: return branch.weightRange0;
+        }
     }
 
     /// <summary>
@@ -1716,8 +1792,14 @@ public class WarForOilManager : MonoBehaviour
         isInChain = false;
         chainStartEvent = null;
         pendingChainBranches = null;
+        pendingChainInfluenceStat = ChainInfluenceStat.JustLuck;
+        pendingChainThreshold0 = 0f;
+        pendingChainThreshold1 = 0f;
+        pendingChainThreshold2 = 0f;
         chainCycleCounter = 0;
         chainSlotsRemaining = 0;
+        currentEventIsChainEvent = false;
+        pendingChainEndWeight = 0f;
         isCornerGrabRace = false;
         rivalInvasionTriggered = false;
         rivalCountry = null;

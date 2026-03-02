@@ -459,6 +459,40 @@ public class WarForOilEventEditor : Editor
         {
             EditorGUI.indentLevel++;
 
+            //etkileyen stat seçimi (choice seviyesinde — tüm branch'ler paylaşır)
+            SerializedProperty chainInfluenceStat = choice.FindPropertyRelative("chainInfluenceStat");
+            EditorGUILayout.PropertyField(chainInfluenceStat, new GUIContent("Etkileyen Stat"));
+
+            bool isJustLuck = (ChainInfluenceStat)chainInfluenceStat.enumValueIndex == ChainInfluenceStat.JustLuck;
+
+            //eşik değerleri — sadece stat bazlıysa göster
+            string range0Label, range1Label, range2Label, range3Label;
+            if (!isJustLuck)
+            {
+                SerializedProperty t0 = choice.FindPropertyRelative("chainThreshold0");
+                SerializedProperty t1 = choice.FindPropertyRelative("chainThreshold1");
+                SerializedProperty t2 = choice.FindPropertyRelative("chainThreshold2");
+                EditorGUILayout.PropertyField(t0, new GUIContent("Eşik 1 (%)"));
+                EditorGUILayout.PropertyField(t1, new GUIContent("Eşik 2 (%)"));
+                EditorGUILayout.PropertyField(t2, new GUIContent("Eşik 3 (%)"));
+
+                //eşik doğrulama
+                if (t0.floatValue >= t1.floatValue || t1.floatValue >= t2.floatValue)
+                    EditorGUILayout.HelpBox("Eşikler sıralı olmalı: Eşik 1 < Eşik 2 < Eşik 3", MessageType.Warning);
+
+                range0Label = $"0-{t0.floatValue:F0}%";
+                range1Label = $"{t0.floatValue:F0}-{t1.floatValue:F0}%";
+                range2Label = $"{t1.floatValue:F0}-{t2.floatValue:F0}%";
+                range3Label = $"{t2.floatValue:F0}-100%";
+            }
+            else
+            {
+                range0Label = range1Label = range2Label = range3Label = "";
+            }
+
+            EditorGUILayout.Space(4);
+
+            //branch listesi
             for (int b = 0; b < chainBranches.arraySize; b++)
             {
                 SerializedProperty branch = chainBranches.GetArrayElementAtIndex(b);
@@ -477,18 +511,66 @@ public class WarForOilEventEditor : Editor
                 if (b < chainBranches.arraySize) //silindiyse atla
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(
-                        branch.FindPropertyRelative("baseWeight"),
-                        new GUIContent("Ağırlık"));
-                    EditorGUILayout.PropertyField(
-                        branch.FindPropertyRelative("influenceStat"),
-                        new GUIContent("Etkileyen Stat"));
-                    EditorGUILayout.PropertyField(
-                        branch.FindPropertyRelative("statInfluence"),
-                        new GUIContent("Stat Etkisi"));
+                    if (isJustLuck)
+                    {
+                        EditorGUILayout.Slider(
+                            branch.FindPropertyRelative("weightRange0"),
+                            0f, 1f, new GUIContent("Ağırlık"));
+                    }
+                    else
+                    {
+                        EditorGUILayout.Slider(
+                            branch.FindPropertyRelative("weightRange0"),
+                            0f, 1f, new GUIContent(range0Label));
+                        EditorGUILayout.Slider(
+                            branch.FindPropertyRelative("weightRange1"),
+                            0f, 1f, new GUIContent(range1Label));
+                        EditorGUILayout.Slider(
+                            branch.FindPropertyRelative("weightRange2"),
+                            0f, 1f, new GUIContent(range2Label));
+                        EditorGUILayout.Slider(
+                            branch.FindPropertyRelative("weightRange3"),
+                            0f, 1f, new GUIContent(range3Label));
+                    }
                     EditorGUI.indentLevel--;
                     EditorGUILayout.Space(2);
                 }
+            }
+
+            //aralık başına toplam ağırlık doğrulaması
+            if (chainBranches.arraySize > 0)
+            {
+                int rangeCount = isJustLuck ? 1 : 4;
+                float[] sums = new float[rangeCount];
+                for (int b = 0; b < chainBranches.arraySize; b++)
+                {
+                    SerializedProperty br = chainBranches.GetArrayElementAtIndex(b);
+                    sums[0] += br.FindPropertyRelative("weightRange0").floatValue;
+                    if (!isJustLuck)
+                    {
+                        sums[1] += br.FindPropertyRelative("weightRange1").floatValue;
+                        sums[2] += br.FindPropertyRelative("weightRange2").floatValue;
+                        sums[3] += br.FindPropertyRelative("weightRange3").floatValue;
+                    }
+                }
+
+                string sumText;
+                if (isJustLuck)
+                {
+                    sumText = $"Toplam: {sums[0]:F2}";
+                }
+                else
+                {
+                    sumText = $"{range0Label}: {sums[0]:F2} | {range1Label}: {sums[1]:F2} | {range2Label}: {sums[2]:F2} | {range3Label}: {sums[3]:F2}";
+                }
+
+                bool anyBad = false;
+                for (int r = 0; r < rangeCount; r++)
+                {
+                    if (Mathf.Abs(sums[r] - 1f) > 0.01f) { anyBad = true; break; }
+                }
+                EditorGUILayout.HelpBox(sumText,
+                    anyBad ? MessageType.Warning : MessageType.Info);
             }
 
             if (GUILayout.Button("+ Dal Ekle"))
@@ -496,9 +578,26 @@ public class WarForOilEventEditor : Editor
                 chainBranches.InsertArrayElementAtIndex(chainBranches.arraySize);
                 SerializedProperty newBranch = chainBranches.GetArrayElementAtIndex(chainBranches.arraySize - 1);
                 newBranch.FindPropertyRelative("targetEvent").objectReferenceValue = null;
-                newBranch.FindPropertyRelative("baseWeight").floatValue = 1f;
-                newBranch.FindPropertyRelative("influenceStat").enumValueIndex = 0;
-                newBranch.FindPropertyRelative("statInfluence").floatValue = 0f;
+                newBranch.FindPropertyRelative("weightRange0").floatValue = 0f;
+                newBranch.FindPropertyRelative("weightRange1").floatValue = 0f;
+                newBranch.FindPropertyRelative("weightRange2").floatValue = 0f;
+                newBranch.FindPropertyRelative("weightRange3").floatValue = 0f;
+            }
+
+            //chain bitme şansı — dallanma varsa göster
+            if (chainBranches.arraySize > 0)
+            {
+                EditorGUILayout.Space(2);
+                SerializedProperty chainCanEnd = choice.FindPropertyRelative("chainCanEnd");
+                EditorGUILayout.PropertyField(chainCanEnd, new GUIContent("Bitme Şansı"));
+                if (chainCanEnd.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("chainEndWeight"),
+                        new GUIContent("Bitme Ağırlığı"));
+                    EditorGUI.indentLevel--;
+                }
             }
 
             EditorGUI.indentLevel--;
@@ -668,7 +767,13 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("counterFeedTopic").enumValueIndex = 0;
         choice.FindPropertyRelative("counterFeedRatio").floatValue = 0f;
         choice.FindPropertyRelative("feedOverrideDuration").floatValue = 0f;
+        choice.FindPropertyRelative("chainInfluenceStat").enumValueIndex = 0;
+        choice.FindPropertyRelative("chainThreshold0").floatValue = 20f;
+        choice.FindPropertyRelative("chainThreshold1").floatValue = 50f;
+        choice.FindPropertyRelative("chainThreshold2").floatValue = 75f;
         choice.FindPropertyRelative("chainBranches").ClearArray();
+        choice.FindPropertyRelative("chainCanEnd").boolValue = false;
+        choice.FindPropertyRelative("chainEndWeight").floatValue = 1f;
         choice.FindPropertyRelative("acceptsRivalDeal").boolValue = false;
         choice.FindPropertyRelative("rejectsRivalDeal").boolValue = false;
         choice.FindPropertyRelative("affectsVandalism").boolValue = false;

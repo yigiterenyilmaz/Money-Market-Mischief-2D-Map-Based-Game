@@ -265,7 +265,9 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `counterFeedRatio` | Counter konu orani (0-1) |
 | `feedOverrideDuration` | Yonlendirme suresi (saniye, her iki topic icin ortak) |
 | **Zincir Dallanmasi** (foldout) | |
-| `chainBranches` | Dallanma hedefleri listesi (List\<ChainBranch\>). Bos = chain biter. Dolu = sonraki chain event bu listeden secilir. |
+| `chainInfluenceStat` | Dallanma secimini etkileyen stat (ChainInfluenceStat: JustLuck / Wealth / Suspicion / Reputation / PoliticalInfluence) |
+| `chainThreshold0/1/2` | Stat aralik esikleri (varsayilan 20/50/75, 4 aralik olusturur) |
+| `chainBranches` | Dallanma hedefleri listesi (List\<ChainBranch\>). Bos = chain biter. Dolu = sonraki chain event bu listeden secilir. Her branch'te 4 aralik agirligi (weightRange0-3). |
 | **Rakip Isgal Flagleri** (foldout) | |
 | `acceptsRivalDeal` | Rakip isgal anlasmasini kabul eder |
 | `rejectsRivalDeal` | Rakip isgal anlasmasini reddeder → kose kapma yarisi baslar |
@@ -312,6 +314,21 @@ Savas sonucu. Manager tarafindan olusturulur, event'lerle UI'a iletilir.
 
 Bazi eventler dallanmali zincirler olusturur. Zincir, Head event ile baslar ve her choice'un `chainBranches` listesi ile dallanir. Normal event dongusune entegre calisir (ayri state yok).
 
+### ChainInfluenceStat (choice seviyesinde)
+
+Dallanma secimini etkileyen stat. Choice'un `chainInfluenceStat` alaninda secilir, tum branch'ler ayni stat'i paylasir.
+
+| Deger | Aciklama |
+|-------|----------|
+| `JustLuck` | Stat etkisi yok, sadece weightRange0 kullanilir (saf sans) |
+| `Wealth` | Para stat'ina gore |
+| `Suspicion` | Suphe stat'ina gore |
+| `Reputation` | Itibar stat'ina gore |
+| `PoliticalInfluence` | Politik nufuz stat'ina gore |
+
+**Esik degerleri** (choice seviyesinde): `chainThreshold0` (varsayilan 20), `chainThreshold1` (varsayilan 50), `chainThreshold2` (varsayilan 75)
+3 esik ile 4 aralik olusur: 0-t0, t0-t1, t1-t2, t2-100
+
 ### ChainBranch
 
 Bir choice secildiginde siradaki chain event'in olasi hedeflerinden birini tanimlar.
@@ -319,20 +336,29 @@ Bir choice secildiginde siradaki chain event'in olasi hedeflerinden birini tanim
 | Alan | Aciklama |
 |------|----------|
 | `targetEvent` | Dallanmanin hedef event'i (WarForOilEvent referansi) |
-| `baseWeight` | Temel agirlik (varsayilan 1) |
-| `influenceStat` | Hangi stat etkiler (StatType enum) |
-| `statInfluence` | Stat'in agirliga etkisi (stat 0-1 normalize, buna carpilir) |
+| `weightRange0` | Aralik 0 agirligi (JustLuck'ta tek agirlik) |
+| `weightRange1` | Aralik 1 agirligi |
+| `weightRange2` | Aralik 2 agirligi |
+| `weightRange3` | Aralik 3 agirligi |
 
-**Secim formulu:** `effectiveWeight = baseWeight + GetStatPercent(influenceStat) * statInfluence`
-Normalize edilir, agirlikli random secim yapilir.
+**Secim mantigi:**
+1. Stat'in mevcut yuzdesi (0-100) hesaplanir
+2. Esik degerlerine gore hangi aralikta oldugu belirlenir
+3. O araligin agirligi (weightRangeX) kullanilir
+4. Tum branch'lerin ayni araliktaki agirliklari toplanir, normalize edilir, agirlikli random secim yapilir
+5. JustLuck modunda aralik yok, sadece weightRange0 kullanilir
+
+**Not:** Her aralik icin tum branch'lerin agirlik toplami ~1 olmalidir (olasilik gibi girilir).
 
 ### Inspector'da Zincir Kurulumu
 
 1. Baslangic event'inin `chainRole`'unu **Head** yap
 2. Head event'in choice'larinda "Zincir Dallanmasi" foldout'unu ac
-3. `+ Dal Ekle` ile dallanma hedeflerini ekle (targetEvent, baseWeight, influenceStat, statInfluence)
-4. Hedef event'lerin choice'larinda da `chainBranches` doldur (dallanma devam etsin)
-5. Bir choice'un `chainBranches` listesi **bos** birakilirsa chain o noktada dogal olarak biter
+3. **Etkileyen Stat** sec (JustLuck veya bir GameStat)
+4. Stat secildiyse **3 esik degerini** ayarla (varsayilan 20/50/75)
+5. `+ Dal Ekle` ile dallanma hedeflerini ekle (targetEvent + aralik basi agirlik)
+6. Hedef event'lerin choice'larinda da `chainBranches` doldur (dallanma devam etsin)
+7. Bir choice'un `chainBranches` listesi **bos** birakilirsa chain o noktada dogal olarak biter
 
 ### 3'lu Event Dongusu (chain aktifken)
 
@@ -351,7 +377,7 @@ Chain aktifken normal event dongusu 3'lu cycle'lara bolunur:
 
 1. Normal havuzdan Head event tetiklenir → `isInChain = true`
 2. Oyuncu choice secer → choice'un `chainBranches` → `pendingChainBranches`
-3. Sonraki chain slotunda `pendingChainBranches`'tan biri secilir (stat-weighted) → tetiklenir
+3. Sonraki chain slotunda `pendingChainBranches`'tan biri secilir (stat bazli veya sans bazli) → tetiklenir
 4. Tekrar choice secilir → `chainBranches` → yeni `pendingChainBranches`
 5. `chainBranches` bos olan choice secilirse → `isInChain = false`, chain dogal olarak biter
 6. Savas biterse (timer, endsWar, ceasefire, protest) → chain de biter, ozel ceza yok
@@ -861,7 +887,7 @@ Savas sirasinda event tetiklemeden once `EventCoordinator.CanShowEvent()` kontro
   2. **Protest Etkisi** — protestModifier, protestTriggerChanceBonus, olasilikli tepki (hasProtestChance + alt alanlari)
   4. **Diger Sonuclar** — endsWar, reducesReward, endsWarWithDeal, blocksEvents, blocksCeasefire, blocksEventGroup, hasProbabilisticRewardReduction, hasProbabilisticWarEnd
   5. **Feed Sonuclari** — freezesFeed, slowsFeed, hasFeedOverride (alt kosullu alanlarla)
-  6. **Zincir Dallanmasi** — chainBranches listesi (targetEvent, baseWeight, influenceStat, statInfluence)
+  6. **Zincir Dallanmasi** — chainInfluenceStat, esik degerleri, chainBranches listesi (targetEvent, weightRange0-3), chainCanEnd, chainEndWeight
   7. **Rakip Isgal Flagleri** — acceptsRivalDeal, rejectsRivalDeal
   8. **Vandalizm Etkisi** — affectsVandalism, vandalismChangeType, vandalismTargetLevel/vandalismLevelDelta (kosullu)
   9. **Medya Takibi Etkisi** — affectsMediaPursuit, mediaPursuitChangeType, mediaPursuitTargetLevel/mediaPursuitLevelDelta (kosullu)
@@ -884,12 +910,13 @@ Savas sirasinda event tetiklemeden once `EventCoordinator.CanShowEvent()` kontro
 ### Zincir Event Akisi
 
 1. Normal savas sirasinda Head event tetiklenir → zincir baslar
-2. Oyuncu choice secer → choice'un `chainBranches` listesi `pendingChainBranches` olur
-3. 3'lu dongude chain slotu geldiginde `pendingChainBranches`'tan stat-agirlikli secim yapilir
-4. Secilen event tetiklenir → oyuncu yeni choice secer → yeni dallanma
-5. `chainBranches` bos olan choice secilirse → chain dogal olarak biter (ceza yok)
-6. Savas biterse (timer, endsWar, ateskes) → chain de biter (ceza yok)
-7. Chain aktifken rival invasion, protest, media pursuit normal calismaya devam eder
+2. Oyuncu choice secer → choice'un `chainInfluenceStat`, esikler ve `chainBranches` kaydedilir
+3. 3'lu dongude chain slotu geldiginde stat'in mevcut yuzdesi hesaplanir → aralik belirlenir → o araligin agirliklariyla secim yapilir
+4. JustLuck modunda aralik yok, sadece weightRange0 kullanilir
+5. Secilen event tetiklenir → oyuncu yeni choice secer → yeni dallanma (her choice farkli stat/esik/agirlik kullanabilir)
+6. `chainBranches` bos olan choice secilirse → chain dogal olarak biter (ceza yok)
+7. Savas biterse (timer, endsWar, ateskes) → chain de biter (ceza yok)
+8. Chain aktifken rival invasion, protest, media pursuit normal calismaya devam eder
 
 ### Rakip Isgal Akisi
 
