@@ -195,6 +195,8 @@ Savas sirasinda tetiklenen karar olaylari. Ayni event sinifi normal eventler, zi
 | `defaultChoiceIndex` | Sure dolunca secilecek secenek (-1 = ilk available secenek) |
 | **Zincir Ayarlari** | |
 | `chainRole` | None / Head (Head = zincir baslatici, dallanma choice seviyesinde tanimlanir) |
+| `blocksSubChainBranching` | true ise bu event tetiklendikten sonra baska zincirlerde dallanma hedefi olarak secilemez. Alt agaci da dolayisiyla erisilemez hale gelir (altinda Head varsa o bagimsiz tetiklenebilir). |
+| `alsoBlockedBranchEvents` | blocksSubChainBranching tetiklenince bu listedeki event'ler de dallanma hedefi olarak engellenir (kendileri tetiklenmemis olsa bile). |
 | **Vandalizm Tetikleme** | |
 | `isVandalismEvent` | Bu event tetiklendiginde vandalizm seviyesi otomatik degisir |
 | `vandalismLevelOnTrigger` | Tetiklendiginde atanacak vandalizm seviyesi |
@@ -988,6 +990,7 @@ Normalize: total = adjWarEnd + adjDismiss + adjRetrigger
 - **Dismiss**: Event id'si `dismissedEventIds` set'ine eklenir. Tum havuzlarda (normal, protest, medya takibi) filtrelenir.
 - **Retrigger**: Event `forcedNextEvent` olarak kaydedilir. Sonraki TryTriggerWarEvent cagirisinda havuz secimi atlanarak direkt tetiklenir (sayac artirilmaz).
 - **Savas bitis**: `eventsBlocked = true` + `warTimer` ilerletilir (probWarEndDelay kadar gecikme).
+- **Alt zincir dallanma engeli**: `blocksSubChainBranching` acik event tetiklendiginde id'si `blockedBranchEventIds`'ye eklenir. Dallanma seciminde bu event'lerin agirligisifirlanir, hedef olarak secilemez. Alt agaci da erisilemez hale gelir (Head alt eventler bagimsiz tetiklenebilir).
 
 ---
 

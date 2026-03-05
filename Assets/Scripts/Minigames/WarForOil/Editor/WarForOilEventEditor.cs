@@ -29,7 +29,7 @@ public class WarForOilEventEditor : Editor
             "hasNarrative", "narrative",
             "isVandalismEvent", "vandalismLevelOnTrigger", "startsVandalism", "forcesVandalismStart",
             "isMediaPursuitEvent", "mediaPursuitLevelOnTrigger",
-            "chainRole");
+            "chainRole", "blocksSubChainBranching", "alsoBlockedBranchEvents");
 
         //isRepeatable açıksa tekrar seçeneklerini göster
         SerializedProperty isRepeatable = serializedObject.FindProperty("isRepeatable");
@@ -72,6 +72,20 @@ public class WarForOilEventEditor : Editor
         //zincir ayarları — sadece None/Head seçimi, dallanma choice seviyesinde
         SerializedProperty chainRole = serializedObject.FindProperty("chainRole");
         EditorGUILayout.PropertyField(chainRole, new GUIContent("Zincir Rolü"));
+
+        SerializedProperty blocksSubChain = serializedObject.FindProperty("blocksSubChainBranching");
+        EditorGUILayout.PropertyField(blocksSubChain, new GUIContent("Alt Zincir Dallanmasını Kapat"));
+        if (blocksSubChain.boolValue)
+        {
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(
+                serializedObject.FindProperty("alsoBlockedBranchEvents"),
+                new GUIContent("Birlikte Engelle"), true);
+            EditorGUI.indentLevel--;
+            EditorGUILayout.HelpBox(
+                "Bu event tetiklendikten sonra, kendisi ve listedeki event'ler başka zincirlerde dallanma hedefi olarak seçilemez.",
+                MessageType.Info);
+        }
 
         EditorGUILayout.Space();
 

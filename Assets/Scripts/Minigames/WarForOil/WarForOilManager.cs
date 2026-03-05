@@ -91,6 +91,9 @@ public class WarForOilManager : MonoBehaviour
     private WarForOilEvent forcedNextEvent; //tekrar tetiklenecek event (sonraki cycle'da)
     private HashSet<string> dismissedEventIds = new HashSet<string>(); //bu savaşta kalıcı yok sayılan event id'leri
 
+    //alt zincir dallanma engeli — tetiklenen event'lerin id'leri (blocksSubChainBranching açıksa)
+    private HashSet<string> blockedBranchEventIds = new HashSet<string>();
+
     //sonuç ekranı beklerken saklanan sonuç
     private WarForOilResult pendingResult;
 
@@ -938,11 +941,19 @@ public class WarForOilManager : MonoBehaviour
         }
 
         //ağırlıkları topla (chain bitme ağırlığı dahil)
+        //alt zincir dallanma engeli olan event'lerin ağırlığını sıfırla
         float endWeight = pendingChainEndWeight > 0f ? pendingChainEndWeight : 0f;
         float totalWeight = endWeight;
         float[] weights = new float[pendingChainBranches.Count];
         for (int i = 0; i < pendingChainBranches.Count; i++)
         {
+            //engellenen event ise ağırlık 0 — dallanma hedefi olamaz
+            if (pendingChainBranches[i].targetEvent != null
+                && blockedBranchEventIds.Contains(pendingChainBranches[i].targetEvent.id))
+            {
+                weights[i] = 0f;
+                continue;
+            }
             float w = GetBranchWeight(pendingChainBranches[i], rangeIndex);
             if (w < 0f) w = 0f;
             weights[i] = w;
@@ -1058,6 +1069,20 @@ public class WarForOilManager : MonoBehaviour
         currentEvent = evt;
         eventTriggerCounts.TryGetValue(evt, out int count);
         eventTriggerCounts[evt] = count + 1;
+
+        //alt zincir dallanma engeli — bu event tetiklendiğinde gelecekte dallanma hedefi olamaz
+        if (evt.blocksSubChainBranching)
+        {
+            blockedBranchEventIds.Add(evt.id);
+            if (evt.alsoBlockedBranchEvents != null)
+            {
+                for (int i = 0; i < evt.alsoBlockedBranchEvents.Count; i++)
+                {
+                    if (evt.alsoBlockedBranchEvents[i] != null)
+                        blockedBranchEventIds.Add(evt.alsoBlockedBranchEvents[i].id);
+                }
+            }
+        }
 
         EventCoordinator.MarkEventShown();
 
@@ -1883,6 +1908,7 @@ public class WarForOilManager : MonoBehaviour
         mediaPursuitTickTimer = 0f;
         forcedNextEvent = null;
         dismissedEventIds.Clear();
+        blockedBranchEventIds.Clear();
 
         OnWarStarted?.Invoke(selectedCountry, database.warDuration);
     }

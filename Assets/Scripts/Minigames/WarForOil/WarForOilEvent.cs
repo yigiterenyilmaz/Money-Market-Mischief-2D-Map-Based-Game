@@ -41,6 +41,8 @@ public class WarForOilEvent : ScriptableObject
 
     [Header("Zincir Ayarları")]
     public ChainRole chainRole = ChainRole.None; //bu event zincirde mi (Head = zincir başlatıcı)
+    public bool blocksSubChainBranching; //true ise bu event tetiklendikten sonra başka zincirlerden dallanma hedefi olarak seçilemez
+    public List<WarForOilEvent> alsoBlockedBranchEvents; //blocksSubChainBranching tetiklenince bu event'ler de dallanma hedefi olarak engellenir
 
     /// <summary>
     /// Şu an seçilebilir olan choice'ların listesini döner.
