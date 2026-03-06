@@ -97,6 +97,9 @@ public class WarForOilManager : MonoBehaviour
     //sonuç ekranı beklerken saklanan sonuç
     private WarForOilResult pendingResult;
 
+    //kalıcı support çarpanı (PermanentMultiplierStatType.WarSupport ile uygulanır)
+    private float supportGainMultiplier = 1f;
+
     //savaş kaybedilirse minigame kalıcı olarak devre dışı kalır
     private bool permanentlyDisabled;
 
@@ -299,17 +302,21 @@ public class WarForOilManager : MonoBehaviour
         }
 
         //kalıcı stat çarpanları uygula
-        if (choice.permanentMultipliers != null && choice.permanentMultipliers.Count > 0 && GameStatManager.Instance != null)
+        if (choice.permanentMultipliers != null && choice.permanentMultipliers.Count > 0)
         {
             for (int i = 0; i < choice.permanentMultipliers.Count; i++)
             {
                 var entry = choice.permanentMultipliers[i];
-                GameStatManager.Instance.ApplyPermanentGainMultiplier(entry.stat, entry.multiplier);
+                if (entry.stat == PermanentMultiplierStatType.WarSupport)
+                    ApplyPermanentSupportMultiplier(entry.multiplier);
+                else if (GameStatManager.Instance != null)
+                    GameStatManager.Instance.ApplyPermanentGainMultiplier((StatType)entry.stat, entry.multiplier);
             }
         }
 
-        //supportStat güncelle
-        supportStat = Mathf.Clamp(supportStat + choice.supportModifier, 0f, 100f);
+        //supportStat güncelle (kalıcı çarpan uygulanır)
+        if (choice.supportModifier != 0f)
+            supportStat = Mathf.Clamp(supportStat + choice.supportModifier * supportGainMultiplier, 0f, 100f);
 
         //köşe kapma stat güncelle (sadece yarış aktifse)
         if (isCornerGrabRace && choice.cornerGrabModifier != 0f)
@@ -367,6 +374,10 @@ public class WarForOilManager : MonoBehaviour
 
         //medya takibi seviyesi güncelle
         ApplyMediaPursuitChange(choice);
+
+        //kadın sürecini başlat
+        if (choice.startsWomanProcess && WomanProcessManager.Instance != null)
+            WomanProcessManager.Instance.StartProcess();
 
         WarForOilEvent resolvedEvent = currentEvent;
         OnWarEventResolved?.Invoke(choice);
@@ -2292,6 +2303,87 @@ public class WarForOilManager : MonoBehaviour
         selectedCountry = null;
         currentState = WarForOilState.Idle;
         pressureCooldownTimer = 0f;
+    }
+
+    // ==================== KADIN SÜRECİ ENTEGRASYONU ====================
+
+    /// <summary>
+    /// Kadın süreci choice'larından gelen savaş-spesifik etkileri uygular.
+    /// Sadece savaş aktifken çağrılmalı. Stat modifier'lar (support, cornerGrab, protest,
+    /// vandalizm, medya takibi, costModifier) uygulanır. Yapısal kontroller (endsWar,
+    /// blocksEvents vb.) uygulanmaz.
+    /// </summary>
+    public void ApplyExternalWarEffects(WarForOilEventChoice choice)
+    {
+        if (currentState != WarForOilState.WarProcess && currentState != WarForOilState.EventPhase) return;
+
+        //costModifier biriktir
+        accumulatedCostModifier += choice.costModifier;
+
+        //supportStat güncelle (kalıcı çarpan uygulanır)
+        if (choice.supportModifier != 0f)
+            supportStat = Mathf.Clamp(supportStat + choice.supportModifier * supportGainMultiplier, 0f, 100f);
+
+        //köşe kapma stat güncelle (sadece yarış aktifse)
+        if (isCornerGrabRace && choice.cornerGrabModifier != 0f)
+        {
+            cornerGrabStat = Mathf.Clamp(cornerGrabStat + choice.cornerGrabModifier, 0f, 100f);
+            OnCornerGrabStatChanged?.Invoke(cornerGrabStat);
+        }
+
+        //toplum tepkisi stat güncelle (sadece tepki aktifse)
+        if (protestActive && !protestSuppressed)
+        {
+            float effectiveProtestMod = 0f;
+
+            if (choice.hasProtestChance)
+            {
+                if (UnityEngine.Random.value < choice.protestDecreaseChance)
+                    effectiveProtestMod = -choice.protestDecreaseAmount;
+                else
+                    effectiveProtestMod = choice.protestIncreaseAmount;
+            }
+            else
+            {
+                effectiveProtestMod = choice.protestModifier;
+            }
+
+            if (effectiveProtestMod != 0f)
+            {
+                protestStat = Mathf.Clamp(protestStat + effectiveProtestMod, 0f, 100f);
+                protestDriftRate = effectiveProtestMod / database.protestDriftDivisor;
+                protestDriftTimer = 0f;
+                OnProtestStatChanged?.Invoke(protestStat);
+
+                if (protestStat >= database.protestFailThreshold)
+                {
+                    ProtestForceCeasefire();
+                    return;
+                }
+                if (protestStat < database.protestSuccessThreshold)
+                {
+                    SuppressProtest();
+                }
+            }
+        }
+
+        //protest tetiklenme şansı bonusu
+        if (choice.protestTriggerChanceBonus > 0f)
+            protestChanceBonus += choice.protestTriggerChanceBonus;
+
+        //vandalizm seviyesi güncelle
+        ApplyVandalismChange(choice);
+
+        //medya takibi seviyesi güncelle
+        ApplyMediaPursuitChange(choice);
+    }
+
+    /// <summary>
+    /// War Support kalıcı çarpanını uygular. Çarpan birikimlidir (mevcut *= yeni).
+    /// </summary>
+    public void ApplyPermanentSupportMultiplier(float multiplier)
+    {
+        supportGainMultiplier *= multiplier;
     }
 
     // ==================== GETTER'LAR ====================

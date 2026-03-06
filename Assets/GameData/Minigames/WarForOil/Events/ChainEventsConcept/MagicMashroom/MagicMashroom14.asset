@@ -75,6 +75,9 @@ MonoBehaviour:
     probWarEndChance: 0
     probDismissChance: 0
     probWarEndDelay: 0
+    hasChainTickEffect: 0
+    chainTickStat: 0
+    chainTickAmount: 0
     chainInfluenceStat: 0
     chainThreshold0: 20
     chainThreshold1: 50
@@ -92,6 +95,7 @@ MonoBehaviour:
     mediaPursuitChangeType: 0
     mediaPursuitTargetLevel: 0
     mediaPursuitLevelDelta: 0
+    permanentMultipliers: []
     requiredSkills: []
     statConditions: []
   - displayName: Search for the Cook
@@ -139,6 +143,9 @@ MonoBehaviour:
     probWarEndChance: 0
     probDismissChance: 0
     probWarEndDelay: 0
+    hasChainTickEffect: 0
+    chainTickStat: 0
+    chainTickAmount: 0
     chainInfluenceStat: 0
     chainThreshold0: 20
     chainThreshold1: 50
@@ -161,11 +168,18 @@ MonoBehaviour:
     mediaPursuitChangeType: 0
     mediaPursuitTargetLevel: 0
     mediaPursuitLevelDelta: 0
+    permanentMultipliers: []
     requiredSkills: []
     statConditions: []
   defaultChoiceIndex: -1
+  hasNarrative: 0
+  narrative: 
   isVandalismEvent: 0
   vandalismLevelOnTrigger: 0
+  startsVandalism: 0
+  forcesVandalismStart: 0
   isMediaPursuitEvent: 0
   mediaPursuitLevelOnTrigger: 0
   chainRole: 0
+  blocksSubChainBranching: 1
+  alsoBlockedBranchEvents: []

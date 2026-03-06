@@ -17,6 +17,7 @@ public class WarForOilEventEditor : Editor
     private Dictionary<int, bool> feedFoldouts = new Dictionary<int, bool>();
     private Dictionary<int, bool> rewardFoldouts = new Dictionary<int, bool>();
     private Dictionary<int, bool> permanentEffectFoldouts = new Dictionary<int, bool>();
+    private Dictionary<int, bool> womanProcessFoldouts = new Dictionary<int, bool>();
     private bool chainFoldout;
 
     public override void OnInspectorGUI()
@@ -29,6 +30,7 @@ public class WarForOilEventEditor : Editor
             "hasNarrative", "narrative",
             "isVandalismEvent", "vandalismLevelOnTrigger", "startsVandalism", "forcesVandalismStart",
             "isMediaPursuitEvent", "mediaPursuitLevelOnTrigger",
+            "isWomanProcessEvent",
             "chainRole", "blocksSubChainBranching", "alsoBlockedBranchEvents");
 
         //isRepeatable açıksa tekrar seçeneklerini göster
@@ -128,6 +130,18 @@ public class WarForOilEventEditor : Editor
 
         EditorGUILayout.Space();
 
+        //kadın süreci eventi
+        SerializedProperty isWomanProcessEvent = serializedObject.FindProperty("isWomanProcessEvent");
+        EditorGUILayout.PropertyField(isWomanProcessEvent, new GUIContent("Kadın Süreci Eventi"));
+        if (isWomanProcessEvent.boolValue)
+        {
+            EditorGUILayout.HelpBox(
+                "Bu event kadın süreci havuzlarında kullanılır. Choice'larda womanObsessionModifier alanı görünür.",
+                MessageType.Info);
+        }
+
+        EditorGUILayout.Space();
+
         //choices listesi
         SerializedProperty choicesProp = serializedObject.FindProperty("choices");
         choicesProp.isExpanded = EditorGUILayout.Foldout(
@@ -210,6 +224,13 @@ public class WarForOilEventEditor : Editor
             EditorGUILayout.PropertyField(choice.FindPropertyRelative("cornerGrabModifier"),
                 new GUIContent("Köşe Kapma"));
 
+            //kadın süreci modifier — sadece isWomanProcessEvent açıkken göster
+            if (serializedObject.FindProperty("isWomanProcessEvent").boolValue)
+            {
+                EditorGUILayout.PropertyField(choice.FindPropertyRelative("womanObsessionModifier"),
+                    new GUIContent("Kadın Obsesyonu"));
+            }
+
             EditorGUI.indentLevel--;
         }
 
@@ -266,6 +287,10 @@ public class WarForOilEventEditor : Editor
         if (consequenceFoldouts[index])
         {
             EditorGUI.indentLevel++;
+
+            EditorGUILayout.PropertyField(
+                choice.FindPropertyRelative("startsWomanProcess"),
+                new GUIContent("Kadın Sürecini Başlat"));
 
             SerializedProperty endsWar = choice.FindPropertyRelative("endsWar");
             EditorGUILayout.PropertyField(endsWar, new GUIContent("Savaş Bitir"));
@@ -788,31 +813,27 @@ public class WarForOilEventEditor : Editor
             for (int p = 0; p < permList.arraySize; p++)
             {
                 SerializedProperty entry = permList.GetArrayElementAtIndex(p);
+                float val = entry.FindPropertyRelative("multiplier").floatValue;
+                string info = val > 1f
+                    ? $"(%{(val - 1f) * 100f:F0} artış)"
+                    : val < 1f
+                        ? $"(%{(1f - val) * 100f:F0} azalış)"
+                        : "(etkisiz)";
+
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.PropertyField(
                     entry.FindPropertyRelative("stat"),
-                    new GUIContent("Stat"));
+                    GUIContent.none, GUILayout.MinWidth(80));
                 EditorGUILayout.PropertyField(
                     entry.FindPropertyRelative("multiplier"),
-                    new GUIContent("Çarpan"), GUILayout.Width(120));
+                    GUIContent.none, GUILayout.Width(90));
+                EditorGUILayout.LabelField(info, EditorStyles.miniLabel, GUILayout.Width(90));
                 if (GUILayout.Button("X", GUILayout.Width(20)))
                 {
                     permList.DeleteArrayElementAtIndex(p);
                     break;
                 }
                 EditorGUILayout.EndHorizontal();
-
-                //bilgi kutusu
-                if (p < permList.arraySize)
-                {
-                    float val = permList.GetArrayElementAtIndex(p).FindPropertyRelative("multiplier").floatValue;
-                    string info = val > 1f
-                        ? $"Kazanımlar %{(val - 1f) * 100f:F0} artacak"
-                        : val < 1f
-                            ? $"Kazanımlar %{(1f - val) * 100f:F0} azalacak"
-                            : "Etkisiz (1.0)";
-                    EditorGUILayout.HelpBox(info, MessageType.Info);
-                }
             }
 
             if (GUILayout.Button("+ Kalıcı Çarpan Ekle"))
@@ -912,6 +933,8 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("mediaPursuitChangeType").enumValueIndex = 0;
         choice.FindPropertyRelative("mediaPursuitTargetLevel").enumValueIndex = 0;
         choice.FindPropertyRelative("mediaPursuitLevelDelta").intValue = 0;
+        choice.FindPropertyRelative("startsWomanProcess").boolValue = false;
+        choice.FindPropertyRelative("womanObsessionModifier").floatValue = 0f;
         choice.FindPropertyRelative("permanentMultipliers").ClearArray();
         choice.FindPropertyRelative("requiredSkills").ClearArray();
         choice.FindPropertyRelative("statConditions").ClearArray();

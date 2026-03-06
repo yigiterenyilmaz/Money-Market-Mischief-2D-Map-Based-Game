@@ -23,6 +23,9 @@ WarForOilDatabase (SO)          — tum ayarlar, event havuzlari ve ulke havuzu
 WarForOilManager (MonoBehaviour, Singleton) — ana mantik
 WarForOilResult (Serializable)              — savas sonucu verisi
 WarForOilState (enum)                       — durum makinesi
+
+WomanProcessDatabase (SO)                   — kadin sureci ayarlari ve event havuzlari
+WomanProcessManager (MonoBehaviour, Singleton) — kadin sureci mantigi (bagimsiz)
 ```
 
 Asset olusturma: `Assets → Create → Minigames → WarForOil → Database / Country / Event`
@@ -203,6 +206,8 @@ Savas sirasinda tetiklenen karar olaylari. Ayni event sinifi normal eventler, zi
 | **Medya Takibi Tetikleme** | |
 | `isMediaPursuitEvent` | Bu event tetiklendiginde medya takibi seviyesi otomatik degisir |
 | `mediaPursuitLevelOnTrigger` | Tetiklendiginde atanacak medya takibi seviyesi |
+| **Kadin Sureci** | |
+| `isWomanProcessEvent` | true ise bu event kadin sureci havuzlarinda kullanilir. Choice'larda womanObsessionModifier alani gorunur. |
 
 #### ChainRole Enum
 
@@ -283,6 +288,9 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `mediaPursuitChangeType` | Direct (hedef seviye ata) veya Relative (+/- tik kaydirma) |
 | `mediaPursuitTargetLevel` | Direct modda: hedef MediaPursuitLevel (None/Low/Medium/High/Ended) |
 | `mediaPursuitLevelDelta` | Relative modda: seviye degisimi (orn. +1 = 1 tik artir, -1 = 1 tik azalt) |
+| **Kadin Sureci** | |
+| `startsWomanProcess` | Secildiginde kadin surecini baslatir (oyun boyunca tek sefer, sadece savas icinde calisir) |
+| `womanObsessionModifier` | Kadin sureci stat degisimi (+ = obsesyon artar, - = azalir). Sadece isWomanProcessEvent acikken Inspector'da gorunur. |
 | **Kalici Stat Carpanlari** (foldout) | |
 | `permanentMultipliers` | Liste: birden fazla stat icin kalici carpan tanimlanabilir. Her entry: `stat` (StatType) + `multiplier` (float). Ornek: 1.1 = %10 artis. Carpisimsal birikir. Tum oyun boyunca, tum kaynaklardan gecerlidir. |
 | **On Kosullar** (foldout) | |
@@ -1024,6 +1032,99 @@ Inspector'da "Hicbir sey olmama" yuzdesini HelpBox gosterir: `%{(1 - retrigger -
 
 ---
 
+## Kadin Sureci Sistemi
+
+Savas sirasinda bir chain choice'u ile tetiklenen, oyuncunun obsesyon stat'ini yonettigi bagimsiz alt sistem. WarForOilManager'dan bagimsiz calisan ayri bir WomanProcessManager singleton'i vardir.
+
+### Temel Ozellikler
+
+- **Tek seferlik**: Oyun boyunca yalnizca 1 kez baslatilabilir (`wasTriggeredThisGame` flag)
+- **Savas disinda da devam eder**: Savas biterse surec sona ermez, RandomEventManager event'lerini sayarak devam eder
+- **Kendi stat'i**: `womanObsession` (0-100, varsayilan baslangic 40)
+- **3 kademe**: Obsesyon degerine gore farkli event havuzlari ve sikliklari
+- **Game over**: Obsesyon 100'e ulasirsa suspicion 100'e cikarilarak game over tetiklenir
+- **Surec bitis**: Obsesyon `endThreshold` (10) altina duserse surec biter
+
+### Kademeler
+
+| Kademe | Aralik | Varsayilan Siklik | Aciklama |
+|--------|--------|-------------------|----------|
+| 1 | 0 - tier1Max (30) | Her 5 eventte 1 | Dusuk obsesyon, seyrek event |
+| 2 | tier1Max - tier2Max (65) | Her 3 eventte 1 | Orta obsesyon |
+| 3 | tier2Max - 100 | Her 2 eventte 1 | Yuksek obsesyon, sik event |
+
+### Baslatma
+
+1. Savas icinde bir WarForOilEventChoice'ta `startsWomanProcess = true` tiklanir
+2. WarForOilManager.ResolveEvent icinde `WomanProcessManager.Instance.StartProcess()` cagirilir
+3. `womanObsession = initialObsession`, surec aktif olur
+
+### Event Sayma
+
+- **Savas icinde**: `WarForOilManager.OnWarEventResolved` dinlenir, her savas event cozumlemesinde sayac artar
+- **Savas disinda**: `RandomEventManager.OnEventTriggered` dinlenir, her random event tetiklemesinde sayac artar
+- Sayac kademenin `frequency` degerine ulasinca kadin eventi tetiklenir
+
+### Event Cozumleme
+
+Kadin eventleri `WarForOilEvent` altyapisini kullanir ama WomanProcessManager kendi cozumler:
+
+| Alan | Uygulanir mi |
+|------|-------------|
+| `womanObsessionModifier` | Evet — obsesyon stat'i guncellenir |
+| `suspicionModifier` | Evet — GameStatManager |
+| `reputationModifier` | Evet — GameStatManager |
+| `politicalInfluenceModifier` | Evet — GameStatManager |
+| `wealthModifier` | Evet — anlik para |
+| Feed etkileri | Evet — freeze/slow/override |
+| `permanentMultipliers` | Evet — kalici stat carpanlari |
+| `supportModifier` | Kosullu — savas aktifse WarForOilManager'a iletilir, degilse yok sayilir |
+| `cornerGrabModifier` | Kosullu — savas aktif + kose kapma yarisi varsa uygulanir |
+| Protest etkileri | Kosullu — savas aktif + protest aktifse uygulanir |
+| Vandalizm etkileri | Kosullu — savas aktifse uygulanir |
+| Medya takibi etkileri | Kosullu — savas aktifse uygulanir |
+| `costModifier` | Kosullu — savas aktifse biriktirilir |
+| `endsWar`, `blocksEvents` vb. | Hayir — yapisal kontroller uygulanmaz |
+
+### WomanProcessDatabase Ayarlari
+
+| Alan | Varsayilan | Aciklama |
+|------|-----------|----------|
+| `initialObsession` | 40 | Baslangic obsesyon degeri |
+| `endThreshold` | 10 | Bu degerin altina duserse surec biter |
+| `tier1Max` | 30 | Kademe 1 ust siniri |
+| `tier2Max` | 65 | Kademe 2 ust siniri |
+| `tier1Events` | — | Kademe 1 event havuzu |
+| `tier2Events` | — | Kademe 2 event havuzu |
+| `tier3Events` | — | Kademe 3 event havuzu |
+| `tier1Frequency` | 5 | Kademe 1'de her N eventte 1 kadin eventi |
+| `tier2Frequency` | 3 | Kademe 2'de her N eventte 1 |
+| `tier3Frequency` | 2 | Kademe 3'te her N eventte 1 |
+| `decisionTime` | 10 | Karar suresi (saniye) |
+
+### Inspector Kullanimi
+
+**Event olusturma:**
+1. `Kadin Sureci Eventi` tiklanir → event kadin sureci havuzuna eklenebilir
+2. Choice'larda Modifiers foldout'unda `Kadin Obsesyonu` alani gorunur
+
+**Sureci baslatma:**
+1. Herhangi bir savas eventinin choice'unda `Diger Sonuclar` → `Kadin Surecini Baslat` tiklanir
+
+### Eventler (UI Dinleyecek)
+
+| Event | Aciklama |
+|-------|----------|
+| `OnWomanProcessStarted` | Surec basladi |
+| `OnObsessionChanged(float)` | Obsesyon degeri degisti |
+| `OnWomanEventTriggered(WarForOilEvent)` | Kadin eventi tetiklendi |
+| `OnWomanEventDecisionTimerUpdate(float)` | Karar sayaci guncellendi |
+| `OnWomanEventResolved(WarForOilEventChoice)` | Secim yapildi |
+| `OnWomanProcessEnded` | Surec bitti (obsesyon dusuk) |
+| `OnWomanProcessGameOver` | Game over (obsesyon 100) |
+
+---
+
 ## Dosya Yapisi
 
 ```
@@ -1032,6 +1133,8 @@ Assets/Scripts/Minigames/WarForOil/
 ├── WarForOilEvent.cs           — event + choice + ChainRole + ChainBranch
 ├── WarForOilDatabase.cs        — ayarlar + event havuzlari (ScriptableObject)
 ├── WarForOilManager.cs         — ana mantik + state machine + rotasyon (MonoBehaviour)
+├── WomanProcessDatabase.cs     — kadin sureci ayarlari (ScriptableObject)
+├── WomanProcessManager.cs      — kadin sureci mantigi (MonoBehaviour, Singleton)
 ├── Editor/
 │   └── WarForOilEventEditor.cs — Inspector custom editor
 └── warforoil-readme.md         — bu dosya

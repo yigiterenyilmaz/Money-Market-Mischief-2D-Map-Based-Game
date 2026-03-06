@@ -39,6 +39,9 @@ public class WarForOilEvent : ScriptableObject
     public bool isMediaPursuitEvent; //bu event tetiklendiğinde medya takibi seviyesi otomatik değişir
     public MediaPursuitLevel mediaPursuitLevelOnTrigger; //tetiklendiğinde atanacak medya takibi seviyesi
 
+    [Header("Kadın Süreci")]
+    public bool isWomanProcessEvent; //true ise bu event kadın süreci havuzlarında kullanılır
+
     [Header("Zincir Ayarları")]
     public ChainRole chainRole = ChainRole.None; //bu event zincirde mi (Head = zincir başlatıcı)
     public bool blocksSubChainBranching; //true ise bu event tetiklendikten sonra başka zincirlerden dallanma hedefi olarak seçilemez
@@ -146,6 +149,10 @@ public class WarForOilEventChoice
     public MediaPursuitChangeType mediaPursuitChangeType; //direkt atama mı göreceli mi
     public MediaPursuitLevel mediaPursuitTargetLevel; //direkt atama: hedef seviye
     public int mediaPursuitLevelDelta; //göreceli değişim: +/- tık (Low=1, Medium=2, High=3)
+
+    //kadın süreci
+    public bool startsWomanProcess; //seçilince kadın sürecini başlatır (oyun boyunca tek sefer)
+    public float womanObsessionModifier; //kadın süreci stat'ını etkiler (pozitif = artar, negatif = azalır)
 
     //kalıcı stat çarpanları (seçildiğinde anında ve kalıcı uygulanır — tüm oyun boyunca geçerli)
     public List<PermanentMultiplierEntry> permanentMultipliers = new List<PermanentMultiplierEntry>();
@@ -269,6 +276,19 @@ public enum MediaPursuitChangeType
 [System.Serializable]
 public class PermanentMultiplierEntry
 {
-    public StatType stat;
+    public PermanentMultiplierStatType stat;
     public float multiplier = 1f; //1.1 = %10 artış, 0.9 = %10 azalış
+}
+
+/// <summary>
+/// Kalıcı çarpan için seçilebilir stat tipleri.
+/// GameStatManager stat'ları + savaşa özel WarSupport.
+/// </summary>
+public enum PermanentMultiplierStatType
+{
+    Wealth,
+    Suspicion,
+    Reputation,
+    PoliticalInfluence,
+    WarSupport
 }

@@ -96,6 +96,7 @@ MonoBehaviour:
     mediaPursuitChangeType: 0
     mediaPursuitTargetLevel: 0
     mediaPursuitLevelDelta: 0
+    permanentMultipliers: []
     requiredSkills: []
     statConditions: []
   - displayName: Pursue the Agent
@@ -151,13 +152,13 @@ MonoBehaviour:
     chainThreshold1: 50
     chainThreshold2: 75
     chainBranches:
-    - targetEvent: {fileID: 0}
-      weightRange0: 0
+    - targetEvent: {fileID: 11400000, guid: 537c6c8abf677994c9884bddccdb6996, type: 2}
+      weightRange0: 0.5
       weightRange1: 0
       weightRange2: 0
       weightRange3: 0
     - targetEvent: {fileID: 0}
-      weightRange0: 0
+      weightRange0: 0.5
       weightRange1: 0
       weightRange2: 0
       weightRange3: 0
@@ -173,6 +174,7 @@ MonoBehaviour:
     mediaPursuitChangeType: 0
     mediaPursuitTargetLevel: 0
     mediaPursuitLevelDelta: 0
+    permanentMultipliers: []
     requiredSkills: []
     statConditions: []
   defaultChoiceIndex: -1
@@ -185,3 +187,5 @@ MonoBehaviour:
   isMediaPursuitEvent: 0
   mediaPursuitLevelOnTrigger: 0
   chainRole: 0
+  blocksSubChainBranching: 0
+  alsoBlockedBranchEvents: []
