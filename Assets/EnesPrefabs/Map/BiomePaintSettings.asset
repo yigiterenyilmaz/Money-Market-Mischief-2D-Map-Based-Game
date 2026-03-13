@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 80544689232b37745b9861d9ea0767c1, type: 3}
+  m_Name: BiomePaintSettings
+  m_EditorClassIdentifier: Assembly-CSharp::BiomePaintSettings
+  beachDark: {r: 0.72, g: 0.62, b: 0.38, a: 1}
+  beachLight: {r: 0.86, g: 0.78, b: 0.52, a: 1}
+  waterDeep: {r: 0.121568635, g: 0.14509805, b: 0.27058825, a: 1}
+  waterShallow: {r: 0.2901961, g: 0.34117648, b: 0.45882356, a: 1}
+  fogColor: {r: 0.5176471, g: 0.6117647, b: 0.7058824, a: 1}
+  urbanDark: {r: 0.16078432, g: 0.29411766, b: 0.20392159, a: 1}
+  urbanLight: {r: 0.26666668, g: 0.4431373, b: 0.24705884, a: 1}
+  agriculturalDark: {r: 0.37254903, g: 0.59607846, b: 0.28627452, a: 1}
+  agriculturalLight: {r: 0.28235295, g: 0.46274513, b: 0.26666668, a: 1}
+  citiesDark: {r: 0.3187549, g: 0.4490565, b: 0.297394, a: 1}
+  citiesLight: {r: 0.38739765, g: 0.5471698, b: 0.35411176, a: 1}
+  industrialDark: {r: 0.2899468, g: 0.29803923, b: 0.18039216, a: 1}
+  industrialLight: {r: 0.42796475, g: 0.45882353, b: 0.2784314, a: 1}
+  industrialCrack: {r: 0.3056603, g: 0.21944104, b: 0.13322175, a: 1}
+  urbanDecor:
+  - {fileID: 7944620761231817343, guid: 2102a7978623df343a343c25ecaa185c, type: 3}
+  agriculturalDecor: []
+  citiesDecor:
+  - {fileID: 1414139173100871430, guid: 2e14e007b7a7427468dae8b7dd166528, type: 3}
+  - {fileID: 4037621421494769097, guid: 42256e3a290a09741a0d10a71df2efd5, type: 3}
+  - {fileID: -1426929989288815221, guid: b8d001d0c940b754eb16354d090da07c, type: 3}
+  - {fileID: -8747121057869537726, guid: 806596b6223b7384c9210b93acb38cc8, type: 3}
+  industrialDecor: []
