@@ -1,6 +1,6 @@
-# Manipulation
+# M.M.M.
 
-Manipulation, oyuncunun finans, medya, siyaset ve güç ilişkilerinin kesiştiği karmaşık bir dünyada yükselmeye çalıştığı gerçek zamanlı bir strateji ve simülasyon oyunudur.
+M.M.M., oyuncunun finans, medya, siyaset ve güç ilişkilerinin kesiştiği karmaşık bir dünyada yükselmeye çalıştığı gerçek zamanlı bir strateji ve simülasyon oyunudur.
 
 Bu oyunda şehirler kurmazsınız.
 Ordular yönetmezsiniz.
@@ -18,7 +18,7 @@ Oyuncu sürekli olarak servet, şüphe ve itibar arasındaki hassas dengeyi yön
 
 ## Oyunun Temel Fikri
 
-Manipulation, klasik strateji oyunlarından farklı olarak gücün görünmeyen tarafını simüle eder.
+M.M.M., klasik strateji oyunlarından farklı olarak gücün görünmeyen tarafını simüle eder.
 
 Oyuncu doğrudan sahnede olan bir lider değil, perde arkasında hareket eden bir aktördür.
 
@@ -83,7 +83,7 @@ Ancak bazı kararlar kısa vadeli kazanç sağlarken itibarınızı ciddi şekil
 
 ## Rastgele Olay Sistemi
 
-Manipulation'da dünya statik değildir.
+M.M.M.'da dünya statik değildir.
 
 Oyun boyunca oyuncunun karşısına rastgele ortaya çıkan olaylar çıkar. Bu olaylar:
 
@@ -135,7 +135,7 @@ Oyuncu bu sosyal medya akışını doğrudan manipüle edebilir. Algı operasyon
 
 ## Procedural Dünya
 
-Manipulation'da her oyun farklı bir dünyada başlar.
+M.M.M.'da her oyun farklı bir dünyada başlar.
 
 Her yeni oyunda harita yeniden oluşturulur. Bununla birlikte:
 
@@ -169,7 +169,7 @@ Bu sayede her oyun deneyimi oyuncunun yaptığı tercihlere göre şekillenir.
 
 ## Çoklu Bitiş Senaryoları
 
-Manipulation tek bir sonu olan bir oyun değildir. Oyunun sonu farklı şekillerde oluşabilir.
+M.M.M. tek bir sonu olan bir oyun değildir. Oyunun sonu farklı şekillerde oluşabilir.
 
 Bir oyun şu yollarla sona ulaşabilir:
 
