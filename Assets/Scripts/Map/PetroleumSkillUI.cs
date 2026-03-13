@@ -2,314 +2,457 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Minimal popup overlay for petroleum actions.
-/// Appears when the player clicks the Petroleum skill button in the main UI.
-/// Shows three icon buttons: Research, Plant Pump, Cancel.
-/// 
-/// SETUP:
-///   1. Create a Canvas (Screen Space - Overlay) if you don't have one.
-///   2. Attach this script to any GameObject.
-///   3. Assign references in Inspector.
-///   4. Call Toggle() from your existing Petroleum skill button's OnClick.
-///     
-///   The script builds the entire popup at runtime — no manual UI construction needed.
-///   Optionally assign custom icons via Inspector; without them it uses colored fallbacks.
+/// RESEARCH:
+///   Popup → Research → ToggleUI() hides everything → map active
+///   Cancel button visible. Player clicks map → circle appears, drag to size.
+///   Release → Confirm button appears with cost label. Click again → new circle.
+///   Confirm → scan, ToggleUI() restores.  Cancel → ToggleUI() restores.
+///
+/// PUMP:
+///   Popup → Pump → ToggleUI() hides everything → map active
+///   Cancel + Accept buttons visible. Click map → place pumps (multiple).
+///   Accept → confirm all, ToggleUI() restores.  Cancel → undo all, restores.
 /// </summary>
 public class PetroleumSkillUI : MonoBehaviour
 {
-    // -------------------------------------------------------------------------
-    // REFERENCES
-    // -------------------------------------------------------------------------
-
     [Header("References")]
-    [Tooltip("Your UI Canvas. If null, the script finds or creates one.")]
-    public Canvas canvas;
-
-    [Tooltip("PetroleumSystem in the scene.")]
     public PetroleumSystem petroleumSystem;
+    public UImanager       uiManager;
+    public Canvas          canvas;
 
-    [Header("Optional Icons (leave null for auto-generated)")]
+    [Header("Optional Icons")]
     public Sprite researchIcon;
     public Sprite pumpIcon;
     public Sprite cancelIcon;
 
-    [Header("Popup Position")]
-    [Tooltip("Screen-space offset from center. (0,0) = dead center.")]
-    public Vector2 popupOffset = Vector2.zero;
+    [Header("Popup Appearance")]
+    public Color panelColor      = new Color(0.12f, 0.12f, 0.14f, 0.92f);
+    public Color btnNormal       = new Color(0.22f, 0.22f, 0.26f, 1f);
+    public Color btnHighlight    = new Color(0.32f, 0.32f, 0.38f, 1f);
+    public Color btnPressed      = new Color(0.16f, 0.16f, 0.20f, 1f);
+    public Color labelColor      = new Color(0.82f, 0.82f, 0.80f, 1f);
+    public int   btnSize         = 64;
+    public int   btnSpacing      = 12;
+    public int   panelPad        = 14;
+    public int   fontSize        = 11;
 
-    [Header("Appearance")]
-    public Color panelColor       = new Color(0.12f, 0.12f, 0.14f, 0.92f);
-    public Color buttonNormal     = new Color(0.22f, 0.22f, 0.26f, 1f);
-    public Color buttonHighlight  = new Color(0.32f, 0.32f, 0.38f, 1f);
-    public Color buttonPressed    = new Color(0.16f, 0.16f, 0.20f, 1f);
-    public Color activeGlow       = new Color(0.30f, 0.75f, 0.45f, 1f);
-    public Color labelColor       = new Color(0.82f, 0.82f, 0.80f, 1f);
-    public int   buttonSize       = 64;
-    public int   buttonSpacing    = 12;
-    public int   panelPadding     = 14;
-    public int   fontSize         = 11;
+    [Header("Action Bar")]
+    public Color cancelColor     = new Color(0.7f, 0.2f, 0.2f, 0.9f);
+    public Color confirmColor    = new Color(0.2f, 0.65f, 0.3f, 0.9f);
+    public int   actionW         = 120;
+    public int   actionH         = 40;
+    public int   actionBottom    = 60;
+    public int   actionGap       = 16;
+    public int   actionFont      = 14;
 
-    // -------------------------------------------------------------------------
-    // RUNTIME STATE
-    // -------------------------------------------------------------------------
-
+    // Runtime
     private GameObject popupRoot;
-    private Button     btnResearch;
-    private Button     btnPump;
-    private Button     btnCancel;
-    private Image      imgResearch;
-    private Image      imgPump;
-    private bool       isOpen = false;
-    private PetroleumSystem.InteractionMode activeMode = PetroleumSystem.InteractionMode.None;
+    private GameObject actionBar;    // container for cancel/confirm/accept
+    private GameObject cancelBtn;
+    private GameObject confirmBtn;   // research confirm
+    private GameObject acceptBtn;    // pump accept
+    private GameObject costLabel;    // shows research cost
+    private Text       costText;
+    private bool       popupOpen;
 
-    // -------------------------------------------------------------------------
-    // PUBLIC API
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // LIFECYCLE
+    // =========================================================================
 
-    /// <summary>Toggle popup visibility. Hook this to your Petroleum skill button.</summary>
+    void OnEnable()
+    {
+        PetroleumSystem.OnResearchDone        += OnFinished;
+        PetroleumSystem.OnPumpsDone           += OnFinished;
+        PetroleumSystem.OnModeCancelled       += OnFinished;
+        PetroleumSystem.OnResearchCostChanged += OnCostChanged;
+        PetroleumSystem.OnResearchCircleReady += OnCircleReady;
+        PetroleumSystem.OnInsufficientFunds   += OnNotEnoughMoney;
+    }
+
+    void OnDisable()
+    {
+        PetroleumSystem.OnResearchDone        -= OnFinished;
+        PetroleumSystem.OnPumpsDone           -= OnFinished;
+        PetroleumSystem.OnModeCancelled       -= OnFinished;
+        PetroleumSystem.OnResearchCostChanged -= OnCostChanged;
+        PetroleumSystem.OnResearchCircleReady -= OnCircleReady;
+        PetroleumSystem.OnInsufficientFunds   -= OnNotEnoughMoney;
+    }
+
+    // =========================================================================
+    // PUBLIC — wire to Petroleum skill button
+    // =========================================================================
+
     public void Toggle()
     {
-        if (isOpen) Close();
-        else        Open();
+        if (popupOpen) ClosePopup();
+        else           OpenPopup();
     }
 
-    public void Open()
+    // =========================================================================
+    // POPUP
+    // =========================================================================
+
+    void OpenPopup()
     {
-        if (popupRoot == null) BuildPopup();
+        if (popupRoot == null) BuildAll();
         popupRoot.SetActive(true);
-        isOpen = true;
-        RefreshButtonStates();
+        actionBar.SetActive(false);
+        popupOpen = true;
     }
 
-    public void Close()
+    void ClosePopup()
     {
         if (popupRoot != null) popupRoot.SetActive(false);
-        isOpen = false;
-
-        // Exit whatever mode was active
-        if (petroleumSystem != null)
-            petroleumSystem.ExitMode();
-
-        activeMode = PetroleumSystem.InteractionMode.None;
+        popupOpen = false;
     }
 
-    public bool IsOpen => isOpen;
+    // =========================================================================
+    // ENTERING MAP MODES
+    // =========================================================================
 
-    // -------------------------------------------------------------------------
-    // BUILD UI AT RUNTIME
-    // -------------------------------------------------------------------------
+    private float savedCameraSize;
 
-    private void BuildPopup()
+    void GoToMap()
+    {
+        ClosePopup();
+
+        if (uiManager != null)
+        {
+            // Hide all UI panels and buttons
+            uiManager.pausePanel.SetActive(false);
+            uiManager.skillTreePanel.SetActive(false);
+            uiManager.pauseButton.SetActive(false);
+            uiManager.skillTreeButton.SetActive(false);
+            uiManager.moneyBar.SetActive(false);
+
+            MapController mc = uiManager.mainCamera;
+
+            // Disable camera pan/zoom so left-click drag doesn't conflict
+            mc.enable = false;
+
+            // Save current zoom and zoom out to maximum (full map view)
+            Camera cam = mc.GetComponent<Camera>();
+            if (cam != null)
+            {
+                savedCameraSize = cam.orthographicSize;
+
+                // Calculate max zoom the same way MapController does
+                if (mc.mapRenderer != null && mc.mapRenderer.sprite != null)
+                {
+                    float mapH = mc.mapRenderer.bounds.size.y / 2f;
+                    float mapW = (mc.mapRenderer.bounds.size.x / 2f) / cam.aspect;
+                    cam.orthographicSize = Mathf.Min(mapH, mapW);
+                }
+
+                // Center camera on map
+                if (mc.mapRenderer != null)
+                {
+                    Vector3 center = mc.mapRenderer.bounds.center;
+                    mc.transform.position = new Vector3(center.x, center.y, mc.transform.position.z);
+                }
+            }
+        }
+    }
+
+    void RestoreUI()
+    {
+        actionBar.SetActive(false);
+
+        if (uiManager != null)
+        {
+            // Restore camera zoom
+            MapController mc = uiManager.mainCamera;
+            Camera cam = mc.GetComponent<Camera>();
+            if (cam != null)
+                cam.orthographicSize = savedCameraSize;
+
+            // Restore full UI (also re-enables camera via mainCamera.enable = true)
+            uiManager.OnGameResumePress();
+        }
+    }
+
+    // =========================================================================
+    // POPUP BUTTON HANDLERS
+    // =========================================================================
+
+    void OnResearchClicked()
+    {
+        if (petroleumSystem == null) return;
+        GoToMap();
+
+        // Show action bar with only Cancel (Confirm appears after circle is placed)
+        actionBar.SetActive(true);
+        cancelBtn.SetActive(true);
+        confirmBtn.SetActive(false);
+        acceptBtn.SetActive(false);
+        costLabel.SetActive(false);
+
+        petroleumSystem.EnterResearchMode();
+    }
+
+    void OnPumpClicked()
+    {
+        if (petroleumSystem == null) return;
+        GoToMap();
+
+        // Show action bar with Cancel + Accept
+        actionBar.SetActive(true);
+        cancelBtn.SetActive(true);
+        confirmBtn.SetActive(false);
+        acceptBtn.SetActive(true);
+        costLabel.SetActive(false);
+
+        petroleumSystem.EnterPumpMode();
+    }
+
+    void OnPopupCancel()
+    {
+        ClosePopup();
+    }
+
+    // =========================================================================
+    // ACTION BUTTON HANDLERS
+    // =========================================================================
+
+    void OnCancelClick()
+    {
+        if (petroleumSystem != null)
+            petroleumSystem.CancelMode();
+        // OnModeCancelled → OnFinished → RestoreUI
+    }
+
+    void OnConfirmClick()
+    {
+        if (petroleumSystem != null)
+            petroleumSystem.ConfirmResearch();
+        // OnResearchDone → OnFinished → RestoreUI
+    }
+
+    void OnAcceptClick()
+    {
+        if (petroleumSystem != null)
+            petroleumSystem.AcceptPumps();
+        // OnPumpsDone → OnFinished → RestoreUI
+    }
+
+    // =========================================================================
+    // EVENT HANDLERS
+    // =========================================================================
+
+    void OnFinished()
+    {
+        RestoreUI();
+        popupOpen = false;
+    }
+
+    void OnCostChanged(float cost)
+    {
+        if (costText != null)
+        {
+            costLabel.SetActive(true);
+            float wealth = GameStatManager.Instance != null ? GameStatManager.Instance.Wealth : 0f;
+            bool canAfford = wealth >= cost;
+            costText.color = canAfford ? Color.white : Color.red;
+            costText.text = $"Cost: {cost:F0}  (Wealth: {wealth:F0})";
+        }
+    }
+
+    void OnCircleReady()
+    {
+        if (confirmBtn != null)
+            confirmBtn.SetActive(true);
+    }
+
+    void OnNotEnoughMoney(float cost)
+    {
+        if (costText != null)
+        {
+            costLabel.SetActive(true);
+            costText.color = Color.red;
+            float wealth = GameStatManager.Instance != null ? GameStatManager.Instance.Wealth : 0f;
+            costText.text = $"Not enough! Need: {cost:F0}  Have: {wealth:F0}";
+        }
+    }
+
+    // =========================================================================
+    // BUILD UI
+    // =========================================================================
+
+    void BuildAll()
     {
         EnsureCanvas();
+        BuildPopup();
+        BuildActionBar();
+    }
 
-        // --- Root panel ---
-        popupRoot = CreateUIObject("PetroleumPopup", canvas.transform);
-        RectTransform rootRT = popupRoot.GetComponent<RectTransform>();
-        rootRT.anchorMin = new Vector2(0.5f, 0.5f);
-        rootRT.anchorMax = new Vector2(0.5f, 0.5f);
-        rootRT.pivot     = new Vector2(0.5f, 0.5f);
+    void BuildPopup()
+    {
+        popupRoot = UI("PetroleumPopup", canvas.transform);
+        RectTransform rt = popupRoot.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        float w = (btnSize * 3) + (btnSpacing * 2) + (panelPad * 2);
+        float h = btnSize + fontSize + 6 + (panelPad * 2);
+        rt.sizeDelta = new Vector2(w, h);
+        rt.anchoredPosition = Vector2.zero;
 
-        float totalWidth  = (buttonSize * 3) + (buttonSpacing * 2) + (panelPadding * 2);
-        float totalHeight = buttonSize + fontSize + 6 + (panelPadding * 2);
-        rootRT.sizeDelta        = new Vector2(totalWidth, totalHeight);
-        rootRT.anchoredPosition = popupOffset;
+        popupRoot.AddComponent<Image>().color = panelColor;
 
-        Image panelImg = popupRoot.AddComponent<Image>();
-        panelImg.color = panelColor;
+        var hlg = popupRoot.AddComponent<HorizontalLayoutGroup>();
+        hlg.spacing = btnSpacing;
+        hlg.padding = new RectOffset(panelPad, panelPad, panelPad, panelPad);
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
 
-        // Round corners if possible — works on Unity 2021.2+
-        // Fallback: plain rectangle on older versions
-        #if UNITY_2021_2_OR_NEWER
-        // No built-in rounded rect in base Unity UI, but the dark panel looks fine
-        #endif
-
-        // --- Horizontal layout ---
-        HorizontalLayoutGroup hlg = popupRoot.AddComponent<HorizontalLayoutGroup>();
-        hlg.spacing            = buttonSpacing;
-        hlg.padding            = new RectOffset(panelPadding, panelPadding, panelPadding, panelPadding);
-        hlg.childAlignment     = TextAnchor.MiddleCenter;
-        hlg.childForceExpandWidth  = false;
-        hlg.childForceExpandHeight = false;
-
-        // --- Buttons ---
-        btnResearch = CreateActionButton("Research",  researchIcon, new Color(0.2f, 0.6f, 0.9f), OnResearchClicked);
-        btnPump     = CreateActionButton("Pump",      pumpIcon,     new Color(0.9f, 0.6f, 0.1f), OnPumpClicked);
-        btnCancel   = CreateActionButton("Cancel",    cancelIcon,   new Color(0.8f, 0.25f, 0.25f), OnCancelClicked);
-
-        imgResearch = btnResearch.GetComponent<Image>();
-        imgPump     = btnPump.GetComponent<Image>();
+        IconBtn("Research", researchIcon, new Color(0.2f, 0.6f, 0.9f),  OnResearchClicked, popupRoot.transform);
+        IconBtn("Pump",     pumpIcon,     new Color(0.9f, 0.6f, 0.1f),  OnPumpClicked,     popupRoot.transform);
+        IconBtn("Cancel",   cancelIcon,   new Color(0.8f, 0.25f, 0.25f), OnPopupCancel,     popupRoot.transform);
 
         popupRoot.SetActive(false);
     }
 
-    private Button CreateActionButton(string label, Sprite icon, Color fallbackColor, UnityEngine.Events.UnityAction onClick)
+    void BuildActionBar()
     {
-        // Container (vertical: icon on top, label below)
-        GameObject container = CreateUIObject(label + "Container", popupRoot.transform);
-        VerticalLayoutGroup vlg = container.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing            = 2;
-        vlg.childAlignment     = TextAnchor.MiddleCenter;
-        vlg.childForceExpandWidth  = true;
-        vlg.childForceExpandHeight = false;
+        actionBar = UI("PetroActions", canvas.transform);
+        RectTransform art = actionBar.GetComponent<RectTransform>();
+        art.anchorMin = new Vector2(0.5f, 0f);
+        art.anchorMax = new Vector2(0.5f, 0f);
+        art.pivot     = new Vector2(0.5f, 0f);
+        art.sizeDelta        = new Vector2(actionW * 3 + actionGap * 2 + 20, actionH + 50);
+        art.anchoredPosition = new Vector2(0f, actionBottom);
 
-        LayoutElement containerLE = container.AddComponent<LayoutElement>();
-        containerLE.preferredWidth  = buttonSize;
-        containerLE.preferredHeight = buttonSize + fontSize + 6;
+        var hlg = actionBar.AddComponent<HorizontalLayoutGroup>();
+        hlg.spacing = actionGap;
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
+        hlg.padding = new RectOffset(10, 10, 5, 5);
 
-        // Button object
-        GameObject btnObj = CreateUIObject(label + "Btn", container.transform);
-        RectTransform btnRT = btnObj.GetComponent<RectTransform>();
-        btnRT.sizeDelta = new Vector2(buttonSize, buttonSize);
+        cancelBtn  = ActionBtn("Cancel",  cancelColor,  OnCancelClick,  actionBar.transform);
+        confirmBtn = ActionBtn("Confirm", confirmColor, OnConfirmClick, actionBar.transform);
+        acceptBtn  = ActionBtn("Accept",  confirmColor, OnAcceptClick,  actionBar.transform);
 
-        LayoutElement btnLE = btnObj.AddComponent<LayoutElement>();
-        btnLE.preferredWidth  = buttonSize;
-        btnLE.preferredHeight = buttonSize;
+        // Cost label — above the action bar
+        costLabel = UI("CostLabel", actionBar.transform);
+        RectTransform clrt = costLabel.GetComponent<RectTransform>();
+        clrt.anchorMin = new Vector2(0f, 1f);
+        clrt.anchorMax = new Vector2(1f, 1f);
+        clrt.pivot     = new Vector2(0.5f, 0f);
+        clrt.sizeDelta = new Vector2(0, 30);
+        clrt.anchoredPosition = new Vector2(0f, 5f);
 
-        Image btnImg = btnObj.AddComponent<Image>();
-        btnImg.color = buttonNormal;
+        costText = costLabel.AddComponent<Text>();
+        costText.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        costText.fontSize  = actionFont;
+        costText.color     = Color.white;
+        costText.alignment = TextAnchor.MiddleCenter;
+        costText.fontStyle = FontStyle.Bold;
+        costText.text      = "";
 
-        Button btn = btnObj.AddComponent<Button>();
-        ColorBlock cb    = btn.colors;
-        cb.normalColor      = buttonNormal;
-        cb.highlightedColor = buttonHighlight;
-        cb.pressedColor     = buttonPressed;
-        cb.selectedColor    = buttonHighlight;
-        cb.fadeDuration     = 0.08f;
-        btn.colors = cb;
+        // Add shadow for readability
+        var shadow = costLabel.AddComponent<Shadow>();
+        shadow.effectColor    = Color.black;
+        shadow.effectDistance  = new Vector2(1, -1);
+
+        actionBar.SetActive(false);
+    }
+
+    // =========================================================================
+    // UI BUILDER HELPERS
+    // =========================================================================
+
+    void IconBtn(string label, Sprite icon, Color fallback,
+                 UnityEngine.Events.UnityAction onClick, Transform parent)
+    {
+        GameObject c = UI(label + "C", parent);
+        var vlg = c.AddComponent<VerticalLayoutGroup>();
+        vlg.spacing = 2; vlg.childAlignment = TextAnchor.MiddleCenter;
+        vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
+        var cle = c.AddComponent<LayoutElement>();
+        cle.preferredWidth = btnSize; cle.preferredHeight = btnSize + fontSize + 6;
+
+        GameObject b = UI(label + "B", c.transform);
+        var ble = b.AddComponent<LayoutElement>();
+        ble.preferredWidth = ble.preferredHeight = btnSize;
+        b.AddComponent<Image>().color = btnNormal;
+        Button btn = b.AddComponent<Button>();
+        ColorBlock cb = btn.colors;
+        cb.normalColor = btnNormal; cb.highlightedColor = btnHighlight;
+        cb.pressedColor = btnPressed; cb.selectedColor = btnHighlight;
+        cb.fadeDuration = 0.08f; btn.colors = cb;
         btn.onClick.AddListener(onClick);
 
-        // Icon inside button
-        GameObject iconObj = CreateUIObject("Icon", btnObj.transform);
-        RectTransform iconRT = iconObj.GetComponent<RectTransform>();
-        iconRT.anchorMin = Vector2.zero;
-        iconRT.anchorMax = Vector2.one;
-        iconRT.offsetMin = new Vector2(12, 12);
-        iconRT.offsetMax = new Vector2(-12, -12);
+        GameObject ico = UI("I", b.transform);
+        RectTransform irt = ico.GetComponent<RectTransform>();
+        irt.anchorMin = Vector2.zero; irt.anchorMax = Vector2.one;
+        irt.offsetMin = Vector2.one * 12; irt.offsetMax = Vector2.one * -12;
+        Image iim = ico.AddComponent<Image>();
+        if (icon != null) { iim.sprite = icon; iim.color = Color.white; }
+        else iim.color = fallback;
+        iim.preserveAspect = true;
 
-        Image iconImg = iconObj.AddComponent<Image>();
-        if (icon != null)
-        {
-            iconImg.sprite = icon;
-            iconImg.color  = Color.white;
-        }
-        else
-        {
-            // Fallback: solid colored square as placeholder icon
-            iconImg.sprite = null;
-            iconImg.color  = fallbackColor;
-        }
-        iconImg.preserveAspect = true;
-
-        // Label below button
-        GameObject labelObj = CreateUIObject(label + "Label", container.transform);
-        Text txt       = labelObj.AddComponent<Text>();
-        txt.text       = label;
-        txt.font       = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        txt.fontSize   = fontSize;
-        txt.color      = labelColor;
-        txt.alignment  = TextAnchor.MiddleCenter;
-        txt.resizeTextForBestFit = false;
-
-        LayoutElement labelLE = labelObj.AddComponent<LayoutElement>();
-        labelLE.preferredWidth  = buttonSize;
-        labelLE.preferredHeight = fontSize + 4;
-
-        return btn;
+        GameObject l = UI(label + "L", c.transform);
+        Text t = l.AddComponent<Text>();
+        t.text = label; t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        t.fontSize = fontSize; t.color = labelColor; t.alignment = TextAnchor.MiddleCenter;
+        var lle = l.AddComponent<LayoutElement>();
+        lle.preferredWidth = btnSize; lle.preferredHeight = fontSize + 4;
     }
 
-    // -------------------------------------------------------------------------
-    // BUTTON HANDLERS
-    // -------------------------------------------------------------------------
-
-    private void OnResearchClicked()
+    GameObject ActionBtn(string label, Color bg,
+                          UnityEngine.Events.UnityAction onClick, Transform parent)
     {
-        if (petroleumSystem == null) return;
+        GameObject go = UI(label, parent);
+        var le = go.AddComponent<LayoutElement>();
+        le.preferredWidth = actionW; le.preferredHeight = actionH;
+        go.AddComponent<Image>().color = bg;
 
-        if (activeMode == PetroleumSystem.InteractionMode.Research)
-        {
-            // Already in research → deactivate
-            petroleumSystem.ExitMode();
-            activeMode = PetroleumSystem.InteractionMode.None;
-        }
-        else
-        {
-            petroleumSystem.EnterResearchMode();
-            activeMode = PetroleumSystem.InteractionMode.Research;
-        }
+        Button btn = go.AddComponent<Button>();
+        ColorBlock cb = btn.colors;
+        cb.normalColor = bg;
+        cb.highlightedColor = Bright(bg, 0.1f);
+        cb.pressedColor = Bright(bg, -0.1f);
+        cb.fadeDuration = 0.08f; btn.colors = cb;
+        btn.onClick.AddListener(onClick);
 
-        RefreshButtonStates();
-    }
+        GameObject l = UI("L", go.transform);
+        RectTransform lr = l.GetComponent<RectTransform>();
+        lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
+        lr.offsetMin = lr.offsetMax = Vector2.zero;
+        Text t = l.AddComponent<Text>();
+        t.text = label; t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        t.fontSize = actionFont; t.color = Color.white;
+        t.alignment = TextAnchor.MiddleCenter; t.fontStyle = FontStyle.Bold;
 
-    private void OnPumpClicked()
-    {
-        if (petroleumSystem == null) return;
-
-        if (activeMode == PetroleumSystem.InteractionMode.PlacePump)
-        {
-            petroleumSystem.ExitMode();
-            activeMode = PetroleumSystem.InteractionMode.None;
-        }
-        else
-        {
-            petroleumSystem.EnterPumpMode();
-            activeMode = PetroleumSystem.InteractionMode.PlacePump;
-        }
-
-        RefreshButtonStates();
-    }
-
-    private void OnCancelClicked()
-    {
-        Close();
-    }
-
-    // -------------------------------------------------------------------------
-    // VISUAL FEEDBACK
-    // -------------------------------------------------------------------------
-
-    private void RefreshButtonStates()
-    {
-        if (imgResearch != null)
-        {
-            ColorBlock cb = btnResearch.colors;
-            cb.normalColor = activeMode == PetroleumSystem.InteractionMode.Research
-                ? activeGlow : buttonNormal;
-            btnResearch.colors = cb;
-        }
-
-        if (imgPump != null)
-        {
-            ColorBlock cb = btnPump.colors;
-            cb.normalColor = activeMode == PetroleumSystem.InteractionMode.PlacePump
-                ? activeGlow : buttonNormal;
-            btnPump.colors = cb;
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // HELPERS
-    // -------------------------------------------------------------------------
-
-    private void EnsureCanvas()
-    {
-        if (canvas != null) return;
-
-        canvas = FindObjectOfType<Canvas>();
-        if (canvas != null) return;
-
-        GameObject canvasObj    = new GameObject("Canvas");
-        canvas                 = canvasObj.AddComponent<Canvas>();
-        canvas.renderMode      = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder    = 100;
-        canvasObj.AddComponent<CanvasScaler>();
-        canvasObj.AddComponent<GraphicRaycaster>();
-    }
-
-    private static GameObject CreateUIObject(string name, Transform parent)
-    {
-        GameObject go = new GameObject(name, typeof(RectTransform));
-        go.transform.SetParent(parent, false);
         return go;
+    }
+
+    // =========================================================================
+    // UTILITIES
+    // =========================================================================
+
+    void EnsureCanvas()
+    {
+        if (canvas != null) return;
+        canvas = FindAnyObjectByType<Canvas>();
+        if (canvas != null) return;
+        GameObject go = new GameObject("Canvas");
+        canvas = go.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 100;
+        go.AddComponent<CanvasScaler>();
+        go.AddComponent<GraphicRaycaster>();
+    }
+
+    static GameObject UI(string n, Transform p)
+    {
+        GameObject g = new GameObject(n, typeof(RectTransform));
+        g.transform.SetParent(p, false); return g;
+    }
+
+    static Color Bright(Color c, float a)
+    {
+        return new Color(
+            Mathf.Clamp01(c.r + a), Mathf.Clamp01(c.g + a),
+            Mathf.Clamp01(c.b + a), c.a);
     }
 }
