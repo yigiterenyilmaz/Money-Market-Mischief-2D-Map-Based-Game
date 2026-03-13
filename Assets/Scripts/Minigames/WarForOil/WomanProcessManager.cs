@@ -21,6 +21,16 @@ public class WomanProcessManager : MonoBehaviour
     private bool pendingTrigger; //bir sonraki uygun anda kadın eventi tetiklenecek
     private Dictionary<WarForOilEvent, int> womanEventTriggerCounts = new Dictionary<WarForOilEvent, int>();
 
+    //zincir durumu
+    private bool isInWomanChain;
+    private List<ChainBranch> pendingWomanChainBranches;
+    private ChainInfluenceStat pendingWomanChainInfluenceStat;
+    private float pendingWomanChainThreshold0;
+    private float pendingWomanChainThreshold1;
+    private float pendingWomanChainThreshold2;
+    private bool pendingWomanChainCanEnd;
+    private float pendingWomanChainEndWeight;
+
     //events — UI dinleyecek
     public static event Action OnWomanProcessStarted; //süreç başladı
     public static event Action<float> OnObsessionChanged; //obsesyon değeri değişti (yeni değer)
@@ -137,6 +147,8 @@ public class WomanProcessManager : MonoBehaviour
         pendingTrigger = false;
         currentWomanEvent = null;
         womanEventTriggerCounts.Clear();
+        isInWomanChain = false;
+        pendingWomanChainBranches = null;
         currentState = WomanProcessState.Active;
 
         OnWomanProcessStarted?.Invoke();
@@ -219,6 +231,35 @@ public class WomanProcessManager : MonoBehaviour
         //oyunu devam ettir
         if (GameManager.Instance != null)
             GameManager.Instance.ResumeGame();
+
+        //direkt bitirme flag'i
+        if (choice.endsWomanProcess)
+        {
+            currentWomanEvent = null;
+            EndWomanChain();
+            currentState = WomanProcessState.Inactive;
+            OnWomanProcessEnded?.Invoke();
+            return;
+        }
+
+        //zincir dallanması kontrolü
+        if (choice.chainBranches != null && choice.chainBranches.Count > 0)
+        {
+            //zincir başlat veya devam ettir
+            isInWomanChain = true;
+            pendingWomanChainBranches = choice.chainBranches;
+            pendingWomanChainInfluenceStat = choice.chainInfluenceStat;
+            pendingWomanChainThreshold0 = choice.chainThreshold0;
+            pendingWomanChainThreshold1 = choice.chainThreshold1;
+            pendingWomanChainThreshold2 = choice.chainThreshold2;
+            pendingWomanChainCanEnd = choice.chainCanEnd;
+            pendingWomanChainEndWeight = choice.chainCanEnd ? choice.chainEndWeight : 0f;
+        }
+        else if (isInWomanChain)
+        {
+            //choice'ta branch yok — zincir biter
+            EndWomanChain();
+        }
 
         currentState = WomanProcessState.Active;
 
@@ -324,12 +365,25 @@ public class WomanProcessManager : MonoBehaviour
 
     private void TriggerWomanEvent()
     {
-        int tier = database.GetTier(womanObsession);
-        List<WarForOilEvent> pool = database.GetTierEvents(tier);
+        WarForOilEvent evt;
 
-        if (pool == null || pool.Count == 0) return;
+        if (isInWomanChain)
+        {
+            //zincir aktif — chain branch'lerinden seç
+            evt = PickEventFromChainBranches();
+            if (evt == null)
+            {
+                //uygun branch kalmadı — zincir biter, havuzdan devam et
+                EndWomanChain();
+                evt = PickEventFromTierPool();
+            }
+        }
+        else
+        {
+            //normal — tier havuzundan seç
+            evt = PickEventFromTierPool();
+        }
 
-        WarForOilEvent evt = PickEventFromPool(pool);
         if (evt == null) return;
 
         currentWomanEvent = evt;
@@ -345,6 +399,107 @@ public class WomanProcessManager : MonoBehaviour
             GameManager.Instance.PauseGame();
 
         OnWomanEventTriggered?.Invoke(evt);
+    }
+
+    private WarForOilEvent PickEventFromTierPool()
+    {
+        int tier = database.GetTier(womanObsession);
+        List<WarForOilEvent> pool = database.GetTierEvents(tier);
+        if (pool == null || pool.Count == 0) return null;
+        return PickEventFromPool(pool);
+    }
+
+    /// <summary>
+    /// Zincir dallanmasından ağırlıklı seçim yapar.
+    /// </summary>
+    private WarForOilEvent PickEventFromChainBranches()
+    {
+        if (pendingWomanChainBranches == null || pendingWomanChainBranches.Count == 0) return null;
+
+        //hangi aralıkta olduğumuzu belirle
+        int rangeIndex = 0;
+        if (pendingWomanChainInfluenceStat != ChainInfluenceStat.JustLuck)
+        {
+            float statPercent = GetWomanChainStatPercent(pendingWomanChainInfluenceStat) * 100f;
+            if (statPercent >= pendingWomanChainThreshold2) rangeIndex = 3;
+            else if (statPercent >= pendingWomanChainThreshold1) rangeIndex = 2;
+            else if (statPercent >= pendingWomanChainThreshold0) rangeIndex = 1;
+            else rangeIndex = 0;
+        }
+
+        //ağırlıkları topla
+        float endWeight = pendingWomanChainCanEnd ? pendingWomanChainEndWeight : 0f;
+        float totalWeight = endWeight;
+        float[] weights = new float[pendingWomanChainBranches.Count];
+
+        for (int i = 0; i < pendingWomanChainBranches.Count; i++)
+        {
+            if (pendingWomanChainBranches[i].targetEvent == null)
+            {
+                weights[i] = 0f;
+                continue;
+            }
+            float w = GetBranchWeight(pendingWomanChainBranches[i], rangeIndex);
+            if (w < 0f) w = 0f;
+            weights[i] = w;
+            totalWeight += w;
+        }
+
+        if (totalWeight <= 0f)
+            return null; //uygun branch yok
+
+        //ağırlıklı seçim
+        float roll = UnityEngine.Random.value * totalWeight;
+
+        //önce chain bitme kontrolü
+        if (roll < endWeight)
+            return null; //null dönünce TriggerWomanEvent zinciri bitirir
+
+        float cumulative = endWeight;
+        for (int i = 0; i < pendingWomanChainBranches.Count; i++)
+        {
+            cumulative += weights[i];
+            if (roll <= cumulative)
+                return pendingWomanChainBranches[i].targetEvent;
+        }
+
+        //fallback
+        return pendingWomanChainBranches[pendingWomanChainBranches.Count - 1].targetEvent;
+    }
+
+    private float GetBranchWeight(ChainBranch branch, int rangeIndex)
+    {
+        switch (rangeIndex)
+        {
+            case 0: return branch.weightRange0;
+            case 1: return branch.weightRange1;
+            case 2: return branch.weightRange2;
+            case 3: return branch.weightRange3;
+            default: return branch.weightRange0;
+        }
+    }
+
+    private float GetWomanChainStatPercent(ChainInfluenceStat stat)
+    {
+        if (GameStatManager.Instance == null) return 0.5f;
+        switch (stat)
+        {
+            case ChainInfluenceStat.Wealth:
+                return GameStatManager.Instance.GetStatPercent(StatType.Wealth);
+            case ChainInfluenceStat.Suspicion:
+                return GameStatManager.Instance.GetStatPercent(StatType.Suspicion);
+            case ChainInfluenceStat.Reputation:
+                return GameStatManager.Instance.GetStatPercent(StatType.Reputation);
+            case ChainInfluenceStat.PoliticalInfluence:
+                return GameStatManager.Instance.GetStatPercent(StatType.PoliticalInfluence);
+            default: return 0.5f;
+        }
+    }
+
+    private void EndWomanChain()
+    {
+        isInWomanChain = false;
+        pendingWomanChainBranches = null;
     }
 
     /// <summary>
@@ -387,6 +542,7 @@ public class WomanProcessManager : MonoBehaviour
         //game over: obsesyon 100'e ulaştı
         if (womanObsession >= 100f)
         {
+            EndWomanChain();
             currentState = WomanProcessState.Inactive;
             OnWomanProcessGameOver?.Invoke();
 
@@ -400,6 +556,7 @@ public class WomanProcessManager : MonoBehaviour
         //süreç bitti: obsesyon eşiğin altına düştü
         if (womanObsession < database.endThreshold)
         {
+            EndWomanChain();
             currentState = WomanProcessState.Inactive;
             OnWomanProcessEnded?.Invoke();
         }

@@ -292,6 +292,10 @@ public class WarForOilEventEditor : Editor
                 choice.FindPropertyRelative("startsWomanProcess"),
                 new GUIContent("Kadın Sürecini Başlat"));
 
+            EditorGUILayout.PropertyField(
+                choice.FindPropertyRelative("endsWomanProcess"),
+                new GUIContent("Kadın Sürecini Bitir"));
+
             SerializedProperty endsWar = choice.FindPropertyRelative("endsWar");
             EditorGUILayout.PropertyField(endsWar, new GUIContent("Savaş Bitir"));
             if (endsWar.boolValue)
@@ -934,6 +938,7 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("mediaPursuitTargetLevel").enumValueIndex = 0;
         choice.FindPropertyRelative("mediaPursuitLevelDelta").intValue = 0;
         choice.FindPropertyRelative("startsWomanProcess").boolValue = false;
+        choice.FindPropertyRelative("endsWomanProcess").boolValue = false;
         choice.FindPropertyRelative("womanObsessionModifier").floatValue = 0f;
         choice.FindPropertyRelative("permanentMultipliers").ClearArray();
         choice.FindPropertyRelative("requiredSkills").ClearArray();

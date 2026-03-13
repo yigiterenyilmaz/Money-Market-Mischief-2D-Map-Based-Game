@@ -152,6 +152,7 @@ public class WarForOilEventChoice
 
     //kadın süreci
     public bool startsWomanProcess; //seçilince kadın sürecini başlatır (oyun boyunca tek sefer)
+    public bool endsWomanProcess; //seçilince kadın sürecini anında bitirir
     public float womanObsessionModifier; //kadın süreci stat'ını etkiler (pozitif = artar, negatif = azalır)
 
     //kalıcı stat çarpanları (seçildiğinde anında ve kalıcı uygulanır — tüm oyun boyunca geçerli)
