@@ -47,6 +47,8 @@ public class RoadGenerator : MonoBehaviour
     [Range(15, 80)] public int branchMinCoverageDistance = 35;
     [Tooltip("Maksimum dal sayısı (güvenlik limiti).")]
     [Range(5, 40)] public int branchMaxCount = 25;
+    [Tooltip("Dal kıvrım oranı. 0 = dümdüz, 0.2 = doğal kıvrım.")]
+    [Range(0f, 0.3f)] public float branchCurviness = 0.08f;
     [Tooltip("Dal başlangıç kalınlığı (highway'e yakın uç).")]
     [Range(1, 6)] public int branchStartThickness = 3;
     [Tooltip("Dal bitiş kalınlığı (en uç).")]
@@ -1032,7 +1034,7 @@ public class RoadGenerator : MonoBehaviour
         Vector2 pathDir = ((Vector2)(rawPath[rawPath.Count - 1] - rawPath[0])).normalized;
         Vector2 pathPerp = new Vector2(-pathDir.y, pathDir.x);
         float pathLength = Vector2Int.Distance(rawPath[0], rawPath[rawPath.Count - 1]);
-        float maxDrift = pathLength * 0.12f; //yol uzunluğunun %12'si kadar sapma
+        float maxDrift = pathLength * branchCurviness;
 
         for (int i = smoothStep; i < rawPath.Count - smoothStep; i += smoothStep)
         {
