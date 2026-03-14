@@ -1,4 +1,4 @@
-    using UnityEngine;
+using UnityEngine;
     using System.Collections.Generic;
 
     [RequireComponent(typeof(MapDecorPlacer))]
@@ -76,7 +76,6 @@
 
         // -------------------------------------------------------------------------
         // SHORE DISTANCE FIELD
-        // BFS from land pixels that touch water — gives exact tile distance from shore
         // -------------------------------------------------------------------------
 
         void BuildShoreDistField(int w, int h)
@@ -140,14 +139,14 @@
                 {
                     beachDistMap[x, y] = -1f;
                     if (!mapGenerator.IsLand(x, y)) continue;
+                    // No beaches on sea rocks
+                    if (mapGenerator.IsSeaRock(x, y)) continue;
 
                     int sd = shoreDistField[x, y];
                     if (sd == int.MaxValue || sd > beachWidth) continue;
 
-                    // Very low frequency noise — large coherent beach stretches
                     float selector = Mathf.PerlinNoise(x * 0.015f + beachSeed, y * 0.015f + beachSeed);
 
-                    // Fade selector near inland edge so beaches thin out naturally
                     float inlandFade = 1f - ((float)sd / beachWidth);
                     selector *= inlandFade;
 
@@ -185,6 +184,8 @@
                 {
                     if (!mapGenerator.IsLand(x, y)) continue;
                     int myBiome = mapGenerator.GetBiome(x, y);
+                    // Sea rocks (biome 5) don't participate in transitions
+                    if (myBiome == 5) continue;
 
                     for (int i = 0; i < 4; i++)
                     {
@@ -193,6 +194,8 @@
                         if (!mapGenerator.IsLand(nx, ny)) continue;
 
                         int neighborBiome = mapGenerator.GetBiome(nx, ny);
+                        // Ignore sea rock neighbors — no blending with them
+                        if (neighborBiome == 5) continue;
                         if (neighborBiome != myBiome)
                         {
                             if (dist[x, y] > 0)
@@ -247,6 +250,10 @@
             float d          = borderDist[x, y];
             int   otherBiome = nearestOther[x, y];
 
+            // Sea rocks: no beach, no biome transition — just paint rock
+            if (myBiome == 5)
+                return PaintSeaRock(x, y, seed);
+
             // Beach overrides everything — paint beach and blend into region inland
             float beachD = beachDistMap[x, y];
             if (beachD >= 0f)
@@ -283,6 +290,7 @@
                 case 2: return PaintCities(x, y, seed);
                 case 3: return PaintIndustrial(x, y, seed);
                 case 4: return PaintAgricultural(x, y, seed);
+                case 5: return PaintSeaRock(x, y, seed);
                 default: return settings.waterDeep;
             }
         }
@@ -362,6 +370,24 @@
             if (n < 0.54f) return settings.industrialLight;
             if (n < 0.62f) return Color.Lerp(settings.industrialDark, settings.industrialLight, 0.66f);
             return settings.industrialDark;
+        }
+
+        Color PaintSeaRock(int x, int y, float seed)
+        {
+            float n1 = Mathf.PerlinNoise(x * 0.025f + seed + 800f, y * 0.025f + seed + 800f);
+            float n2 = Mathf.PerlinNoise(x * 0.065f + seed + 840f, y * 0.065f + seed + 840f) * 0.5f;
+            float n3 = Mathf.PerlinNoise(x * 0.15f  + seed + 880f, y * 0.15f  + seed + 880f) * 0.25f;
+            float n  = (n1 + n2 + n3) / 1.75f;
+
+            // Crevice noise — dark cracks across the rock surface
+            float crack = Mathf.PerlinNoise(x * 0.08f + seed + 900f, y * 0.08f + seed + 900f);
+            if (crack > 0.74f) return settings.seaRockCrack;
+
+            if (n < 0.36f) return settings.seaRockDark;
+            if (n < 0.44f) return Color.Lerp(settings.seaRockDark, settings.seaRockLight, 0.33f);
+            if (n < 0.54f) return settings.seaRockLight;
+            if (n < 0.62f) return Color.Lerp(settings.seaRockDark, settings.seaRockLight, 0.66f);
+            return settings.seaRockDark;
         }
 
         // -------------------------------------------------------------------------

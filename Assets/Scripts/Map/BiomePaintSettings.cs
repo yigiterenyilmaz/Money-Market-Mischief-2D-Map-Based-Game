@@ -32,6 +32,11 @@ public class BiomePaintSettings : ScriptableObject
     public Color industrialLight  = new Color(0.46f, 0.38f, 0.28f); // dry dirt
     public Color industrialCrack  = new Color(0.18f, 0.14f, 0.10f); // deep cracks
 
+    [Header("Sea Rocks — gray stone formations in the ocean")]
+    public Color seaRockDark  = new Color(0.38f, 0.38f, 0.40f); // dark gray stone
+    public Color seaRockLight = new Color(0.56f, 0.55f, 0.54f); // lighter gray
+    public Color seaRockCrack = new Color(0.24f, 0.23f, 0.22f); // deep crevice
+
     [Header("Decorative Sprites — Urban")]
     public List<Sprite> urbanDecor = new List<Sprite>();
 

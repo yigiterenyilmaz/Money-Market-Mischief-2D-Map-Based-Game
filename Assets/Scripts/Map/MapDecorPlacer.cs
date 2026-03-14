@@ -159,11 +159,6 @@ public class MapDecorPlacer : MonoBehaviour
             }
         }
 
-        // attempts = cellCount * spawnRate
-        // cellCount = how many cells fit in this biome's area
-        // spawnRate 1 = 1 attempt per cell, 16 = 16 attempts per cell
-        // Scales naturally with region size, slider is intuitive
-
         int cityAttempts = (cityTilePool.Count / Mathf.Max(1, cellArea)) * citiesSpawnRate;
         for (int attempt = 0; attempt < cityAttempts; attempt++)
         {
@@ -205,6 +200,20 @@ public class MapDecorPlacer : MonoBehaviour
             case 4: return urbanSpawnRate;
             default: return 0;
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // VISIBILITY TOGGLE — used by UndergroundMapManager
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Show or hide all decor sprites (buildings, trees, etc.).
+    /// Called when switching between surface and underground views.
+    /// </summary>
+    public void SetDecorVisible(bool visible)
+    {
+        foreach (var go in decorObjects)
+            if (go != null) go.SetActive(visible);
     }
 
     // -------------------------------------------------------------------------

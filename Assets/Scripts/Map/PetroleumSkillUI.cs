@@ -9,7 +9,7 @@ public class PetroleumSkillUI : MonoBehaviour
     public Canvas          canvas;
 
     [Header("Optional Icons")]
-    public Sprite researchIcon, pumpIcon, cancelIcon;
+    public Sprite researchIcon, pumpIcon, cancelIcon, undergroundIcon;
 
     [Header("Popup")]
     public Color panelColor = new Color(0f, 0f, 0f, 0.75f);
@@ -24,12 +24,33 @@ public class PetroleumSkillUI : MonoBehaviour
     public Color confirmColor = new Color(0.2f, 0.65f, 0.3f, 0.9f);
     public int actionW = 220, actionH = 64, actionBottom = 90, actionGap = 28, actionFont = 24;
 
+    [Header("View Toggle Button")]
+    public Color viewToggleBg      = new Color(0.22f, 0.18f, 0.12f, 0.85f);
+    public Color viewToggleActiveBg = new Color(0.45f, 0.34f, 0.18f, 0.9f);
+    public int   viewToggleSize    = 72;
+    public int   viewToggleMargin  = 16;
+
     private GameObject popupRoot, actionBar, cancelBtn, confirmBtn, acceptBtn, costLabel;
     private GameObject timerSliderGO;
     private Image timerFill;
     private Text costText, timerText;
     private bool popupOpen;
     private float savedCamSize;
+
+    // View toggle
+    private GameObject viewToggleGO;
+    private Image      viewToggleBgImage;
+    private Button     viewToggleButton;
+    private Text       viewToggleLabel;
+    private bool       viewToggleBuilt;
+
+    void Start()
+    {
+        // Build the view toggle immediately so it's always available,
+        // independent of the popup which is lazy-built on first open.
+        EnsureCanvas();
+        if (!viewToggleBuilt) BuildViewToggle();
+    }
 
     void OnEnable()
     {
@@ -42,6 +63,7 @@ public class PetroleumSkillUI : MonoBehaviour
         PetroleumSystem.OnResearchTimerStarted  += OnTimerStarted;
         PetroleumSystem.OnResearchTimerProgress += OnTimerProgress;
         PetroleumSystem.OnPumpPlaced            += OnPumpPlacedUI;
+        UndergroundMapManager.OnViewModeChanged += OnViewModeChanged;
     }
 
     void OnDisable()
@@ -55,6 +77,7 @@ public class PetroleumSkillUI : MonoBehaviour
         PetroleumSystem.OnResearchTimerStarted  -= OnTimerStarted;
         PetroleumSystem.OnResearchTimerProgress -= OnTimerProgress;
         PetroleumSystem.OnPumpPlaced            -= OnPumpPlacedUI;
+        UndergroundMapManager.OnViewModeChanged -= OnViewModeChanged;
     }
 
     public void Toggle() { if (popupOpen) ClosePopup(); else OpenPopup(); }
@@ -112,7 +135,6 @@ public class PetroleumSkillUI : MonoBehaviour
     void RestoreUI()
     {
         actionBar.SetActive(false);
-        // Only hide timer if no background research is running
         if (petroleumSystem == null || petroleumSystem.PendingResearchCount == 0)
             timerSliderGO.SetActive(false);
         if (uiManager != null)
@@ -129,6 +151,9 @@ public class PetroleumSkillUI : MonoBehaviour
     {
         if (petroleumSystem == null) return;
         GoToMap();
+        // Auto-switch to underground view when entering research mode
+        if (UndergroundMapManager.Instance != null && UndergroundMapManager.Instance.IsReady)
+            UndergroundMapManager.Instance.SetView(UndergroundMapManager.ViewMode.Underground);
         actionBar.SetActive(true);
         cancelBtn.SetActive(true);
         confirmBtn.SetActive(false);
@@ -159,14 +184,34 @@ public class PetroleumSkillUI : MonoBehaviour
     }
 
     void OnPopupCancel() { ClosePopup(); }
-    void OnCancelClick() { if (petroleumSystem != null) petroleumSystem.CancelMode(); }
-    void OnConfirmClick() { if (petroleumSystem != null) petroleumSystem.ConfirmResearch(); }
-    void OnAcceptClick() { if (petroleumSystem != null) petroleumSystem.AcceptPumps(); }
+    void OnCancelClick()
+    {
+        // Switch back to surface when cancelling research
+        if (UndergroundMapManager.Instance != null && UndergroundMapManager.Instance.IsReady)
+            UndergroundMapManager.Instance.SetView(UndergroundMapManager.ViewMode.Surface);
+        if (petroleumSystem != null) petroleumSystem.CancelMode();
+    }
+    void OnConfirmClick()
+    {
+        if (petroleumSystem != null) petroleumSystem.ConfirmResearch();
+    }
+    void OnAcceptClick()  { if (petroleumSystem != null) petroleumSystem.AcceptPumps(); }
+
+    void OnViewToggleClicked()
+    {
+        if (UndergroundMapManager.Instance != null && UndergroundMapManager.Instance.IsReady)
+            UndergroundMapManager.Instance.ToggleView();
+    }
 
     // === EVENT HANDLERS ===
 
     void OnFinished()
     {
+        // Switch back to surface when finishing research/pump modes
+        if (UndergroundMapManager.Instance != null && UndergroundMapManager.Instance.IsReady
+            && UndergroundMapManager.Instance.CurrentView == UndergroundMapManager.ViewMode.Underground)
+            UndergroundMapManager.Instance.SetView(UndergroundMapManager.ViewMode.Surface);
+
         RestoreUI();
         popupOpen = false;
     }
@@ -206,7 +251,6 @@ public class PetroleumSkillUI : MonoBehaviour
 
     void OnTimerStarted(float duration)
     {
-        // Timer starts after UI is already restored — show slider on normal map view
         if (timerSliderGO != null) timerSliderGO.SetActive(true);
         if (timerFill != null) timerFill.fillAmount = 0f;
         if (timerText != null) timerText.text = $"Researching... 0/{duration:F1}s";
@@ -222,9 +266,36 @@ public class PetroleumSkillUI : MonoBehaviour
             float d = petroleumSystem.GetResearchDuration();
             timerText.text = $"Researching... {(d * progress):F1}/{d:F1}s";
         }
-        // Hide when done (progress == 1 means complete, next frame PendingResearch is removed)
         if (progress >= 1f && timerSliderGO != null)
             timerSliderGO.SetActive(false);
+    }
+
+    void OnViewModeChanged(UndergroundMapManager.ViewMode mode)
+    {
+        UpdateViewToggleVisual(mode);
+    }
+
+    void UpdateViewToggleVisual(UndergroundMapManager.ViewMode mode)
+    {
+        Color bg = (mode == UndergroundMapManager.ViewMode.Underground) ? viewToggleActiveBg : viewToggleBg;
+
+        if (viewToggleBgImage != null)
+            viewToggleBgImage.color = bg;
+
+        // Must also update the Button's ColorBlock, otherwise Unity's Button
+        // component continuously applies normalColor and overrides our change.
+        if (viewToggleButton != null)
+        {
+            var cbl = viewToggleButton.colors;
+            cbl.normalColor      = bg;
+            cbl.highlightedColor = Br(bg, 0.08f);
+            cbl.pressedColor     = Br(bg, -0.06f);
+            cbl.selectedColor    = bg;
+            viewToggleButton.colors = cbl;
+        }
+
+        if (viewToggleLabel != null)
+            viewToggleLabel.text = (mode == UndergroundMapManager.ViewMode.Underground) ? "UG" : "SF";
     }
 
     // === BUILD UI ===
@@ -235,7 +306,7 @@ public class PetroleumSkillUI : MonoBehaviour
         BuildPopup();
         BuildActionBar();
         BuildTimerSlider();
-        // Everything starts hidden
+        if (!viewToggleBuilt) BuildViewToggle();
         popupRoot.SetActive(false);
         actionBar.SetActive(false);
         timerSliderGO.SetActive(false);
@@ -320,6 +391,54 @@ public class PetroleumSkillUI : MonoBehaviour
         timerText.fontSize = 20; timerText.color = Color.white;
         timerText.alignment = TextAnchor.MiddleCenter; timerText.fontStyle = FontStyle.Bold;
         txtGO.AddComponent<Shadow>().effectColor = Color.black;
+    }
+
+    void BuildViewToggle()
+    {
+        viewToggleGO = UI("ViewToggle", canvas.transform);
+        var rt = viewToggleGO.GetComponent<RectTransform>();
+        // Bottom-left corner
+        rt.anchorMin = new Vector2(0f, 0f);
+        rt.anchorMax = new Vector2(0f, 0f);
+        rt.pivot     = new Vector2(0f, 0f);
+        rt.sizeDelta = new Vector2(viewToggleSize, viewToggleSize);
+        rt.anchoredPosition = new Vector2(viewToggleMargin, viewToggleMargin);
+
+        viewToggleBgImage = viewToggleGO.AddComponent<Image>();
+        viewToggleBgImage.color = viewToggleBg;
+
+        viewToggleButton = viewToggleGO.AddComponent<Button>();
+        var cbl = viewToggleButton.colors;
+        cbl.normalColor      = viewToggleBg;
+        cbl.highlightedColor = Br(viewToggleBg, 0.08f);
+        cbl.pressedColor     = Br(viewToggleBg, -0.06f);
+        cbl.fadeDuration     = 0.08f;
+        viewToggleButton.colors = cbl;
+        viewToggleButton.onClick.AddListener(OnViewToggleClicked);
+
+        // Icon area (uses undergroundIcon sprite if assigned, else fallback color)
+        var icoGO = UI("Ico", viewToggleGO.transform);
+        var irt = icoGO.GetComponent<RectTransform>();
+        irt.anchorMin = Vector2.zero; irt.anchorMax = Vector2.one;
+        irt.offsetMin = Vector2.one * 10; irt.offsetMax = Vector2.one * -10;
+        var img = icoGO.AddComponent<Image>();
+        if (undergroundIcon != null) { img.sprite = undergroundIcon; img.color = Color.white; }
+        else img.color = new Color(0.55f, 0.40f, 0.22f);
+        img.preserveAspect = true;
+
+        // Small label
+        var lblGO = UI("Lbl", viewToggleGO.transform);
+        var lrt = lblGO.GetComponent<RectTransform>();
+        lrt.anchorMin = new Vector2(0f, 0f); lrt.anchorMax = new Vector2(1f, 0.35f);
+        lrt.offsetMin = lrt.offsetMax = Vector2.zero;
+        viewToggleLabel = lblGO.AddComponent<Text>();
+        viewToggleLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        viewToggleLabel.fontSize = 14; viewToggleLabel.color = Color.white;
+        viewToggleLabel.alignment = TextAnchor.MiddleCenter; viewToggleLabel.fontStyle = FontStyle.Bold;
+        viewToggleLabel.text = "SF";
+        lblGO.AddComponent<Shadow>().effectColor = Color.black;
+
+        viewToggleBuilt = true;
     }
 
     // === HELPERS ===
