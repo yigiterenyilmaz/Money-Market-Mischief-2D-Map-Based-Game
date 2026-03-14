@@ -46,15 +46,15 @@ public class MapDecorPlacer : MonoBehaviour
     public Vector2 spriteScaleRange = new Vector2(0.75f, 1.25f);
 
     // -------------------------------------------------------------------------
-    // CITIES
+    // CITIES — ROAD-AWARE PLACEMENT
     // -------------------------------------------------------------------------
 
-    [Header("Cities Decor")]
+    [Header("Cities Decor — Road-Aware Placement")]
 
     [Tooltip("Minimum distance from water (in tiles) before a building can spawn. Set 0 to disable.")]
     [Range(0, 20)] public int cityShoreBuffer = 3;
 
-    [Tooltip("Minimum distance in tiles from any non-Cities biome tile. Keep low (4-8) due to domain warp noise.")]
+    [Tooltip("Minimum distance in tiles from any non-Cities biome tile.")]
     [Range(0, 20)] public int cityRegionBorderBuffer = 5;
 
     [Tooltip("When enabled, building sprites are rotated in 90-degree increments only.")]
@@ -63,45 +63,11 @@ public class MapDecorPlacer : MonoBehaviour
     [Tooltip("World-space radius around each building that blocks other buildings from spawning.")]
     [Range(0.05f, 2f)] public float overlapRadius = 0.3f;
 
-    // -------------------------------------------------------------------------
-    // ROADS
-    // -------------------------------------------------------------------------
+    [Tooltip("Maximum tile distance from a road for a building to spawn. 0 = disable road constraint.")]
+    [Range(0, 30)] public int cityBuildingMaxRoadDistance = 8;
 
-    [Header("Roads — Web Structure")]
-
-    [Tooltip("How many nearest neighbours each building connects to. 2 creates a web with loops. 1 creates a tree.")]
-    [Range(1, 5)] public int roadNeighbourConnections = 2;
-
-    [Tooltip("How directly the road walks toward its target. 1 = straight line, 0 = fully random.")]
-    [Range(0f, 1f)] public float roadConnectionBias = 0.90f;
-
-    [Tooltip("Maximum steps a connection walk takes before giving up.")]
-    [Range(50, 1000)] public int roadConnectionMaxSteps = 500;
-
-    [Header("Roads — Branch Phase")]
-
-    [Tooltip("Number of extra roads added after main connections.")]
-    [Range(0, 20)] public int roadBranchCount = 5;
-
-    [Tooltip("How directly each branch walks toward its target. Lower = more winding.")]
-    [Range(0f, 1f)] public float roadBranchBias = 0.60f;
-
-    [Tooltip("Maximum steps a branch walk takes.")]
-    [Range(50, 1000)] public int roadBranchMaxSteps = 250;
-
-    [Tooltip("Minimum pixel distance between branch start and end. Prevents tiny stub roads.")]
-    [Range(10, 300)] public int roadBranchMinDistance = 50;
-
-    [Header("Roads — Appearance & Borders")]
-
-    [Tooltip("Road line thickness in pixels.")]
-    [Range(1, 6)] public int roadThickness = 2;
-
-    [Tooltip("Minimum distance in tiles from any non-Cities biome tile before a road pixel is painted.")]
-    [Range(0, 20)] public int roadRegionBorderBuffer = 4;
-
-    [Tooltip("Color painted onto the map texture for all road pixels.")]
-    public Color roadColor = new Color(0.30f, 0.28f, 0.25f);
+    [Tooltip("Buildings closer to roads are more likely to spawn. Higher = stricter clustering.")]
+    [Range(0f, 1f)] public float cityRoadAffinityStrength = 0.7f;
 
     // -------------------------------------------------------------------------
     // PRIVATE STATE
@@ -109,12 +75,6 @@ public class MapDecorPlacer : MonoBehaviour
 
     private List<GameObject> decorObjects    = new List<GameObject>();
     private List<Vector2>    occupiedCenters = new List<Vector2>();
-    private HashSet<int>     roadPixels      = new HashSet<int>();
-    private List<Vector2Int> buildingTiles   = new List<Vector2Int>();
-    private List<Vector2Int> roadPointList   = new List<Vector2Int>();
-
-    private Texture2D _tex;
-    private int _mapW, _mapH;
 
     // -------------------------------------------------------------------------
     // ENTRY POINT
@@ -124,10 +84,6 @@ public class MapDecorPlacer : MonoBehaviour
     {
         Clear();
         if (settings == null) { Debug.LogError("MapDecorPlacer: settings is null!"); return; }
-
-        _tex  = mapTexture;
-        _mapW = map.width;
-        _mapH = map.height;
 
         int scaledCellSize = Mathf.Max(cellSize, Mathf.RoundToInt(cellSize * (map.width / 256f)));
         int cellArea       = scaledCellSize * scaledCellSize;
@@ -182,13 +138,7 @@ public class MapDecorPlacer : MonoBehaviour
             }
         }
 
-        if (mapTexture != null)
-        {
-            PaintRoads(map);
-            mapTexture.Apply();
-        }
-
-        Debug.Log($"MapDecorPlacer: cellArea={cellArea}, buildings={buildingTiles.Count}, decor={decorObjects.Count}");
+        Debug.Log($"MapDecorPlacer: decor={decorObjects.Count}");
     }
 
     int GetSpawnRate(int biome)
@@ -206,10 +156,6 @@ public class MapDecorPlacer : MonoBehaviour
     // VISIBILITY TOGGLE — used by UndergroundMapManager
     // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Show or hide all decor sprites (buildings, trees, etc.).
-    /// Called when switching between surface and underground views.
-    /// </summary>
     public void SetDecorVisible(bool visible)
     {
         foreach (var go in decorObjects)
@@ -217,7 +163,7 @@ public class MapDecorPlacer : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // PLACEMENT — CITIES
+    // PLACEMENT — CITIES (now road-aware)
     // -------------------------------------------------------------------------
 
     void TryPlaceCityBuilding(MapGenerator map, BiomePaintSettings settings,
@@ -225,6 +171,23 @@ public class MapDecorPlacer : MonoBehaviour
     {
         if (settings.citiesDecor == null || settings.citiesDecor.Count == 0) return;
         if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) return;
+
+        // --- Road-aware placement ---
+        if (cityBuildingMaxRoadDistance > 0 && RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated)
+        {
+            int roadDist = RoadGenerator.Instance.GetDistanceToRoad(tx, ty);
+
+            // Hard cutoff: don't place beyond max distance
+            if (roadDist > cityBuildingMaxRoadDistance) return;
+
+            // Soft falloff: tiles further from roads have lower spawn chance
+            if (cityRoadAffinityStrength > 0f && roadDist > 0)
+            {
+                float normalizedDist = (float)roadDist / cityBuildingMaxRoadDistance;
+                float spawnChance = 1f - (normalizedDist * cityRoadAffinityStrength);
+                if (Random.value > spawnChance) return;
+            }
+        }
 
         Sprite sprite = settings.citiesDecor[Random.Range(0, settings.citiesDecor.Count)];
         if (sprite == null) return;
@@ -235,7 +198,6 @@ public class MapDecorPlacer : MonoBehaviour
         if (IsOverlapping(wx, wy)) return;
 
         occupiedCenters.Add(new Vector2(wx, wy));
-        buildingTiles.Add(new Vector2Int(tx, ty));
 
         float scale = Random.Range(spriteScaleRange.x, spriteScaleRange.y);
         PlaceSprite("CityBuilding", sprite, wx, wy, scale, false, 10 + (int)(wy * -100f));
@@ -326,134 +288,8 @@ public class MapDecorPlacer : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // ROAD GENERATION
+    // CLEANUP
     // -------------------------------------------------------------------------
-
-    void PaintRoads(MapGenerator map)
-    {
-        roadPixels.Clear();
-        roadPointList.Clear();
-
-        if (buildingTiles.Count < 2) return;
-
-        HashSet<long> connectedPairs = new HashSet<long>();
-
-        for (int i = 0; i < buildingTiles.Count; i++)
-        {
-            List<(float dist, int idx)> sorted = new List<(float, int)>();
-            for (int j = 0; j < buildingTiles.Count; j++)
-            {
-                if (i == j) continue;
-                sorted.Add((Vector2Int.Distance(buildingTiles[i], buildingTiles[j]), j));
-            }
-            sorted.Sort((a, b) => a.dist.CompareTo(b.dist));
-
-            int connections = Mathf.Min(roadNeighbourConnections, sorted.Count);
-            for (int n = 0; n < connections; n++)
-            {
-                int j = sorted[n].idx;
-                long pairKey = i < j ? ((long)i << 32 | (uint)j) : ((long)j << 32 | (uint)i);
-                if (connectedPairs.Contains(pairKey)) continue;
-                connectedPairs.Add(pairKey);
-                WalkToward(map, buildingTiles[i], buildingTiles[j], roadConnectionBias, roadConnectionMaxSteps);
-            }
-        }
-
-        if (roadPointList.Count < 2) return;
-
-        for (int b = 0; b < roadBranchCount; b++)
-        {
-            Vector2Int start  = roadPointList[Random.Range(0, roadPointList.Count)];
-            Vector2Int target = start;
-
-            for (int attempt = 0; attempt < 20; attempt++)
-            {
-                Vector2Int candidate = roadPointList[Random.Range(0, roadPointList.Count)];
-                if (Vector2Int.Distance(start, candidate) >= roadBranchMinDistance)
-                { target = candidate; break; }
-            }
-
-            if (target == start) continue;
-            WalkToward(map, start, target, roadBranchBias, roadBranchMaxSteps);
-        }
-    }
-
-    void WalkToward(MapGenerator map, Vector2Int start, Vector2Int target, float bias, int maxSteps)
-    {
-        int[] dx4 = { 1, -1, 0, 0 };
-        int[] dy4 = { 0, 0, 1, -1 };
-
-        Vector2Int pos = start;
-        List<Vector2Int> candidate = new List<Vector2Int>();
-        bool reached = false;
-
-        for (int step = 0; step < maxSteps; step++)
-        {
-            if (!map.IsLand(pos.x, pos.y) || map.GetBiome(pos.x, pos.y) != 2) break;
-            if (roadRegionBorderBuffer > 0 && !IsInsideRegion(map, pos.x, pos.y, roadRegionBorderBuffer)) break;
-
-            candidate.Add(pos);
-
-            if (Vector2Int.Distance(pos, target) <= roadThickness + 1)
-            { reached = true; break; }
-
-            int chosenDir = -1;
-
-            if (Random.value < bias)
-            {
-                float bestDist = float.MaxValue;
-                for (int i = 0; i < 4; i++)
-                {
-                    int nx = pos.x + dx4[i], ny = pos.y + dy4[i];
-                    if (!InBounds(nx, ny, map) || !map.IsLand(nx, ny) || map.GetBiome(nx, ny) != 2) continue;
-                    float d = Vector2Int.Distance(new Vector2Int(nx, ny), target);
-                    if (d < bestDist) { bestDist = d; chosenDir = i; }
-                }
-            }
-
-            if (chosenDir == -1)
-            {
-                for (int attempt = 0; attempt < 8; attempt++)
-                {
-                    int c = Random.Range(0, 4);
-                    int nx = pos.x + dx4[c], ny = pos.y + dy4[c];
-                    if (InBounds(nx, ny, map) && map.IsLand(nx, ny) && map.GetBiome(nx, ny) == 2)
-                    { chosenDir = c; break; }
-                }
-            }
-
-            if (chosenDir == -1) break;
-            pos = new Vector2Int(pos.x + dx4[chosenDir], pos.y + dy4[chosenDir]);
-        }
-
-        if (!reached) return;
-
-        foreach (var p in candidate)
-        {
-            PaintThickPixel(p.x, p.y);
-            int key = p.x + p.y * _mapW;
-            if (!roadPixels.Contains(key))
-            {
-                roadPixels.Add(key);
-                roadPointList.Add(p);
-            }
-        }
-    }
-
-    void PaintThickPixel(int cx, int cy)
-    {
-        int half = roadThickness / 2;
-        for (int dx = -half; dx <= half; dx++)
-            for (int dy = -half; dy <= half; dy++)
-            {
-                int px = cx + dx, py = cy + dy;
-                if (px >= 0 && px < _mapW && py >= 0 && py < _mapH)
-                    _tex.SetPixel(px, py, roadColor);
-            }
-    }
-
-    bool InBounds(int x, int y, MapGenerator map)
-        => x >= 0 && x < map.width && y >= 0 && y < map.height;
 
     public void Clear()
     {
@@ -461,9 +297,5 @@ public class MapDecorPlacer : MonoBehaviour
             if (go != null) Destroy(go);
         decorObjects.Clear();
         occupiedCenters.Clear();
-        roadPixels.Clear();
-        buildingTiles.Clear();
-        roadPointList.Clear();
-        _tex = null;
     }
 }
