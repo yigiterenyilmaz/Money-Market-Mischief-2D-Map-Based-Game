@@ -77,7 +77,7 @@ public class MapPainter : MonoBehaviour
 
         // --- Generate roads onto the texture before decor ---
         if (roadGenerator == null)
-            roadGenerator = FindObjectOfType<RoadGenerator>();
+            roadGenerator = FindFirstObjectByType<RoadGenerator>();
 
         if (roadGenerator != null)
         {

@@ -33,6 +33,20 @@ public class WomanProcessManager : MonoBehaviour
     private Event currentPrecursorRandomEvent; //gösterilen öncü random event
     private float precursorDecisionTimer;
 
+    //havuz yönlendirme — bir choice ile kalıcı olarak başka database'e geçiş
+    private WomanProcessDatabase redirectedDatabase; //null ise normal database kullanılır
+
+    //kalıcı obsesyon kazanım çarpanı — çarpımsal birikir (1.0 = etkisiz)
+    private float obsessionGainMultiplier = 1f;
+
+    //son chain branch seçiminin anında event olup olmadığı
+    private bool lastChainPickWasImmediate;
+    private float lastChainPickImmediateDelay;
+
+    //gecikmeli anında event (chain branch'ten)
+    private WarForOilEvent pendingImmediateEvent;
+    private float immediateEventTimer;
+
     //zincir durumu
     private bool isInWomanChain;
     private List<ChainBranch> pendingWomanChainBranches;
@@ -85,6 +99,19 @@ public class WomanProcessManager : MonoBehaviour
     private void Update()
     {
         if (currentState == WomanProcessState.Inactive) return;
+
+        //gecikmeli anında event (chain branch'ten)
+        if (pendingImmediateEvent != null && currentState == WomanProcessState.Active)
+        {
+            immediateEventTimer -= Time.deltaTime;
+            if (immediateEventTimer <= 0f)
+            {
+                WarForOilEvent evt = pendingImmediateEvent;
+                pendingImmediateEvent = null;
+                ShowWomanEvent(evt);
+                return;
+            }
+        }
 
         //bekleyen tetikleme — uygun an gelince kadın eventini göster
         if (pendingTrigger && currentState == WomanProcessState.Active)
@@ -226,9 +253,13 @@ public class WomanProcessManager : MonoBehaviour
         currentWomanEvent = null;
         womanEventTriggerCounts.Clear();
         dismissedWomanEvents.Clear();
+        redirectedDatabase = null;
+        obsessionGainMultiplier = 1f;
         isInWomanChain = false;
         pendingWomanChainBranches = null;
         pendingWomanEventAfterPrecursor = null;
+        pendingImmediateEvent = null;
+        immediateEventTimer = 0f;
         currentPrecursorWarEvent = null;
         currentPrecursorRandomEvent = null;
         currentState = WomanProcessState.Active;
@@ -253,7 +284,28 @@ public class WomanProcessManager : MonoBehaviour
         //womanObsession güncelle
         if (choice.womanObsessionModifier != 0f)
         {
-            womanObsession = Mathf.Clamp(womanObsession + choice.womanObsessionModifier, 0f, 100f);
+            float obsessionAmount = choice.womanObsessionModifier;
+            if (obsessionAmount > 0f)
+                obsessionAmount *= obsessionGainMultiplier;
+
+            if (choice.hasObsessionFloor && obsessionAmount < 0f)
+            {
+                if (womanObsession < choice.obsessionFloor)
+                {
+                    //zaten floor'un altında — sadece 0.1 düşür
+                    womanObsession = Mathf.Max(womanObsession - 0.1f, 0f);
+                }
+                else
+                {
+                    womanObsession = Mathf.Clamp(womanObsession + obsessionAmount, 0f, 100f);
+                    if (womanObsession < choice.obsessionFloor)
+                        womanObsession = choice.obsessionFloor;
+                }
+            }
+            else
+            {
+                womanObsession = Mathf.Clamp(womanObsession + obsessionAmount, 0f, 100f);
+            }
             OnObsessionChanged?.Invoke(womanObsession);
         }
 
@@ -263,7 +315,23 @@ public class WomanProcessManager : MonoBehaviour
             if (choice.suspicionModifier != 0f)
                 GameStatManager.Instance.AddSuspicion(choice.suspicionModifier);
             if (choice.reputationModifier != 0f)
-                GameStatManager.Instance.AddReputation(choice.reputationModifier);
+            {
+                if (choice.hasReputationFloor && choice.reputationModifier < 0f)
+                {
+                    if (GameStatManager.Instance.Reputation < choice.reputationFloor)
+                        GameStatManager.Instance.AddReputation(-0.1f);
+                    else
+                    {
+                        GameStatManager.Instance.AddReputation(choice.reputationModifier);
+                        if (GameStatManager.Instance.Reputation < choice.reputationFloor)
+                            GameStatManager.Instance.SetStat(StatType.Reputation, choice.reputationFloor);
+                    }
+                }
+                else
+                {
+                    GameStatManager.Instance.AddReputation(choice.reputationModifier);
+                }
+            }
             if (choice.politicalInfluenceModifier != 0f)
                 GameStatManager.Instance.AddPoliticalInfluence(choice.politicalInfluenceModifier);
             if (choice.wealthModifier != 0f)
@@ -301,9 +369,19 @@ public class WomanProcessManager : MonoBehaviour
                     if (WarForOilManager.Instance != null)
                         WarForOilManager.Instance.ApplyPermanentSupportMultiplier(entry.multiplier);
                 }
+                else if (entry.stat == PermanentMultiplierStatType.WomanObsession)
+                {
+                    ApplyPermanentObsessionMultiplier(entry.multiplier);
+                }
                 else if (GameStatManager.Instance != null)
                     GameStatManager.Instance.ApplyPermanentGainMultiplier((StatType)entry.stat, entry.multiplier);
             }
+        }
+
+        //havuz yönlendirme — kalıcı olarak başka database'e geçiş
+        if (choice.redirectsWomanPool && choice.womanPoolDatabase != null)
+        {
+            redirectedDatabase = choice.womanPoolDatabase;
         }
 
         OnWomanEventResolved?.Invoke(choice);
@@ -371,6 +449,14 @@ public class WomanProcessManager : MonoBehaviour
     public float GetObsession()
     {
         return womanObsession;
+    }
+
+    /// <summary>
+    /// Kadın obsesyonu kalıcı kazanım çarpanını uygular. Çarpan birikimlidir (mevcut *= yeni).
+    /// </summary>
+    public void ApplyPermanentObsessionMultiplier(float multiplier)
+    {
+        obsessionGainMultiplier *= multiplier;
     }
 
     /// <summary>
@@ -452,12 +538,26 @@ public class WomanProcessManager : MonoBehaviour
         if (isInWomanChain)
         {
             //zincir aktif — chain branch'lerinden seç
+            lastChainPickWasImmediate = false;
             evt = PickEventFromChainBranches();
             if (evt == null)
             {
                 //uygun branch kalmadı — zincir biter, havuzdan devam et
                 EndWomanChain();
                 evt = PickEventFromTierPool();
+            }
+            else if (lastChainPickWasImmediate)
+            {
+                //anında event olarak seçildi — zincir biter, event standalone olarak tetiklenir
+                EndWomanChain();
+
+                if (lastChainPickImmediateDelay > 0f)
+                {
+                    //gecikmeli tetikle
+                    pendingImmediateEvent = evt;
+                    immediateEventTimer = lastChainPickImmediateDelay;
+                    return;
+                }
             }
         }
         else
@@ -545,11 +645,14 @@ public class WomanProcessManager : MonoBehaviour
 
     private WarForOilEvent PickEventFromTierPool()
     {
-        int tier = database.GetTier(womanObsession);
-        List<WarForOilEvent> pool = database.GetTierEvents(tier);
+        //yönlendirilmiş database varsa onu kullan
+        WomanProcessDatabase activeDb = redirectedDatabase != null ? redirectedDatabase : database;
+
+        int tier = activeDb.GetTier(womanObsession);
+        List<WarForOilEvent> pool = activeDb.GetTierEvents(tier);
         if (pool == null || pool.Count == 0) return null;
 
-        database.GetTierRange(tier, out float tierMin, out float tierMax);
+        activeDb.GetTierRange(tier, out float tierMin, out float tierMax);
         return PickEventFromPool(pool, tierMin, tierMax);
     }
 
@@ -591,7 +694,29 @@ public class WomanProcessManager : MonoBehaviour
         }
 
         if (totalWeight <= 0f)
-            return null; //uygun branch yok
+        {
+            //tüm ağırlıklar 0 — engellenmemiş event varsa eşit ağırlıkla dağıt
+            int eligibleCount = 0;
+            for (int i = 0; i < pendingWomanChainBranches.Count; i++)
+            {
+                if (pendingWomanChainBranches[i].targetEvent != null
+                    && !dismissedWomanEvents.Contains(pendingWomanChainBranches[i].targetEvent))
+                    eligibleCount++;
+            }
+            if (eligibleCount == 0) return null;
+            Debug.LogWarning("[KADIN SÜRECİ] ZİNCİR DALLANMASI: TÜM AĞIRLIKLAR 0! EŞİT DAĞITIM YAPILIYOR. INSPECTOR'DAN AĞIRLIKLARI KONTROL ET!");
+            float equalWeight = 1f / eligibleCount;
+            totalWeight = 0f;
+            for (int i = 0; i < pendingWomanChainBranches.Count; i++)
+            {
+                if (pendingWomanChainBranches[i].targetEvent != null
+                    && !dismissedWomanEvents.Contains(pendingWomanChainBranches[i].targetEvent))
+                {
+                    weights[i] = equalWeight;
+                    totalWeight += equalWeight;
+                }
+            }
+        }
 
         //ağırlıklı seçim
         float roll = UnityEngine.Random.value * totalWeight;
@@ -605,11 +730,24 @@ public class WomanProcessManager : MonoBehaviour
         {
             cumulative += weights[i];
             if (roll <= cumulative)
+            {
+                if (pendingWomanChainBranches[i].triggersAsImmediateEvent)
+                {
+                    lastChainPickWasImmediate = true;
+                    lastChainPickImmediateDelay = pendingWomanChainBranches[i].immediateEventDelay;
+                }
                 return pendingWomanChainBranches[i].targetEvent;
+            }
         }
 
         //fallback
-        return pendingWomanChainBranches[pendingWomanChainBranches.Count - 1].targetEvent;
+        int lastIdx = pendingWomanChainBranches.Count - 1;
+        if (pendingWomanChainBranches[lastIdx].triggersAsImmediateEvent)
+        {
+            lastChainPickWasImmediate = true;
+            lastChainPickImmediateDelay = pendingWomanChainBranches[lastIdx].immediateEventDelay;
+        }
+        return pendingWomanChainBranches[lastIdx].targetEvent;
     }
 
     private float GetBranchWeight(ChainBranch branch, int rangeIndex)
@@ -726,7 +864,23 @@ public class WomanProcessManager : MonoBehaviour
             if (choice.suspicionModifier != 0f)
                 GameStatManager.Instance.AddSuspicion(choice.suspicionModifier);
             if (choice.reputationModifier != 0f)
-                GameStatManager.Instance.AddReputation(choice.reputationModifier);
+            {
+                if (choice.hasReputationFloor && choice.reputationModifier < 0f)
+                {
+                    if (GameStatManager.Instance.Reputation < choice.reputationFloor)
+                        GameStatManager.Instance.AddReputation(-0.1f);
+                    else
+                    {
+                        GameStatManager.Instance.AddReputation(choice.reputationModifier);
+                        if (GameStatManager.Instance.Reputation < choice.reputationFloor)
+                            GameStatManager.Instance.SetStat(StatType.Reputation, choice.reputationFloor);
+                    }
+                }
+                else
+                {
+                    GameStatManager.Instance.AddReputation(choice.reputationModifier);
+                }
+            }
             if (choice.politicalInfluenceModifier != 0f)
                 GameStatManager.Instance.AddPoliticalInfluence(choice.politicalInfluenceModifier);
             if (choice.wealthModifier != 0f)
@@ -736,7 +890,28 @@ public class WomanProcessManager : MonoBehaviour
         //womanObsession etkisi
         if (choice.womanObsessionModifier != 0f)
         {
-            womanObsession = Mathf.Clamp(womanObsession + choice.womanObsessionModifier, 0f, 100f);
+            float obsessionAmount = choice.womanObsessionModifier;
+            if (obsessionAmount > 0f)
+                obsessionAmount *= obsessionGainMultiplier;
+
+            if (choice.hasObsessionFloor && obsessionAmount < 0f)
+            {
+                if (womanObsession < choice.obsessionFloor)
+                {
+                    //zaten floor'un altında — sadece 0.1 düşür
+                    womanObsession = Mathf.Max(womanObsession - 0.1f, 0f);
+                }
+                else
+                {
+                    womanObsession = Mathf.Clamp(womanObsession + obsessionAmount, 0f, 100f);
+                    if (womanObsession < choice.obsessionFloor)
+                        womanObsession = choice.obsessionFloor;
+                }
+            }
+            else
+            {
+                womanObsession = Mathf.Clamp(womanObsession + obsessionAmount, 0f, 100f);
+            }
             OnObsessionChanged?.Invoke(womanObsession);
         }
 

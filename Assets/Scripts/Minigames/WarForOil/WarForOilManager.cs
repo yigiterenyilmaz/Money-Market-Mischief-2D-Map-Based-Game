@@ -26,6 +26,8 @@ public class WarForOilManager : MonoBehaviour
     private float eventCheckTimer;
     private float eventDecisionTimer;
     private WarForOilEvent currentEvent;
+    private WarForOilEvent pendingImmediateEvent; //gecikmeli anında event
+    private float immediateEventTimer; //gecikme sayacı
     private Dictionary<WarForOilEvent, int> eventTriggerCounts = new Dictionary<WarForOilEvent, int>();
 
     //operasyon boyunca biriken modifier'lar
@@ -276,7 +278,32 @@ public class WarForOilManager : MonoBehaviour
 
         //modifier'ları biriktir
         accumulatedSuspicionModifier += choice.suspicionModifier;
-        accumulatedReputationModifier += choice.reputationModifier;
+
+        //itibar — anlık uygula
+        if (choice.reputationModifier != 0f && GameStatManager.Instance != null)
+        {
+            if (choice.hasReputationFloor && choice.reputationModifier < 0f)
+            {
+                //floor sadece düşürme için geçerli
+                float currentRep = GameStatManager.Instance.Reputation;
+                if (currentRep < choice.reputationFloor)
+                {
+                    //zaten floor'un altında — floor'a yükseltme, sadece 0.1 düşür
+                    GameStatManager.Instance.AddReputation(-0.1f);
+                }
+                else
+                {
+                    GameStatManager.Instance.AddReputation(choice.reputationModifier);
+                    //floor'un altına düştüyse geri çek
+                    if (GameStatManager.Instance.Reputation < choice.reputationFloor)
+                        GameStatManager.Instance.SetStat(StatType.Reputation, choice.reputationFloor);
+                }
+            }
+            else
+            {
+                GameStatManager.Instance.AddReputation(choice.reputationModifier);
+            }
+        }
         accumulatedPoliticalInfluenceModifier += choice.politicalInfluenceModifier;
         accumulatedCostModifier += choice.costModifier;
 
@@ -309,6 +336,11 @@ public class WarForOilManager : MonoBehaviour
                 var entry = choice.permanentMultipliers[i];
                 if (entry.stat == PermanentMultiplierStatType.WarSupport)
                     ApplyPermanentSupportMultiplier(entry.multiplier);
+                else if (entry.stat == PermanentMultiplierStatType.WomanObsession)
+                {
+                    if (WomanProcessManager.Instance != null)
+                        WomanProcessManager.Instance.ApplyPermanentObsessionMultiplier(entry.multiplier);
+                }
                 else if (GameStatManager.Instance != null)
                     GameStatManager.Instance.ApplyPermanentGainMultiplier((StatType)entry.stat, entry.multiplier);
             }
@@ -491,11 +523,25 @@ public class WarForOilManager : MonoBehaviour
             dealRewardRatio = choice.dealRewardRatio;
         }
 
-        //anında event tetikleme — choice'a bağlı event varsa direkt göster, WarProcess'e dönmeden
-        if (choice.hasImmediateEvent && choice.immediateEvent != null)
+        //anında event tetikleme — choice'a bağlı havuzdan rastgele biri gösterilir
+        if (choice.hasImmediateEvent && choice.immediateEventPool != null && choice.immediateEventPool.Count > 0)
         {
-            TriggerEvent(choice.immediateEvent);
-            return;
+            WarForOilEvent picked = PickImmediateEvent(choice.immediateEventPool);
+            if (picked != null)
+            {
+                if (choice.immediateEventDelay <= 0f)
+                {
+                    //anında tetikle
+                    TriggerEvent(picked);
+                    return;
+                }
+                else
+                {
+                    //gecikmeli tetikle — WarProcess'e dön, timer say
+                    pendingImmediateEvent = picked;
+                    immediateEventTimer = choice.immediateEventDelay;
+                }
+            }
         }
 
         //savaş sürecine geri dön
@@ -568,8 +614,7 @@ public class WarForOilManager : MonoBehaviour
                 GameStatManager.Instance.AddWealth(result.wealthChange);
             if (result.suspicionChange != 0)
                 GameStatManager.Instance.AddSuspicion(result.suspicionChange);
-            if (result.reputationChange != 0)
-                GameStatManager.Instance.AddReputation(result.reputationChange);
+            //reputation artık anlık uygulanıyor (ResolveEvent'te), burada tekrar uygulanmaz
             if (result.politicalInfluenceChange != 0)
                 GameStatManager.Instance.AddPoliticalInfluence(result.politicalInfluenceChange);
         }
@@ -716,6 +761,19 @@ public class WarForOilManager : MonoBehaviour
     {
         warTimer += Time.deltaTime;
 
+        //gecikmeli anında event kontrolü
+        if (pendingImmediateEvent != null)
+        {
+            immediateEventTimer -= Time.deltaTime;
+            if (immediateEventTimer <= 0f)
+            {
+                WarForOilEvent evt = pendingImmediateEvent;
+                pendingImmediateEvent = null;
+                TriggerEvent(evt);
+                return;
+            }
+        }
+
         //UI'a ilerleme bildir
         float progress = Mathf.Clamp01(warTimer / database.warDuration);
         OnWarProgress?.Invoke(progress);
@@ -853,6 +911,9 @@ public class WarForOilManager : MonoBehaviour
     /// </summary>
     private void UpdateEventPhase()
     {
+        //süresiz event (decisionTime <= 0) — sayaç işlemez, oyuncu seçene kadar bekler
+        if (eventDecisionTimer < 0f) return;
+
         eventDecisionTimer -= Time.unscaledDeltaTime;
         OnEventDecisionTimerUpdate?.Invoke(eventDecisionTimer);
 
@@ -1001,17 +1062,40 @@ public class WarForOilManager : MonoBehaviour
             totalWeight += w;
         }
 
-        WarForOilEvent selected;
+        WarForOilEvent selected = null;
 
         if (totalWeight <= 0f)
         {
-            //tüm ağırlıklar 0 — uygun branch kalmadı, zincir biter
-            EndChain();
-            return;
+            //tüm ağırlıklar 0 — engellenmemiş event varsa eşit ağırlıkla dağıt
+            int eligibleCount = 0;
+            for (int i = 0; i < pendingChainBranches.Count; i++)
+            {
+                if (pendingChainBranches[i].targetEvent != null && weights[i] >= 0f
+                    && !blockedBranchEventIds.Contains(pendingChainBranches[i].targetEvent.id))
+                    eligibleCount++;
+            }
+            if (eligibleCount == 0)
+            {
+                EndChain();
+                return;
+            }
+            //eşit ağırlık ata
+            Debug.LogWarning("[WAR FOR OIL] ZİNCİR DALLANMASI: TÜM AĞIRLIKLAR 0! EŞİT DAĞITIM YAPILIYOR. INSPECTOR'DAN AĞIRLIKLARI KONTROL ET!");
+            float equalWeight = 1f / eligibleCount;
+            totalWeight = 0f;
+            for (int i = 0; i < pendingChainBranches.Count; i++)
+            {
+                if (pendingChainBranches[i].targetEvent != null && weights[i] >= 0f
+                    && !blockedBranchEventIds.Contains(pendingChainBranches[i].targetEvent.id))
+                {
+                    weights[i] = equalWeight;
+                    totalWeight += equalWeight;
+                }
+            }
         }
-        else
+
+        //ağırlıklı rastgele seçim — önce chain bitme kontrolü
         {
-            //ağırlıklı rastgele seçim — önce chain bitme kontrolü
             float roll = UnityEngine.Random.value * totalWeight;
 
             if (roll < endWeight)
@@ -1045,8 +1129,40 @@ public class WarForOilManager : MonoBehaviour
         //chain event tetiklenince önceki tick etkisi durur (yeni choice kendi etkisini başlatabilir)
         hasActiveChainTickEffect = false;
 
-        //event'i tetikle — chain slotundan geldiğini işaretle
-        currentEventIsChainEvent = true;
+        //seçilen branch anında event mi kontrol et
+        bool isImmediate = false;
+        float immDelay = 0f;
+        for (int i = 0; i < pendingChainBranches.Count; i++)
+        {
+            if (pendingChainBranches[i].targetEvent == selected && pendingChainBranches[i].triggersAsImmediateEvent)
+            {
+                isImmediate = true;
+                immDelay = pendingChainBranches[i].immediateEventDelay;
+                break;
+            }
+        }
+
+        if (isImmediate)
+        {
+            //anında event olarak tetikle — zincir biter, event non-chain olarak gösterilir
+            EndChain();
+            currentEventIsChainEvent = false;
+
+            if (immDelay > 0f)
+            {
+                //gecikmeli tetikle — WarProcess'e dön, timer say
+                pendingImmediateEvent = selected;
+                immediateEventTimer = immDelay;
+                currentState = WarForOilState.WarProcess;
+                return;
+            }
+        }
+        else
+        {
+            //normal chain event — zincir devam eder
+            currentEventIsChainEvent = true;
+        }
+
         TriggerEvent(selected);
     }
 
@@ -1409,6 +1525,52 @@ public class WarForOilManager : MonoBehaviour
     }
 
     // ==================== VANDALİZM SİSTEMİ ====================
+
+    /// <summary>
+    /// Ağırlıklı havuzdan rastgele bir anında event seçer.
+    /// </summary>
+    private WarForOilEvent PickImmediateEvent(List<ImmediateEventEntry> pool)
+    {
+        float totalWeight = 0f;
+        int eligibleCount = 0;
+        for (int i = 0; i < pool.Count; i++)
+        {
+            if (pool[i].targetEvent != null)
+            {
+                if (pool[i].weight > 0f)
+                    totalWeight += pool[i].weight;
+                eligibleCount++;
+            }
+        }
+        //tüm ağırlıklar 0 ama event varsa eşit dağıt
+        if (totalWeight <= 0f)
+        {
+            if (eligibleCount == 0) return null;
+            Debug.LogWarning("[WAR FOR OIL] ANLIK EVENT HAVUZU: TÜM AĞIRLIKLAR 0! EŞİT DAĞITIM YAPILIYOR. INSPECTOR'DAN AĞIRLIKLARI KONTROL ET!");
+            int pick = UnityEngine.Random.Range(0, eligibleCount);
+            int idx = 0;
+            for (int i = 0; i < pool.Count; i++)
+            {
+                if (pool[i].targetEvent != null)
+                {
+                    if (idx == pick) return pool[i].targetEvent;
+                    idx++;
+                }
+            }
+            return null;
+        }
+
+        float roll = UnityEngine.Random.Range(0f, totalWeight);
+        float cumulative = 0f;
+        for (int i = 0; i < pool.Count; i++)
+        {
+            if (pool[i].targetEvent == null || pool[i].weight <= 0f) continue;
+            cumulative += pool[i].weight;
+            if (roll <= cumulative)
+                return pool[i].targetEvent;
+        }
+        return pool[pool.Count - 1].targetEvent;
+    }
 
     /// <summary>
     /// Choice'un vandalizm etkisini uygular.
@@ -1911,6 +2073,8 @@ public class WarForOilManager : MonoBehaviour
         accumulatedSuspicionModifier = 0f;
         accumulatedReputationModifier = 0f;
         accumulatedPoliticalInfluenceModifier = 0f;
+        pendingImmediateEvent = null;
+        immediateEventTimer = 0f;
         accumulatedCostModifier = 0;
         rewardMultiplier = 1f;
         eventsBlocked = false;

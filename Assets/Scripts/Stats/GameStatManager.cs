@@ -16,8 +16,9 @@ public class GameStatManager : MonoBehaviour
     public float maxSuspicion = 100f;
 
     [Header("Reputation Settings")]
-    public float minReputation = 0f;
+    public float minReputation = -50f; //eksiye düşebilir, bu değere ulaşınca game over
     public float maxReputation = 100f;
+    public float reputationCeilingPenaltyMultiplier = 1f; //eksiye düşüşün kaç katı tavandan düşer (1 = aynı, 2 = 2 katı, 0.5 = yarısı)
 
     [Header("Political Influence Settings")]
     public float minPoliticalInfluence = -100f;
@@ -36,6 +37,9 @@ public class GameStatManager : MonoBehaviour
     private float suspicion;
     private float reputation;
     private float politicalInfluence;
+
+    //itibar tavan düşüşü — eksiye düşülen en düşük nokta kadar tavan kalıcı olarak düşer
+    private float lowestNegativeReputation = 0f; //en düşük negatif itibar noktası (0 = hiç eksiye düşmedi)
 
     //kalıcı stat çarpanları — çarpımsal birikir (1.0 = etkisiz, 1.1 = %10 bonus)
     private float wealthGainMultiplier = 1f;
@@ -86,6 +90,16 @@ public class GameStatManager : MonoBehaviour
 
     #region Modifiers (hesaplayıcılar)
 
+    /// <summary>
+    /// Efektif itibar tavanı. Eksiye düşülen en düşük nokta kadar tavan kalıcı olarak düşer.
+    /// Örn: en düşük -20 → tavan = 100 - 20 = 80
+    /// </summary>
+    /// <summary>
+    /// Efektif itibar tavanı. Eksiye düşülen en düşük nokta * çarpan kadar tavan kalıcı olarak düşer.
+    /// Örn: en düşük -20, çarpan 1.5 → tavan = 100 - 30 = 70
+    /// </summary>
+    public float EffectiveMaxReputation => maxReputation + (lowestNegativeReputation * reputationCeilingPenaltyMultiplier);
+
     //itibar bazlı şüphe çarpanı
     //yüksek itibar = düşük çarpan (şüphe daha az artar)
     //düşük itibar = yüksek çarpan (şüphe daha çok artar)
@@ -93,7 +107,9 @@ public class GameStatManager : MonoBehaviour
     {
         //itibar 0 → baseSuspicionMultiplier (1.5)
         //itibar 100 → minSuspicionMultiplier (0.5)
-        float t = reputation / maxReputation;
+        float effectiveMax = EffectiveMaxReputation;
+        float t = effectiveMax > 0f ? reputation / effectiveMax : 0f;
+        t = Mathf.Clamp01(t);
         return Mathf.Lerp(baseSuspicionMultiplier, minSuspicionMultiplier, t);
     }
 
@@ -231,11 +247,23 @@ public class GameStatManager : MonoBehaviour
             amount *= reputationGainMultiplier;
 
         float oldValue = reputation;
-        reputation = Mathf.Clamp(reputation + amount, minReputation, maxReputation);
+        reputation = Mathf.Clamp(reputation + amount, minReputation, EffectiveMaxReputation);
+
+        //eksiye düştüyse en düşük noktayı güncelle (tavan kalıcı olarak düşer)
+        if (reputation < 0f && reputation < lowestNegativeReputation)
+        {
+            lowestNegativeReputation = reputation;
+        }
 
         if (oldValue != reputation)
         {
             OnStatChanged?.Invoke(StatType.Reputation, oldValue, reputation);
+        }
+
+        //game over kontrolü — itibar minimum değere ulaştığında
+        if (reputation <= minReputation)
+        {
+            OnGameOver?.Invoke();
         }
     }
 
@@ -270,7 +298,9 @@ public class GameStatManager : MonoBehaviour
                 suspicion = Mathf.Clamp(value, minSuspicion, maxSuspicion);
                 break;
             case StatType.Reputation:
-                reputation = Mathf.Clamp(value, minReputation, maxReputation);
+                reputation = Mathf.Clamp(value, minReputation, EffectiveMaxReputation);
+                if (reputation < 0f && reputation < lowestNegativeReputation)
+                    lowestNegativeReputation = reputation;
                 break;
             case StatType.PoliticalInfluence:
                 politicalInfluence = Mathf.Clamp(value, minPoliticalInfluence, maxPoliticalInfluence);
@@ -287,6 +317,10 @@ public class GameStatManager : MonoBehaviour
 
         //set ile de game over kontrolü
         if (statType == StatType.Suspicion && suspicion >= maxSuspicion)
+        {
+            OnGameOver?.Invoke();
+        }
+        if (statType == StatType.Reputation && reputation <= minReputation)
         {
             OnGameOver?.Invoke();
         }
@@ -316,7 +350,7 @@ public class GameStatManager : MonoBehaviour
         return statType switch
         {
             StatType.Suspicion => suspicion / maxSuspicion,
-            StatType.Reputation => reputation / maxReputation,
+            StatType.Reputation => EffectiveMaxReputation > 0f ? reputation / EffectiveMaxReputation : 0f,
             StatType.PoliticalInfluence => (politicalInfluence - minPoliticalInfluence) / (maxPoliticalInfluence - minPoliticalInfluence),
             _ => 0f
         };

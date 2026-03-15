@@ -260,8 +260,8 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `eventBlockCycles` | Gecici event engeli — bu kadar event donemi boyunca event gelmez (0-10, 0=etkisiz) |
 | `blocksCeasefire` | Secilirse savas sonuna kadar oyuncunun ateskes butonu engellenir |
 | `blocksEventGroup` | Secilirse bu event'in ait oldugu gruptaki (OFPC/WTETWC) tum eventler bir daha tetiklenmez |
-| `hasImmediateEvent` | Secildiginde hic beklemeden direkt baska bir event tetiklenir (WarProcess'e donmeden) |
-| `immediateEvent` | Aninda tetiklenecek WarForOilEvent referansi |
+| `hasImmediateEvent` | Secildiginde hic beklemeden havuzdan rastgele bir event tetiklenir (WarProcess'e donmeden) |
+| `immediateEventPool` | Agirlikli event havuzu (List&lt;ImmediateEventEntry&gt;). Her giris: targetEvent + weight. Agirliga gore rastgele secilir |
 | `hasProbabilisticWarEnd` | Olasilik bazli savas bitirme (3 sonuc: savas biter / event yok olur / tekrar tetiklenir) |
 | `probWarEndChance` | Savas bitme olasiligi (0-1, support=50 icin base deger) |
 | `probDismissChance` | Event yok olma olasiligi (0-1, support=50 icin base deger). Tekrar tetiklenme = 1 - warEnd - dismiss |
@@ -301,8 +301,10 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `startsWomanProcess` | Secildiginde kadin surecini baslatir (oyun boyunca tek sefer, sadece savas icinde calisir) |
 | `endsWomanProcess` | Secildiginde kadin surecini aninda bitirir (obsesyon degeri ne olursa olsun) |
 | `womanObsessionModifier` | Kadin sureci stat degisimi (+ = obsesyon artar, - = azalir). Sadece isWomanProcessEvent acikken Inspector'da gorunur. |
+| `redirectsWomanPool` | true ise secildiginde kadin sureci havuzunu kalici olarak baska bir WomanProcessDatabase'e yonlendirir. Sadece isWomanProcessEvent acikken Inspector'da gorunur. |
+| `womanPoolDatabase` | Yonlendirilecek WomanProcessDatabase referansi. redirectsWomanPool aktifken gorunur. |
 | **Kalici Stat Carpanlari** (foldout) | |
-| `permanentMultipliers` | Liste: birden fazla stat icin kalici carpan tanimlanabilir. Her entry: `stat` (StatType) + `multiplier` (float). Ornek: 1.1 = %10 artis. Carpisimsal birikir. Tum oyun boyunca, tum kaynaklardan gecerlidir. |
+| `permanentMultipliers` | Liste: birden fazla stat icin kalici carpan tanimlanabilir. Her entry: `stat` (PermanentMultiplierStatType) + `multiplier` (float). Ornek: 1.1 = %10 artis. Carpisimsal birikir. Tum oyun boyunca, tum kaynaklardan gecerlidir. Secenekler: Wealth, Suspicion, Reputation, PoliticalInfluence, WarSupport, WomanObsession. WarSupport icin WarForOilManager, WomanObsession icin WomanProcessManager, digerleri icin GameStatManager uygulanir. |
 | **On Kosullar** (foldout) | |
 | `requiredSkills` | Bu secenek icin acilmis olmasi gereken skill'ler |
 | `statConditions` | Bu secenek icin saglanmasi gereken stat kosullari |
@@ -362,6 +364,8 @@ Bir choice secildiginde siradaki chain event'in olasi hedeflerinden birini tanim
 | `weightRange1` | Aralik 1 agirligi |
 | `weightRange2` | Aralik 2 agirligi |
 | `weightRange3` | Aralik 3 agirligi |
+| `triggersAsImmediateEvent` | true ise secilen branch zincir devami yerine aninda event olarak tetiklenir. Zincir biter, event standalone olarak gosterilir. |
+| `immediateEventDelay` | Aninda event gecikmesi (0-5 saniye). triggersAsImmediateEvent aktifken gorunur. 0 = aninda, N = N saniye sonra tetiklenir. |
 
 **Secim mantigi:**
 1. Stat'in mevcut yuzdesi (0-100) hesaplanir
@@ -1054,6 +1058,7 @@ Savas sirasinda bir chain choice'u ile tetiklenen, oyuncunun obsesyon stat'ini y
 - **3 kademe**: Obsesyon degerine gore farkli event havuzlari ve sikliklari
 - **Game over**: Obsesyon 100'e ulasirsa suspicion 100'e cikarilarak game over tetiklenir
 - **Surec bitis**: Obsesyon `endThreshold` (10) altina duserse surec biter
+- **Havuz yonlendirme**: Bir choice'taki `redirectsWomanPool` ile kadin sureci kalici olarak baska bir WomanProcessDatabase'e yonlendirilebilir — bundan sonra eventler o database'den cekilir
 
 ### Kademeler
 
@@ -1118,6 +1123,7 @@ Kadin eventleri `WarForOilEvent` altyapisini kullanir ama WomanProcessManager ke
 | `wealthModifier` | Evet — anlik para |
 | Feed etkileri | Evet — freeze/slow/override |
 | `permanentMultipliers` | Evet — kalici stat carpanlari |
+| `redirectsWomanPool` | Evet — kalici havuz yonlendirme (baska WomanProcessDatabase'e gecer) |
 | `supportModifier` | Kosullu — savas aktifse WarForOilManager'a iletilir, degilse yok sayilir |
 | `cornerGrabModifier` | Kosullu — savas aktif + kose kapma yarisi varsa uygulanir |
 | Protest etkileri | Kosullu — savas aktif + protest aktifse uygulanir |

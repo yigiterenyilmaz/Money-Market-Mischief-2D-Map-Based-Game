@@ -82,6 +82,8 @@ public class WarForOilEventChoice
     public float supportModifier; //destek stat'ını etkiler (pozitif = ülkeyi destekle)
     public float suspicionModifier; //şüphe etkisi
     public float reputationModifier; //itibar etkisi (pozitif = artar, negatif = düşer)
+    public bool hasReputationFloor; //true ise itibar bu choice yüzünden belirli bir değerin altına düşmez
+    public float reputationFloor; //itibarın düşemeyeceği minimum değer
     public float politicalInfluenceModifier; //politik nüfuz etkisi (negatif = düşürür)
     public int costModifier; //maliyet etkisi (savaş sonunda birikimli uygulanır)
     public float wealthModifier; //anlık para değişimi (pozitif = kazan, negatif = kaybet, seçildiğinde hemen uygulanır)
@@ -164,13 +166,18 @@ public class WarForOilEventChoice
     public bool startsWomanProcess; //seçilince kadın sürecini başlatır (oyun boyunca tek sefer)
     public bool endsWomanProcess; //seçilince kadın sürecini anında bitirir
     public float womanObsessionModifier; //kadın süreci stat'ını etkiler (pozitif = artar, negatif = azalır)
+    public bool hasObsessionFloor; //true ise obsesyon bu choice yüzünden belirli bir değerin altına düşmez
+    public float obsessionFloor; //obsesyonun düşemeyeceği minimum değer
+    public bool redirectsWomanPool; //seçilince kadın süreci havuzunu başka bir database'e yönlendirir (kalıcı)
+    public WomanProcessDatabase womanPoolDatabase; //yönlendirilecek database
 
     //kalıcı stat çarpanları (seçildiğinde anında ve kalıcı uygulanır — tüm oyun boyunca geçerli)
     public List<PermanentMultiplierEntry> permanentMultipliers = new List<PermanentMultiplierEntry>();
 
-    //anında tetiklenen event — choice seçildiğinde hiç beklemeden direkt bu event gösterilir
-    public bool hasImmediateEvent; //true ise seçildiğinde anında bir event tetiklenir
-    public WarForOilEvent immediateEvent; //anında tetiklenecek event
+    //anında tetiklenen event — choice seçildiğinde havuzdan biri gösterilir
+    public bool hasImmediateEvent; //true ise seçildiğinde bir event tetiklenir
+    [Range(0f, 5f)] public float immediateEventDelay; //tetikleme gecikmesi (0 = anında, saniye cinsinden)
+    public List<ImmediateEventEntry> immediateEventPool; //ağırlıklı event havuzu — birinden biri rastgele seçilir
 
     //ön koşullar (Editor tarafından foldout içinde çizilir)
     public List<Skill> requiredSkills; //bu seçenek için açılmış olması gereken skill'ler
@@ -246,6 +253,8 @@ public class ChainBranch
     [Range(0f, 1f)] public float weightRange1; //aralık 1 ağırlığı
     [Range(0f, 1f)] public float weightRange2; //aralık 2 ağırlığı
     [Range(0f, 1f)] public float weightRange3; //aralık 3 ağırlığı
+    public bool triggersAsImmediateEvent; //true ise zincir devamı yerine anında event olarak tetiklenir (zincir biter)
+    [Range(0f, 5f)] public float immediateEventDelay; //anında event gecikmesi (0 = anında, saniye cinsinden)
 }
 
 /// <summary>
@@ -305,7 +314,8 @@ public enum PermanentMultiplierStatType
     Suspicion,
     Reputation,
     PoliticalInfluence,
-    WarSupport
+    WarSupport,
+    WomanObsession
 }
 
 /// <summary>
@@ -315,4 +325,14 @@ public enum PrecursorEventType
 {
     WarForOil,      //öncü event bir war for oil eventi (savaş yoksa ikisi de tetiklenmez)
     RandomEvent     //öncü event bir random event
+}
+
+/// <summary>
+/// Anında tetiklenen event havuzu girişi. Ağırlığa göre rastgele seçilir.
+/// </summary>
+[System.Serializable]
+public class ImmediateEventEntry
+{
+    public WarForOilEvent targetEvent; //tetiklenecek event
+    [Range(0f, 100f)] public float weight = 50f; //seçilme yüzdesi (tüm girişlerin toplamı %100 olmalı)
 }
