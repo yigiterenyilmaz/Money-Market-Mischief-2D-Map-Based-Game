@@ -56,7 +56,7 @@ public class RoadGenerator : MonoBehaviour
     [Tooltip("Dal outline genişliği.")]
     [Range(0, 2)] public int branchOutlineWidth = 1;
     [Tooltip("Preferred shore distance for branch roads. Uses soft penalty — branches prefer inland but CAN reach coastal areas.")]
-    [Range(2, 30)] public int branchShoreBuffer = 3;
+    [Range(2, 30)] public int branchShoreBuffer = 12;
 
     // -------------------------------------------------------------------------
     // BİYOM GÖRÜNÜMLERİ (dallanma hedef renkleri)
@@ -595,8 +595,7 @@ public class RoadGenerator : MonoBehaviour
 
                     int shore = shoreDistCache[nx, ny];
 
-                    // Hard cutoff — tiles within 40% of buffer are impassable
-                    if (shore < hardCutoff) continue;
+                    if (shore >= 0 && shore < hardCutoff) continue;
 
                     int penalty = shore >= highwayShoreBuffer ? 1 : Mathf.Max(1, maxPenalty - shore * 3);
                     int newCost = curCost + penalty;
@@ -642,6 +641,16 @@ public class RoadGenerator : MonoBehaviour
         }
         waypoints.Add((Vector2)rawPath[rawPath.Count - 1]);
 
+        // Clamp all waypoints to stay inland
+        for (int i = 0; i < waypoints.Count; i++)
+        {
+            int wx = Mathf.Clamp(Mathf.RoundToInt(waypoints[i].x), 0, _w - 1);
+            int wy = Mathf.Clamp(Mathf.RoundToInt(waypoints[i].y), 0, _h - 1);
+            int shore = shoreDistCache[wx, wy];
+            if (shore >= 0 && shore < highwayShoreBuffer)
+                waypoints[i] = PushInland(new Vector2Int(wx, wy), highwayShoreBuffer);
+        }
+
         List<Vector2Int> smoothed = new List<Vector2Int>();
         HashSet<long> visited = new HashSet<long>();
         List<Vector2Int> splinePixels = SplineToPixels(waypoints, 10);
@@ -656,27 +665,34 @@ public class RoadGenerator : MonoBehaviour
 
     Vector2 PushInland(Vector2Int pt, int targetDist)
     {
+        if (pt.x < 0 || pt.x >= _w || pt.y < 0 || pt.y >= _h) return (Vector2)pt;
         if (shoreDistCache[pt.x, pt.y] >= targetDist) return (Vector2)pt;
 
-        int bestDx = 0, bestDy = 0;
-        int bestShore = shoreDistCache[pt.x, pt.y];
-        for (int r = -3; r <= 3; r++)
-            for (int c = -3; c <= 3; c++)
-            {
-                int nx = pt.x + r, ny = pt.y + c;
-                if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
-                if (shoreDistCache[nx, ny] > bestShore)
+        int cx = pt.x, cy = pt.y;
+        for (int step = 0; step < targetDist * 2; step++)
+        {
+            if (shoreDistCache[cx, cy] >= targetDist) break;
+
+            int bestX = cx, bestY = cy;
+            int bestShore = shoreDistCache[cx, cy];
+
+            for (int dx = -5; dx <= 5; dx++)
+                for (int dy = -5; dy <= 5; dy++)
                 {
-                    bestShore = shoreDistCache[nx, ny];
-                    bestDx = r; bestDy = c;
+                    int nx = cx + dx, ny = cy + dy;
+                    if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
+                    if (shoreDistCache[nx, ny] > bestShore)
+                    {
+                        bestShore = shoreDistCache[nx, ny];
+                        bestX = nx; bestY = ny;
+                    }
                 }
-            }
 
-        if (bestDx == 0 && bestDy == 0) return (Vector2)pt;
+            if (bestX == cx && bestY == cy) break;
+            cx = bestX; cy = bestY;
+        }
 
-        Vector2 dir = new Vector2(bestDx, bestDy).normalized;
-        float pushDist = (targetDist - shoreDistCache[pt.x, pt.y]) * 0.7f;
-        return (Vector2)pt + dir * pushDist;
+        return new Vector2(cx, cy);
     }
 
     Vector2Int SnapToNearestLand(MapGenerator map, int[,] landComponent, int compId, Vector2Int from)
@@ -801,6 +817,9 @@ public class RoadGenerator : MonoBehaviour
                     if (!map.IsLand(x, y)) continue;
                     int d = roadDist[x, y];
                     if (d == int.MaxValue) continue;
+                    // Skip targets too close to shore
+                    int shore = shoreDistCache[x, y];
+                    if (shore >= 0 && shore < branchShoreBuffer) continue;
                     if (d > maxDist)
                     {
                         maxDist = d;
@@ -922,58 +941,32 @@ public class RoadGenerator : MonoBehaviour
     /// </summary>
     List<Vector2Int> BFSPathOnLandSimple(MapGenerator map, Vector2Int from, Vector2Int to)
     {
-        // Use weighted BFS (bucket queue) with shore penalty instead of hard cutoff
-        int maxPenalty = branchShoreBuffer * 3;
-        int maxBuckets = (_w + _h) * Mathf.Max(1, maxPenalty);
-        maxBuckets = Mathf.Min(maxBuckets, 300000);
-
-        int[,] cost = new int[_w, _h];
         Vector2Int[,] parent = new Vector2Int[_w, _h];
+        bool[,] visited = new bool[_w, _h];
         for (int x = 0; x < _w; x++)
             for (int y = 0; y < _h; y++)
-            { cost[x, y] = int.MaxValue; parent[x, y] = new Vector2Int(-1, -1); }
+                parent[x, y] = new Vector2Int(-1, -1);
 
-        Queue<Vector2Int>[] buckets = new Queue<Vector2Int>[maxBuckets];
-
-        cost[from.x, from.y] = 0;
-        if (buckets[0] == null) buckets[0] = new Queue<Vector2Int>();
-        buckets[0].Enqueue(from);
+        Queue<Vector2Int> queue = new Queue<Vector2Int>();
+        queue.Enqueue(from);
+        visited[from.x, from.y] = true;
 
         bool found = false;
-        for (int bucket = 0; bucket < maxBuckets && !found; bucket++)
+        while (queue.Count > 0)
         {
-            if (buckets[bucket] == null || buckets[bucket].Count == 0) continue;
+            var pos = queue.Dequeue();
+            if (pos == to) { found = true; break; }
 
-            while (buckets[bucket].Count > 0)
+            for (int i = 0; i < 4; i++)
             {
-                var pos = buckets[bucket].Dequeue();
-                if (pos == to) { found = true; break; }
+                int nx = pos.x + dx4[i], ny = pos.y + dy4[i];
+                if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
+                if (visited[nx, ny]) continue;
+                if (!map.IsLand(nx, ny)) continue;
 
-                int curCost = cost[pos.x, pos.y];
-                if (curCost > bucket) continue;
-
-                for (int i = 0; i < 4; i++)
-                {
-                    int nx = pos.x + dx4[i], ny = pos.y + dy4[i];
-                    if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
-                    if (!map.IsLand(nx, ny)) continue;
-
-                    // Soft penalty: tiles close to shore cost more but are not blocked
-                    int shore = shoreDistCache[nx, ny];
-                    int penalty = 1;
-                    if (shore >= 0 && shore < branchShoreBuffer && maxPenalty > 0)
-                        penalty = Mathf.Max(1, maxPenalty - shore * 2);
-
-                    int newCost = curCost + penalty;
-
-                    if (newCost < cost[nx, ny] && newCost < maxBuckets)
-                    {
-                        cost[nx, ny] = newCost;
-                        parent[nx, ny] = pos;
-                        if (buckets[newCost] == null) buckets[newCost] = new Queue<Vector2Int>();
-                        buckets[newCost].Enqueue(new Vector2Int(nx, ny));
-                    }
-                }
+                visited[nx, ny] = true;
+                parent[nx, ny] = pos;
+                queue.Enqueue(new Vector2Int(nx, ny));
             }
         }
 
@@ -1014,6 +1007,16 @@ public class RoadGenerator : MonoBehaviour
 
         if (wp1.Count < 3) return rawPath;
 
+        // Clamp first-pass waypoints away from shore
+        for (int i = 0; i < wp1.Count; i++)
+        {
+            int wx = Mathf.Clamp(Mathf.RoundToInt(wp1[i].x), 0, _w - 1);
+            int wy = Mathf.Clamp(Mathf.RoundToInt(wp1[i].y), 0, _h - 1);
+            int shore = shoreDistCache[wx, wy];
+            if (shore >= 0 && shore < 5)
+                wp1[i] = PushInland(new Vector2Int(wx, wy), 5);
+        }
+
         List<Vector2Int> pass1 = SplineToPixels(wp1, 20);
         List<Vector2Int> pass1Valid = new List<Vector2Int>();
         foreach (var p in pass1)
@@ -1046,6 +1049,16 @@ public class RoadGenerator : MonoBehaviour
         wp2.Add((Vector2)pass1Valid[pass1Valid.Count - 1]);
 
         if (wp2.Count < 3) return pass1Valid;
+
+        // Clamp second-pass waypoints away from shore
+        for (int i = 0; i < wp2.Count; i++)
+        {
+            int wx = Mathf.Clamp(Mathf.RoundToInt(wp2[i].x), 0, _w - 1);
+            int wy = Mathf.Clamp(Mathf.RoundToInt(wp2[i].y), 0, _h - 1);
+            int shore = shoreDistCache[wx, wy];
+            if (shore >= 0 && shore < 5)
+                wp2[i] = PushInland(new Vector2Int(wx, wy), 5);
+        }
 
         List<Vector2Int> pass2 = SplineToPixels(wp2, 20);
         List<Vector2Int> result = new List<Vector2Int>();

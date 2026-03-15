@@ -399,6 +399,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 5718375045061896029, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1710072573}
+    - targetCorrespondingSourceObject: {fileID: 5718375045061896029, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1710072575}
   m_SourcePrefab: {fileID: 100100000, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
 --- !u!1001 &102576865
 PrefabInstance:
@@ -10189,7 +10192,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bfa8aed3e4a23de4c830d90cafb5a698, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapDecorPlacer
-  cellSize: 14
+  cellSize: 12
   pixelsPerUnit: 100
   spriteZ: -0.5
   citiesSpawnRate: 4
@@ -10398,20 +10401,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoadGenerator
   mapGenerator: {fileID: 1710072556}
-  highwayControlPoints: 2
-  highwayCurviness: 0.074
-  highwaySplineResolution: 12
-  highwayThickness: 6
+  highwayControlPoints: 3
+  highwayCurviness: 0.428
+  highwaySplineResolution: 14
+  highwayThickness: 5
   highwayOutlineWidth: 2
-  highwayShoreBuffer: 15
+  highwayShoreBuffer: 11
   highwayFill: {r: 0.38, g: 0.36, b: 0.32, a: 1}
   highwayOutline: {r: 0.25, g: 0.23, b: 0.2, a: 1}
   branchMinCoverageDistance: 35
   branchMaxCount: 35
-  branchCurviness: 0.08
+  branchCurviness: 0.085
   branchStartThickness: 3
   branchEndThickness: 1
   branchOutlineWidth: 0
+  branchShoreBuffer: 30
   agriculturalFill: {r: 0.5, g: 0.42, b: 0.28, a: 1}
   agriculturalOutline: {r: 0.38, g: 0.32, b: 0.2, a: 1}
   citiesFill: {r: 0.42, g: 0.4, b: 0.37, a: 1}
@@ -10422,6 +10426,44 @@ MonoBehaviour:
   urbanOutline: {r: 0.3, g: 0.28, b: 0.25, a: 1}
   shoreBuffer: 2
   scaleWithMapSize: 1
+--- !u!114 &1710072575
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 744350989}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dabe7af1ec6daed4b9ab7b99d840152f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoadTrafficSystem
+  mapPainter: {fileID: 1710072559}
+  roadGenerator: {fileID: 1710072573}
+  carSprite: {fileID: -7011324565457971746, guid: 6601d8a1f536eb04fb2bba756b231ba9, type: 3}
+  carSortingLayer: Default
+  carSortingOrder: 20
+  pixelsPerUnit: 100
+  highwayCarDensity: 2
+  branchCarDensity: 1.15
+  carScale: 0.301
+  carScaleVariation: 0.094
+  carColors:
+  - color: {r: 0.7433963, g: 0.7433963, b: 0.7433963, a: 1}
+    spawnWeight: 1
+  - color: {r: 0.17735851, g: 0.17501603, b: 0.17501603, a: 1}
+    spawnWeight: 1
+  - color: {r: 0.5169811, g: 0, b: 0, a: 1}
+    spawnWeight: 0.83
+  - color: {r: 1, g: 1, b: 1, a: 1}
+    spawnWeight: 1
+  - color: {r: 0.062746845, g: 0, b: 0.5396226, a: 1}
+    spawnWeight: 0.6
+  baseSpeed: 0.23
+  speedVariation: 0.219
+  directionLookahead: 10
+  directionSmoothSpeed: 17.3
+  flipRotationSpeed: 94
 --- !u!1 &1711406226
 GameObject:
   m_ObjectHideFlags: 0

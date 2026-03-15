@@ -1,158 +1,154 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Pixel-based traffic simulation painted directly onto the map texture.
-/// Cars are small colored dots (2–3px) that ride along highway and branch paths.
-///
-/// Setup:
-///   1. Attach to the same GameObject as MapPainter (or any persistent GO).
-///   2. Assign mapPainter and roadGenerator references.
-///   3. The system auto-starts after roads are generated.
-///
-/// How it works:
-///   - On road generation, snapshots the "clean" map texture (roads drawn, no cars).
-///   - Each frame, erases previous car positions (restoring snapshot pixels),
-///     advances cars along their paths, and paints new car pixels.
-///   - Texture2D.Apply() is batched — called once per frame, not per car.
-/// </summary>
+[System.Serializable]
+public class CarColorEntry
+{
+    public Color color = Color.white;
+    [Range(0f, 10f)] public float spawnWeight = 1f;
+}
+
 public class RoadTrafficSystem : MonoBehaviour
 {
-    // -------------------------------------------------------------------------
-    // INSPECTOR
-    // -------------------------------------------------------------------------
-
     [Header("References")]
     public MapPainter mapPainter;
     public RoadGenerator roadGenerator;
 
-    [Header("Spawn Rates")]
-    [Tooltip("Cars per 100 path-pixels on the highway.")]
-    [Range(0.5f, 5f)] public float highwayCarDensity = 2f;
+    [Header("Car Sprite")]
+    [Tooltip("Your car sprite. Should point UPWARD (local +Y) in the source image.")]
+    public Sprite carSprite;
+    public string carSortingLayer = "Default";
+    public int carSortingOrder = 20;
+    [Tooltip("Pixels per unit — must match MapPainter (default 100).")]
+    public float pixelsPerUnit = 100f;
 
-    [Tooltip("Cars per 100 path-pixels on branches.")]
+    [Header("Spawn Rates")]
+    [Range(0.5f, 5f)] public float highwayCarDensity = 2f;
     [Range(0.1f, 3f)] public float branchCarDensity = 0.8f;
 
     [Header("Car Appearance")]
-    [Tooltip("Car dot radius in pixels. 1 = 3×3 diamond, 0 = single pixel.")]
-    [Range(0, 2)] public int carRadius = 1;
+    [Range(0.01f, 2f)] public float carScale = 0.05f;
+    [Range(0f, 0.3f)] public float carScaleVariation = 0.1f;
 
-    [Tooltip("Possible car body colors. Picked at random per car.")]
-    public Color[] carColors = new Color[]
-    {
-        new Color(0.85f, 0.20f, 0.15f), // red
-        new Color(0.15f, 0.45f, 0.85f), // blue
-        new Color(0.95f, 0.85f, 0.25f), // yellow
-        new Color(0.90f, 0.90f, 0.88f), // white
-        new Color(0.20f, 0.20f, 0.22f), // dark
-    };
+    [Header("Car Colors")]
+    public List<CarColorEntry> carColors = new List<CarColorEntry>();
 
     [Header("Speed")]
-    [Tooltip("Base speed in path-pixels per second.")]
-    [Range(5f, 80f)] public float baseSpeed = 30f;
-
-    [Tooltip("Random speed variation ±%.")]
+    [Tooltip("Car speed in world units per second.")]
+    [Range(0.01f, 5f)] public float baseSpeed = 0.5f;
     [Range(0f, 0.5f)] public float speedVariation = 0.2f;
 
-    [Header("Performance")]
-    [Tooltip("How many frames between texture Apply() calls. 1 = every frame.")]
-    [Range(1, 4)] public int applyInterval = 2;
+    [Header("Rotation")]
+    [Tooltip("How many pixels ahead/behind to sample for direction.")]
+    [Range(1, 40)] public int directionLookahead = 10;
+    [Tooltip("How quickly the direction smooths out. Lower = smoother, higher = snappier.")]
+    [Range(1f, 30f)] public float directionSmoothSpeed = 10f;
+    [Tooltip("Turning speed for 180 flips at path ends and junction switches. 0 = instant snap.")]
+    [Range(0f, 720f)] public float flipRotationSpeed = 0f;
 
     // -------------------------------------------------------------------------
-    // INTERNAL
-    // -------------------------------------------------------------------------
 
-    private struct Car
+    private struct JunctionEntry
     {
-        public int pathIndex;       // index into allPaths
-        public float position;      // 0…pathLength-1 (fractional pixel index)
-        public float speed;         // pixels per second (signed: + forward, - backward)
+        public int pathIndex;
+        public int pixelIndex;
+    }
+
+    private class Car
+    {
+        public int   pathIndex;
+        public float position;        // fractional index along path
+        public float speedInPixels;   // path-pixels per second
         public Color color;
-        public Vector2Int lastPixel;
+        public float scaleFactor;
+        public GameObject     go;
+        public SpriteRenderer sr;
+        public Quaternion     currentRotation;
+        public Vector2        smoothedDir;
+        public Vector3        smoothedWorldPos; // interpolated world position
     }
 
-    private List<List<Vector2Int>> allPaths = new List<List<Vector2Int>>();
-    private List<Car> cars = new List<Car>();
-
-    private Texture2D mapTexture;
-    private Color[] basePixels;       // snapshot of the map without cars
-    private int texW, texH;
-    private int frameCounter;
-    private bool active = false;
-
-    // reusable buffer for pixels to restore each frame
-    private List<Vector2Int> dirtyPixels = new List<Vector2Int>();
+    private List<List<Vector2Int>> allPaths   = new List<List<Vector2Int>>();
+    private List<Car>              activeCars = new List<Car>();
+    private Queue<GameObject>      pool       = new Queue<GameObject>();
+    private int                    highwayPathCount;
+    private List<List<JunctionEntry>> junctionGroups = new List<List<JunctionEntry>>();
+    private Transform carParent;
+    private float mapHalfW;
+    private float mapHalfH;
+    private float worldUnitsPerPixel;
+    private bool  active = false;
 
     // -------------------------------------------------------------------------
-    // LIFECYCLE
-    // -------------------------------------------------------------------------
 
-    void OnEnable()
-    {
-        RoadGenerator.OnRoadsGenerated += HandleRoadsGenerated;
-    }
+    void OnEnable()  { RoadGenerator.OnRoadsGenerated += HandleRoadsGenerated; }
+    void OnDisable() { RoadGenerator.OnRoadsGenerated -= HandleRoadsGenerated; }
 
-    void OnDisable()
-    {
-        RoadGenerator.OnRoadsGenerated -= HandleRoadsGenerated;
-    }
+    void HandleRoadsGenerated() { StartCoroutine(InitAfterFrame()); }
 
-    void HandleRoadsGenerated()
+    IEnumerator InitAfterFrame()
     {
-        // Small delay: MapPainter calls decorPlacer after roads,
-        // so we wait one frame to snapshot the final texture.
-        StartCoroutine(InitAfterFrame());
-    }
-
-    System.Collections.IEnumerator InitAfterFrame()
-    {
-        yield return null; // let MapPainter + decor finish
+        yield return null;
         Initialize();
     }
 
     // -------------------------------------------------------------------------
-    // INITIALIZATION
-    // -------------------------------------------------------------------------
 
     void Initialize()
     {
-        if (roadGenerator == null || mapPainter == null) return;
+        if (roadGenerator == null || mapPainter == null)
+        {
+            Debug.LogError("RoadTrafficSystem: mapPainter or roadGenerator not assigned.");
+            return;
+        }
 
-        // Grab the map texture from the SpriteRenderer
-        SpriteRenderer sr = mapPainter.mapRenderer;
-        if (sr == null || sr.sprite == null) return;
+        if (carSprite == null)
+        {
+            Debug.LogError("RoadTrafficSystem: carSprite not assigned.");
+            return;
+        }
 
-        mapTexture = sr.sprite.texture;
-        texW = mapTexture.width;
-        texH = mapTexture.height;
+        StopTraffic();
+        ReturnAllCarsToPool();
 
-        // Snapshot base pixels (roads painted, no cars)
-        basePixels = mapTexture.GetPixels();
+        if (carParent == null)
+        {
+            GameObject container = new GameObject("CarTraffic");
+            container.transform.SetParent(transform);
+            carParent = container.transform;
+        }
 
-        // Collect all road paths
+        MapGenerator mapGen = mapPainter.mapGenerator;
+        mapHalfW = mapGen.width  * 0.5f / pixelsPerUnit;
+        mapHalfH = mapGen.height * 0.5f / pixelsPerUnit;
+        worldUnitsPerPixel = 1f / pixelsPerUnit;
+
         allPaths.Clear();
-        cars.Clear();
-        dirtyPixels.Clear();
+        activeCars.Clear();
 
         var highways = roadGenerator.GetHighwaySegments();
         if (highways != null)
-        {
             foreach (var seg in highways)
                 if (seg != null && seg.Count >= 10)
                     allPaths.Add(seg);
-        }
+
+        highwayPathCount = allPaths.Count;
 
         var branches = roadGenerator.GetBranchPaths();
         if (branches != null)
-        {
             foreach (var seg in branches)
                 if (seg != null && seg.Count >= 10)
                     allPaths.Add(seg);
-        }
 
-        // Spawn cars on each path
-        int highwayPathCount = highways != null ? highways.Count : 0;
+        BuildJunctions();
+        SpawnCars();
 
+        active = true;
+    }
+
+    void SpawnCars()
+    {
         for (int p = 0; p < allPaths.Count; p++)
         {
             float density = (p < highwayPathCount) ? highwayCarDensity : branchCarDensity;
@@ -160,159 +156,381 @@ public class RoadTrafficSystem : MonoBehaviour
 
             for (int c = 0; c < count; c++)
             {
-                float pos = Random.Range(0f, allPaths[p].Count - 1f);
-                float spd = baseSpeed * Random.Range(1f - speedVariation, 1f + speedVariation);
-                if (Random.value > 0.5f) spd = -spd; // half go in reverse direction
+                float pos      = Random.Range(0f, allPaths[p].Count - 1f);
+                float worldSpd = baseSpeed * Random.Range(1f - speedVariation, 1f + speedVariation);
+                float pixelSpd = worldSpd / worldUnitsPerPixel;
+                if (Random.value > 0.5f) pixelSpd = -pixelSpd;
 
-                Color col = carColors.Length > 0
-                    ? carColors[Random.Range(0, carColors.Length)]
-                    : Color.red;
+                Color col   = PickCarColor();
+                float scale = carScale * Random.Range(1f - carScaleVariation, 1f + carScaleVariation);
 
                 int idx = Mathf.Clamp(Mathf.RoundToInt(pos), 0, allPaths[p].Count - 1);
+                Vector2 initialDir   = GetDirectionAtIndex(p, idx, pixelSpd);
+                Vector3 initialWorld = InterpolatedWorldPos(p, pos);
 
-                cars.Add(new Car
+                Car car = new Car
                 {
-                    pathIndex = p,
-                    position = pos,
-                    speed = spd,
-                    color = col,
-                    lastPixel = allPaths[p][idx]
-                });
+                    pathIndex        = p,
+                    position         = pos,
+                    speedInPixels    = pixelSpd,
+                    color            = col,
+                    scaleFactor      = scale,
+                    smoothedDir      = initialDir,
+                    currentRotation  = DirToRotation(initialDir),
+                    smoothedWorldPos = initialWorld
+                };
+
+                car.go = GetFromPool();
+                car.sr = car.go.GetComponent<SpriteRenderer>();
+                car.sr.sprite           = carSprite;
+                car.sr.color            = col;
+                car.sr.sortingLayerName = carSortingLayer;
+                car.sr.sortingOrder     = carSortingOrder;
+                car.go.transform.localScale = new Vector3(scale, scale, 1f);
+                car.go.transform.position   = initialWorld;
+                car.go.transform.rotation   = car.currentRotation;
+                car.go.SetActive(true);
+
+                activeCars.Add(car);
             }
         }
-
-        frameCounter = 0;
-        active = true;
     }
 
-    // -------------------------------------------------------------------------
-    // UPDATE LOOP
+    Color PickCarColor()
+    {
+        if (carColors == null || carColors.Count == 0) return Color.white;
+
+        float totalWeight = 0f;
+        foreach (var entry in carColors) totalWeight += Mathf.Max(0f, entry.spawnWeight);
+        if (totalWeight <= 0f) return carColors[0].color;
+
+        float roll = Random.Range(0f, totalWeight);
+        float cumulative = 0f;
+        foreach (var entry in carColors)
+        {
+            cumulative += Mathf.Max(0f, entry.spawnWeight);
+            if (roll <= cumulative) return entry.color;
+        }
+
+        return carColors[carColors.Count - 1].color;
+    }
+
     // -------------------------------------------------------------------------
 
     void Update()
     {
-        if (!active || cars.Count == 0) return;
+        if (!active || activeCars.Count == 0) return;
 
         float dt = Time.deltaTime;
 
-        // 1) Erase previous car pixels → restore from base snapshot
-        foreach (var px in dirtyPixels)
+        for (int i = 0; i < activeCars.Count; i++)
         {
-            int idx = px.x + px.y * texW;
-            if (idx >= 0 && idx < basePixels.Length)
-                mapTexture.SetPixel(px.x, px.y, basePixels[idx]);
-        }
-        dirtyPixels.Clear();
-
-        // 2) Advance and paint each car
-        for (int i = 0; i < cars.Count; i++)
-        {
-            Car car = cars[i];
+            Car car  = activeCars[i];
             List<Vector2Int> path = allPaths[car.pathIndex];
-            int pathLen = path.Count;
 
-            // Advance position
-            car.position += car.speed * dt;
+            car.position += car.speedInPixels * dt;
 
-            // Bounce at ends
-            if (car.position >= pathLen - 1)
+            bool didFlip = false;
+
+            // Mid-path junction
+            int currentIdx = Mathf.Clamp(Mathf.RoundToInt(car.position), 0, path.Count - 1);
+            if (car.pathIndex < highwayPathCount && Random.value < 0.002f)
             {
-                car.position = pathLen - 1;
-                car.speed = -Mathf.Abs(car.speed);
+                var midConnections = FindConnections(car.pathIndex, currentIdx, 5);
+                if (midConnections.Count > 0)
+                {
+                    JunctionEntry target = midConnections[Random.Range(0, midConnections.Count)];
+                    Vector2Int currentPx = path[currentIdx];
+
+                    car.pathIndex     = target.pathIndex;
+                    car.position      = FindNearestPixelOnPath(allPaths[car.pathIndex], currentPx);
+                    path              = allPaths[car.pathIndex];
+
+                    int newLen = path.Count;
+                    if (car.position < newLen * 0.3f)      car.speedInPixels =  Mathf.Abs(car.speedInPixels);
+                    else if (car.position > newLen * 0.7f) car.speedInPixels = -Mathf.Abs(car.speedInPixels);
+
+                    didFlip = true;
+                }
             }
-            else if (car.position < 0)
+
+            int pathLen       = path.Count;
+            bool reachedEnd   = car.position >= pathLen - 1;
+            bool reachedStart = car.position < 0;
+
+            if (reachedEnd || reachedStart)
             {
-                car.position = 0;
-                car.speed = Mathf.Abs(car.speed);
+                int endIdx = reachedStart ? 0 : pathLen - 1;
+                var connections = FindConnections(car.pathIndex, endIdx, 3);
+
+                bool  isOnHighway = car.pathIndex < highwayPathCount;
+                float turnChance  = isOnHighway ? 0.8f : 0.5f;
+
+                if (connections.Count > 0 && Random.value < turnChance)
+                {
+                    JunctionEntry target = connections[Random.Range(0, connections.Count)];
+                    Vector2Int currentPx = path[endIdx];
+
+                    car.pathIndex     = target.pathIndex;
+                    car.position      = FindNearestPixelOnPath(allPaths[car.pathIndex], currentPx);
+                    path              = allPaths[car.pathIndex];
+
+                    int newLen = allPaths[car.pathIndex].Count;
+                    if (car.position < newLen * 0.3f)      car.speedInPixels =  Mathf.Abs(car.speedInPixels);
+                    else if (car.position > newLen * 0.7f) car.speedInPixels = -Mathf.Abs(car.speedInPixels);
+                }
+                else
+                {
+                    if (reachedEnd)   { car.position = pathLen - 1; car.speedInPixels = -Mathf.Abs(car.speedInPixels); }
+                    else              { car.position = 0;           car.speedInPixels =  Mathf.Abs(car.speedInPixels); }
+                }
+
+                didFlip = true;
             }
 
-            int idx = Mathf.Clamp(Mathf.RoundToInt(car.position), 0, pathLen - 1);
-            Vector2Int center = path[idx];
-            car.lastPixel = center;
-            cars[i] = car;
+            // Sub-pixel interpolated world position
+            Vector3 targetWorldPos = InterpolatedWorldPos(car.pathIndex, car.position);
 
-            // Paint car dot
-            PaintCarDot(center.x, center.y, car.color);
-        }
+            if (didFlip)
+            {
+                // Snap position on flip so there's no lerp lag across a junction
+                car.smoothedWorldPos = targetWorldPos;
+            }
+            else
+            {
+                // Smooth world position to eliminate per-pixel stepping jitter
+                car.smoothedWorldPos = Vector3.Lerp(car.smoothedWorldPos, targetWorldPos, dt * directionSmoothSpeed * 2f);
+            }
 
-        // 3) Apply texture (batched)
-        frameCounter++;
-        if (frameCounter >= applyInterval)
-        {
-            mapTexture.Apply();
-            frameCounter = 0;
+            car.go.transform.position = car.smoothedWorldPos;
+
+            // Direction smoothing
+            int finalIdx = Mathf.Clamp(Mathf.RoundToInt(car.position), 0, path.Count - 1);
+            Vector2 rawDir = GetDirectionAtIndex(car.pathIndex, finalIdx, car.speedInPixels);
+
+            if (didFlip)
+            {
+                car.smoothedDir     = rawDir;
+                car.currentRotation = DirToRotation(rawDir);
+            }
+            else
+            {
+                car.smoothedDir = Vector2.Lerp(car.smoothedDir, rawDir, dt * directionSmoothSpeed).normalized;
+                if (car.smoothedDir == Vector2.zero) car.smoothedDir = rawDir;
+                car.currentRotation = DirToRotation(car.smoothedDir);
+            }
+
+            car.go.transform.rotation = car.currentRotation;
+
+            activeCars[i] = car;
         }
     }
 
     // -------------------------------------------------------------------------
-    // PAINTING
-    // -------------------------------------------------------------------------
 
-    void PaintCarDot(int cx, int cy, Color color)
+    /// <summary>
+    /// Linearly interpolates world position between floor and ceil path indices
+    /// using the fractional part of position, giving smooth sub-pixel movement.
+    /// </summary>
+    Vector3 InterpolatedWorldPos(int pathIndex, float position)
     {
-        if (carRadius <= 0)
+        List<Vector2Int> path = allPaths[pathIndex];
+        int count = path.Count;
+
+        int   idxA = Mathf.Clamp(Mathf.FloorToInt(position), 0, count - 1);
+        int   idxB = Mathf.Clamp(idxA + 1,                   0, count - 1);
+        float t    = position - Mathf.FloorToInt(position);
+
+        Vector3 worldA = TileToWorld(path[idxA]);
+        Vector3 worldB = TileToWorld(path[idxB]);
+
+        return Vector3.Lerp(worldA, worldB, t);
+    }
+
+    int FindNearestPixelOnPath(List<Vector2Int> path, Vector2Int fromPixel)
+    {
+        int   bestIdx  = 0;
+        float bestDist = float.MaxValue;
+        int   step     = Mathf.Max(1, path.Count / 100);
+
+        for (int i = 0; i < path.Count; i += step)
         {
-            // Single pixel
-            if (cx >= 0 && cx < texW && cy >= 0 && cy < texH)
-            {
-                mapTexture.SetPixel(cx, cy, color);
-                dirtyPixels.Add(new Vector2Int(cx, cy));
-            }
-            return;
+            float d = Vector2Int.Distance(fromPixel, path[i]);
+            if (d < bestDist) { bestDist = d; bestIdx = i; }
         }
 
-        // Diamond shape within radius
-        for (int dx = -carRadius; dx <= carRadius; dx++)
+        int from = Mathf.Max(0, bestIdx - step);
+        int to   = Mathf.Min(path.Count - 1, bestIdx + step);
+        for (int i = from; i <= to; i++)
         {
-            for (int dy = -carRadius; dy <= carRadius; dy++)
-            {
-                if (Mathf.Abs(dx) + Mathf.Abs(dy) > carRadius) continue;
-                int px = cx + dx, py = cy + dy;
-                if (px < 0 || px >= texW || py < 0 || py >= texH) continue;
-
-                mapTexture.SetPixel(px, py, color);
-                dirtyPixels.Add(new Vector2Int(px, py));
-            }
+            float d = Vector2Int.Distance(fromPixel, path[i]);
+            if (d < bestDist) { bestDist = d; bestIdx = i; }
         }
+
+        return bestIdx;
+    }
+
+    Vector2 GetDirectionAtIndex(int pathIndex, int idx, float speed)
+    {
+        List<Vector2Int> path = allPaths[pathIndex];
+        int count = path.Count;
+
+        int ahead = speed >= 0 ? directionLookahead : -directionLookahead;
+
+        int aheadIdx  = Mathf.Clamp(idx + ahead,  0, count - 1);
+        int behindIdx = Mathf.Clamp(idx - ahead, 0, count - 1);
+
+        if (aheadIdx == behindIdx) return Vector2.up;
+
+        Vector2 dir = new Vector2(
+            path[aheadIdx].x - path[behindIdx].x,
+            path[aheadIdx].y - path[behindIdx].y
+        ).normalized;
+
+        return dir == Vector2.zero ? Vector2.up : dir;
+    }
+
+    Quaternion DirToRotation(Vector2 dir)
+    {
+        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - 90f;
+        return Quaternion.Euler(0f, 0f, angle);
+    }
+
+    Vector3 TileToWorld(Vector2Int tile)
+    {
+        SpriteRenderer sr = mapPainter.mapRenderer;
+        Vector3 anchor = sr != null ? sr.transform.position : Vector3.zero;
+
+        float wx = anchor.x + (tile.x / pixelsPerUnit) - mapHalfW;
+        float wy = anchor.y + (tile.y / pixelsPerUnit) - mapHalfH;
+        return new Vector3(wx, wy, anchor.z - 1f);
     }
 
     // -------------------------------------------------------------------------
-    // PUBLIC API
+
+    GameObject GetFromPool()
+    {
+        while (pool.Count > 0)
+        {
+            GameObject go = pool.Dequeue();
+            if (go != null) return go;
+        }
+
+        GameObject newGo = new GameObject("Car");
+        newGo.transform.SetParent(carParent);
+        newGo.AddComponent<SpriteRenderer>();
+        return newGo;
+    }
+
+    void ReturnToPool(Car car)
+    {
+        if (car.go == null) return;
+        car.go.SetActive(false);
+        pool.Enqueue(car.go);
+    }
+
+    void ReturnAllCarsToPool()
+    {
+        foreach (var car in activeCars)
+            ReturnToPool(car);
+        activeCars.Clear();
+    }
+
     // -------------------------------------------------------------------------
 
-    /// <summary>Stop all traffic and restore the clean map texture.</summary>
+    void BuildJunctions()
+    {
+        junctionGroups.Clear();
+        float junctionRadius = 8f;
+
+        for (int p = 0; p < allPaths.Count; p++)
+        {
+            for (int endIdx = 0; endIdx < 2; endIdx++)
+            {
+                int myPixelIdx = (endIdx == 0) ? 0 : allPaths[p].Count - 1;
+                Vector2Int myPixel = allPaths[p][myPixelIdx];
+
+                for (int other = 0; other < allPaths.Count; other++)
+                {
+                    if (other == p) continue;
+
+                    int   bestIdx  = -1;
+                    float bestDist = float.MaxValue;
+                    int   step     = Mathf.Max(1, allPaths[other].Count / 80);
+
+                    for (int i = 0; i < allPaths[other].Count; i += step)
+                    {
+                        float d = Vector2Int.Distance(myPixel, allPaths[other][i]);
+                        if (d < bestDist) { bestDist = d; bestIdx = i; }
+                    }
+
+                    int from = Mathf.Max(0, bestIdx - step);
+                    int to   = Mathf.Min(allPaths[other].Count - 1, bestIdx + step);
+                    for (int i = from; i <= to; i++)
+                    {
+                        float d = Vector2Int.Distance(myPixel, allPaths[other][i]);
+                        if (d < bestDist) { bestDist = d; bestIdx = i; }
+                    }
+
+                    if (bestDist <= junctionRadius)
+                    {
+                        var group = new List<JunctionEntry>();
+                        group.Add(new JunctionEntry { pathIndex = p,     pixelIndex = myPixelIdx });
+                        group.Add(new JunctionEntry { pathIndex = other, pixelIndex = bestIdx    });
+                        junctionGroups.Add(group);
+                    }
+                }
+            }
+        }
+
+        Debug.Log($"RoadTrafficSystem: {junctionGroups.Count} junction connections found.");
+    }
+
+    List<JunctionEntry> FindConnections(int pathIndex, int pixelIndex, int tolerance)
+    {
+        var results = new List<JunctionEntry>();
+        for (int g = 0; g < junctionGroups.Count; g++)
+        {
+            var group    = junctionGroups[g];
+            bool matched = false;
+            for (int e = 0; e < group.Count; e++)
+            {
+                if (group[e].pathIndex == pathIndex &&
+                    Mathf.Abs(group[e].pixelIndex - pixelIndex) <= tolerance)
+                { matched = true; break; }
+            }
+
+            if (matched)
+                for (int o = 0; o < group.Count; o++)
+                    if (group[o].pathIndex != pathIndex)
+                        results.Add(group[o]);
+        }
+        return results;
+    }
+
+    // -------------------------------------------------------------------------
+
     public void StopTraffic()
     {
-        if (!active) return;
         active = false;
-
-        // Restore all dirty pixels
-        foreach (var px in dirtyPixels)
-        {
-            int idx = px.x + px.y * texW;
-            if (idx >= 0 && idx < basePixels.Length)
-                mapTexture.SetPixel(px.x, px.y, basePixels[idx]);
-        }
-        dirtyPixels.Clear();
-        mapTexture.Apply();
+        foreach (var car in activeCars)
+            if (car.go != null) car.go.SetActive(false);
     }
 
-    /// <summary>Resume traffic after StopTraffic().</summary>
     public void ResumeTraffic()
     {
-        if (cars.Count > 0) active = true;
+        if (activeCars.Count == 0) return;
+        foreach (var car in activeCars)
+            if (car.go != null) car.go.SetActive(true);
+        active = true;
     }
 
-    /// <summary>Fully clear and re-initialize (e.g., after map regeneration).</summary>
     public void Reinitialize()
     {
         StopTraffic();
-        cars.Clear();
-        allPaths.Clear();
         Initialize();
     }
 
-    /// <summary>Toggle visibility — used by UndergroundMapManager etc.</summary>
     public void SetTrafficVisible(bool visible)
     {
         if (visible) ResumeTraffic();
