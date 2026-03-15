@@ -303,6 +303,8 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `womanObsessionModifier` | Kadin sureci stat degisimi (+ = obsesyon artar, - = azalir). Sadece isWomanProcessEvent acikken Inspector'da gorunur. |
 | `redirectsWomanPool` | true ise secildiginde kadin sureci havuzunu kalici olarak baska bir WomanProcessDatabase'e yonlendirir. Sadece isWomanProcessEvent acikken Inspector'da gorunur. |
 | `womanPoolDatabase` | Yonlendirilecek WomanProcessDatabase referansi. redirectsWomanPool aktifken gorunur. |
+| `freezesWomanProcess` | true ise kadin surecini belirli dongu sayisi kadar dondurur. Sadece isWomanProcessEvent acikken gorunur. |
+| `womanProcessFreezeCycles` | Kac dongu boyunca kadin eventi tetiklenmeyecek (min 1). freezesWomanProcess aktifken gorunur. Mevcut dondurma varsa ustune eklenir. |
 | **Kalici Stat Carpanlari** (foldout) | |
 | `permanentMultipliers` | Liste: birden fazla stat icin kalici carpan tanimlanabilir. Her entry: `stat` (PermanentMultiplierStatType) + `multiplier` (float). Ornek: 1.1 = %10 artis. Carpisimsal birikir. Tum oyun boyunca, tum kaynaklardan gecerlidir. Secenekler: Wealth, Suspicion, Reputation, PoliticalInfluence, WarSupport, WomanObsession. WarSupport icin WarForOilManager, WomanObsession icin WomanProcessManager, digerleri icin GameStatManager uygulanir. |
 | **On Kosullar** (foldout) | |
@@ -1068,6 +1070,8 @@ Savas sirasinda bir chain choice'u ile tetiklenen, oyuncunun obsesyon stat'ini y
 | 2 | tier1Max - tier2Max (65) | Her 3 eventte 1 | Orta obsesyon |
 | 3 | tier2Max - 100 | Her 2 eventte 1 | Yuksek obsesyon, sik event |
 
+Her kademe icin "N eventte M kadin eventi" ayarlanabilir. Ornek: tier2Frequency=3, tier2WomanCount=2 → her 3 eventte 2 kadin eventi art arda tetiklenir.
+
 ### Baslatma
 
 1. Savas icinde bir WarForOilEventChoice'ta `startsWomanProcess = true` tiklanir
@@ -1143,9 +1147,12 @@ Kadin eventleri `WarForOilEvent` altyapisini kullanir ama WomanProcessManager ke
 | `tier1Events` | — | Kademe 1 event havuzu |
 | `tier2Events` | — | Kademe 2 event havuzu |
 | `tier3Events` | — | Kademe 3 event havuzu |
-| `tier1Frequency` | 5 | Kademe 1'de her N eventte 1 kadin eventi |
-| `tier2Frequency` | 3 | Kademe 2'de her N eventte 1 |
-| `tier3Frequency` | 2 | Kademe 3'te her N eventte 1 |
+| `tier1Frequency` | 5 | Kademe 1'de her N eventte |
+| `tier1WomanCount` | 1 | Kademe 1'de dongu basina kac kadin eventi |
+| `tier2Frequency` | 3 | Kademe 2'de her N eventte |
+| `tier2WomanCount` | 1 | Kademe 2'de dongu basina kac kadin eventi |
+| `tier3Frequency` | 2 | Kademe 3'te her N eventte |
+| `tier3WomanCount` | 1 | Kademe 3'te dongu basina kac kadin eventi |
 | `decisionTime` | 10 | Karar suresi (saniye) |
 
 ### Inspector Kullanimi

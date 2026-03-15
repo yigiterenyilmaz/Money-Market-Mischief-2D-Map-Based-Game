@@ -21,10 +21,13 @@ public class WomanProcessDatabase : ScriptableObject
     public List<WarForOilEvent> tier2Events; //kademe 2 event havuzu (orta obsesyon)
     public List<WarForOilEvent> tier3Events; //kademe 3 event havuzu (yüksek obsesyon)
 
-    [Header("Event Sıklığı (her N eventte 1 kadın eventi)")]
-    public int tier1Frequency = 5; //kademe 1'de her 5 eventte 1
-    public int tier2Frequency = 3; //kademe 2'de her 3 eventte 1
-    public int tier3Frequency = 2; //kademe 3'te her 2 eventte 1
+    [Header("Event Sıklığı (her N eventte M kadın eventi)")]
+    public int tier1Frequency = 5; //kademe 1'de her 5 eventte
+    public int tier1WomanCount = 1; //1 kadın eventi
+    public int tier2Frequency = 3; //kademe 2'de her 3 eventte
+    public int tier2WomanCount = 1; //1 kadın eventi
+    public int tier3Frequency = 2; //kademe 3'te her 2 eventte
+    public int tier3WomanCount = 1; //1 kadın eventi
 
     [Header("Karar Süresi")]
     public float decisionTime = 10f; //kadın eventi karar süresi (saniye)
@@ -54,7 +57,7 @@ public class WomanProcessDatabase : ScriptableObject
     }
 
     /// <summary>
-    /// Kademeye göre event sıklığını döner (her N eventte 1).
+    /// Kademeye göre event sıklığını döner (her N eventte).
     /// </summary>
     public int GetTierFrequency(int tier)
     {
@@ -64,6 +67,20 @@ public class WomanProcessDatabase : ScriptableObject
             case 2: return tier2Frequency;
             case 3: return tier3Frequency;
             default: return tier3Frequency;
+        }
+    }
+
+    /// <summary>
+    /// Kademeye göre döngü başına kaç kadın eventi geleceğini döner.
+    /// </summary>
+    public int GetTierWomanCount(int tier)
+    {
+        switch (tier)
+        {
+            case 1: return Mathf.Max(1, tier1WomanCount);
+            case 2: return Mathf.Max(1, tier2WomanCount);
+            case 3: return Mathf.Max(1, tier3WomanCount);
+            default: return Mathf.Max(1, tier3WomanCount);
         }
     }
 

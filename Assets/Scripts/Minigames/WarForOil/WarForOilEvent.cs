@@ -170,6 +170,8 @@ public class WarForOilEventChoice
     public float obsessionFloor; //obsesyonun düşemeyeceği minimum değer
     public bool redirectsWomanPool; //seçilince kadın süreci havuzunu başka bir database'e yönlendirir (kalıcı)
     public WomanProcessDatabase womanPoolDatabase; //yönlendirilecek database
+    public bool freezesWomanProcess; //seçilince kadın sürecini belirli döngü sayısı kadar dondurur
+    public int womanProcessFreezeCycles = 1; //kaç döngü boyunca kadın eventi gelmeyecek
 
     //kalıcı stat çarpanları (seçildiğinde anında ve kalıcı uygulanır — tüm oyun boyunca geçerli)
     public List<PermanentMultiplierEntry> permanentMultipliers = new List<PermanentMultiplierEntry>();

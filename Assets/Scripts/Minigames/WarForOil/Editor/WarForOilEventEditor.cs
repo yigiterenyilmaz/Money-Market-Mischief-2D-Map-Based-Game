@@ -419,6 +419,21 @@ public class WarForOilEventEditor : Editor
                         MessageType.Info);
                     EditorGUI.indentLevel--;
                 }
+
+                SerializedProperty freezesWP = choice.FindPropertyRelative("freezesWomanProcess");
+                EditorGUILayout.PropertyField(freezesWP, new GUIContent("Kadın Sürecini Dondur"));
+                if (freezesWP.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    SerializedProperty freezeCycles = choice.FindPropertyRelative("womanProcessFreezeCycles");
+                    freezeCycles.intValue = EditorGUILayout.IntField(
+                        new GUIContent("Dondurma Süresi (döngü)"), freezeCycles.intValue);
+                    if (freezeCycles.intValue < 1) freezeCycles.intValue = 1;
+                    EditorGUILayout.HelpBox(
+                        $"Kadın süreci {freezeCycles.intValue} döngü boyunca tetiklenmez. Mevcut dondurma varsa üstüne eklenir.",
+                        MessageType.Info);
+                    EditorGUI.indentLevel--;
+                }
             }
 
             SerializedProperty endsWar = choice.FindPropertyRelative("endsWar");
@@ -1126,6 +1141,8 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("hasObsessionFloor").boolValue = false;
         choice.FindPropertyRelative("obsessionFloor").floatValue = 0f;
         choice.FindPropertyRelative("redirectsWomanPool").boolValue = false;
+        choice.FindPropertyRelative("freezesWomanProcess").boolValue = false;
+        choice.FindPropertyRelative("womanProcessFreezeCycles").intValue = 1;
         choice.FindPropertyRelative("womanPoolDatabase").objectReferenceValue = null;
         choice.FindPropertyRelative("permanentMultipliers").ClearArray();
         choice.FindPropertyRelative("hasImmediateEvent").boolValue = false;

@@ -47,6 +47,12 @@ public class WomanProcessManager : MonoBehaviour
     private WarForOilEvent pendingImmediateEvent;
     private float immediateEventTimer;
 
+    //dondurma — belirli sayıda döngü boyunca kadın eventi tetiklenmez
+    private int freezeRemainingCycles;
+
+    //döngü başına birden fazla kadın eventi desteği
+    private int remainingWomanEventsInCycle;
+
     //zincir durumu
     private bool isInWomanChain;
     private List<ChainBranch> pendingWomanChainBranches;
@@ -260,6 +266,8 @@ public class WomanProcessManager : MonoBehaviour
         pendingWomanEventAfterPrecursor = null;
         pendingImmediateEvent = null;
         immediateEventTimer = 0f;
+        freezeRemainingCycles = 0;
+        remainingWomanEventsInCycle = 0;
         currentPrecursorWarEvent = null;
         currentPrecursorRandomEvent = null;
         currentState = WomanProcessState.Active;
@@ -384,6 +392,12 @@ public class WomanProcessManager : MonoBehaviour
             redirectedDatabase = choice.womanPoolDatabase;
         }
 
+        //kadın sürecini dondurma
+        if (choice.freezesWomanProcess && choice.womanProcessFreezeCycles > 0)
+        {
+            FreezeProcess(choice.womanProcessFreezeCycles);
+        }
+
         OnWomanEventResolved?.Invoke(choice);
 
         currentWomanEvent = null;
@@ -425,6 +439,12 @@ public class WomanProcessManager : MonoBehaviour
 
         //bitiş kontrolleri
         CheckEndConditions();
+
+        //döngüde bekleyen kadın eventi varsa bir sonrakini tetikle
+        if (currentState == WomanProcessState.Active && remainingWomanEventsInCycle > 0)
+        {
+            pendingTrigger = true;
+        }
     }
 
     /// <summary>
@@ -457,6 +477,14 @@ public class WomanProcessManager : MonoBehaviour
     public void ApplyPermanentObsessionMultiplier(float multiplier)
     {
         obsessionGainMultiplier *= multiplier;
+    }
+
+    /// <summary>
+    /// Kadın sürecini belirli döngü sayısı kadar dondurur. Mevcut freeze varsa üstüne eklenir.
+    /// </summary>
+    public void FreezeProcess(int cycles)
+    {
+        freezeRemainingCycles += cycles;
     }
 
     /// <summary>
@@ -500,14 +528,28 @@ public class WomanProcessManager : MonoBehaviour
 
     private void IncrementEventCounter()
     {
+        //döngüde bekleyen kadın eventi varsa normal event sayacını artırma
+        if (remainingWomanEventsInCycle > 0) return;
+
         eventCounter++;
 
-        int tier = database.GetTier(womanObsession);
-        int frequency = database.GetTierFrequency(tier);
+        WomanProcessDatabase activeDb = redirectedDatabase != null ? redirectedDatabase : database;
+        int tier = activeDb.GetTier(womanObsession);
+        int frequency = activeDb.GetTierFrequency(tier);
 
         if (eventCounter >= frequency)
         {
             eventCounter = 0;
+
+            //dondurma aktifse bu döngüde kadın eventi tetiklenmez
+            if (freezeRemainingCycles > 0)
+            {
+                freezeRemainingCycles--;
+                return;
+            }
+
+            int womanCount = activeDb.GetTierWomanCount(tier);
+            remainingWomanEventsInCycle = womanCount;
             pendingTrigger = true;
         }
     }
@@ -566,7 +608,15 @@ public class WomanProcessManager : MonoBehaviour
             evt = PickEventFromTierPool();
         }
 
-        if (evt == null) return;
+        if (evt == null)
+        {
+            remainingWomanEventsInCycle = 0;
+            return;
+        }
+
+        //döngü sayacını düşür
+        if (remainingWomanEventsInCycle > 0)
+            remainingWomanEventsInCycle--;
 
         //öncü event kontrolü
         if (evt.hasPrecursorEvent)
