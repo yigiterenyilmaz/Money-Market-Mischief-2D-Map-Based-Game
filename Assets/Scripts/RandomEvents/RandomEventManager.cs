@@ -16,6 +16,8 @@ public class RandomEventManager : MonoBehaviour
     private float eventTimer = 0f;
     private float nextEventTime;
 
+    //global event engeli — WarForOilManager üzerinden yönetilir
+
     private HashSet<Event> triggeredEvents = new HashSet<Event>();
     //bu zamana kadar oyuncuya atılmış eventler.
 
@@ -131,6 +133,10 @@ public class RandomEventManager : MonoBehaviour
 
     public void TriggerRandomEvent() //random event tetikler
     {
+        //global event engeli aktifse random event tetikleme, sayacı düşür
+        if (WarForOilManager.Instance != null && WarForOilManager.Instance.TryConsumeGlobalBlock())
+            return;
+
         //başka bir sistem az önce event gösterdiyse bu cycle'ı atla (en az 2s aralık)
         if (!EventCoordinator.CanShowEvent())
             return;

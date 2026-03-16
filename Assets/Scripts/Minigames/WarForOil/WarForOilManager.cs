@@ -37,7 +37,8 @@ public class WarForOilManager : MonoBehaviour
     private int accumulatedCostModifier;
     private float rewardMultiplier; //baseRewardReduction'lar sonucu biriken ödül çarpanı (1.0'dan başlar)
     private bool eventsBlocked; //bir choice eventleri engelledi mi
-    private int remainingBlockCycles; //geçici event engeli — kalan dönem sayısı
+    private int remainingBlockCycles; //geçici event engeli — kalan dönem sayısı (sadece savaş eventleri)
+    private int remainingGlobalBlockCycles; //global event engeli — kadın eventleri hariç tüm eventler durur
     private bool ceasefireBlocked; //bir choice ateşkesi engelledi mi
     private bool pendingDeal; //anlaşmayla bitirme aktif mi
     private float dealRewardRatio; //anlaşma ödül oranı
@@ -495,9 +496,13 @@ public class WarForOilManager : MonoBehaviour
         if (choice.blocksEvents || choice.endsWar || choice.endsWarWithDeal)
             eventsBlocked = true;
 
-        //geçici event engeli — belirli dönem boyunca event gelmez
+        //geçici event engeli — belirli dönem boyunca savaş eventi gelmez
         if (choice.eventBlockCycles > 0)
             remainingBlockCycles = choice.eventBlockCycles;
+
+        //global event engeli — kadın eventleri hariç tüm eventler durur
+        if (choice.globalEventBlockCycles > 0)
+            remainingGlobalBlockCycles = choice.globalEventBlockCycles;
 
         //ateşkes engelleme
         if (choice.blocksCeasefire)
@@ -869,8 +874,10 @@ public class WarForOilManager : MonoBehaviour
                 }
                 else
                 {
-                    //random slotu — eventBlockCycles sadece random slotları etkiler
-                    if (remainingBlockCycles > 0)
+                    //random slotu — eventBlockCycles ve globalEventBlockCycles kontrol
+                    if (remainingGlobalBlockCycles > 0)
+                        remainingGlobalBlockCycles--;
+                    else if (remainingBlockCycles > 0)
                         remainingBlockCycles--;
                     else
                         TryTriggerWarEvent();
@@ -883,7 +890,11 @@ public class WarForOilManager : MonoBehaviour
             else
             {
                 //zincir dışı normal akış
-                if (remainingBlockCycles > 0)
+                if (remainingGlobalBlockCycles > 0)
+                {
+                    remainingGlobalBlockCycles--;
+                }
+                else if (remainingBlockCycles > 0)
                 {
                     remainingBlockCycles--;
                 }
@@ -2079,6 +2090,7 @@ public class WarForOilManager : MonoBehaviour
         rewardMultiplier = 1f;
         eventsBlocked = false;
         remainingBlockCycles = 0;
+        remainingGlobalBlockCycles = 0;
         ceasefireBlocked = false;
         pendingDeal = false;
         dealRewardRatio = 0f;
@@ -2640,6 +2652,17 @@ public class WarForOilManager : MonoBehaviour
         if (currentState != WarForOilState.WarProcess && currentState != WarForOilState.EventPhase)
             return 0f;
         return Mathf.Clamp01(warTimer / database.warDuration);
+    }
+
+    /// <summary>
+    /// Global event engeli aktifse sayacı 1 düşürür ve true döner. Değilse false.
+    /// RandomEventManager gibi dış sistemler bunu çağırarak kendi event'lerini de engeller.
+    /// </summary>
+    public bool TryConsumeGlobalBlock()
+    {
+        if (remainingGlobalBlockCycles <= 0) return false;
+        remainingGlobalBlockCycles--;
+        return true;
     }
 }
 

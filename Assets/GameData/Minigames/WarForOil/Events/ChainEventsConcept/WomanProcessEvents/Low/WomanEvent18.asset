@@ -14,13 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
   id: wfo_we_low_18
   displayName: A Dinner Invitation
-  description: 'Even though our relationship is in a bad place, I believe we can
-    get through this. Let''s go out for dinner tonight. Let''s fix our shattered
-    hopes.
-
-    The flower never grew...
-
-    But I love you just the same.'
+  description: Even though our relationship is in a bad place, I believe we can get
+    through this. Let's go out for dinner tonight. Let's fix our shattered hopes.
   devNote: 
   eventNote: 
   minWarTime: 0

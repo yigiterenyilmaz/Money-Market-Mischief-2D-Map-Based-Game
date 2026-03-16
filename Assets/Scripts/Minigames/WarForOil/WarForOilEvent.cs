@@ -115,7 +115,8 @@ public class WarForOilEventChoice
     public float dealDelay; //anlaşma kaç saniye sonra savaşı bitirir (0 = anında)
     [Range(0f, 1f)] public float dealRewardRatio; //normal kazanımın bu oranı garanti verilir (0.8 = %80)
     public bool blocksEvents; //seçilirse savaş sonuna kadar yeni event gelmez
-    [Range(0, 10)] public int eventBlockCycles; //seçilirse bu kadar event dönemi boyunca event gelmez (0 = etkisiz)
+    [Range(0, 10)] public int eventBlockCycles; //seçilirse bu kadar event dönemi boyunca savaş eventi gelmez (0 = etkisiz)
+    [Range(0, 10)] public int globalEventBlockCycles; //seçilirse bu kadar event dönemi boyunca kadın eventleri HARİÇ tüm eventler durur (0 = etkisiz)
     public bool blocksCeasefire; //seçilirse savaş sonuna kadar ateşkes yapılamaz
     public bool blocksEventGroup; //seçilirse belirtilen gruptaki tüm eventler bir daha tetiklenmez
     public ScriptableObject blockedGroup; //engellenecek grup (WTETWCEventGroup veya OFPCEventGroup sürüklenebilir)

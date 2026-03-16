@@ -555,7 +555,11 @@ public class WarForOilEventEditor : Editor
                 new GUIContent("Event Engelle"));
             EditorGUILayout.IntSlider(
                 choice.FindPropertyRelative("eventBlockCycles"),
-                0, 10, new GUIContent("Event Dondur (Dönem)"));
+                0, 10, new GUIContent("Savaş Event Dondur (Dönem)"));
+            EditorGUILayout.IntSlider(
+                choice.FindPropertyRelative("globalEventBlockCycles"),
+                0, 10, new GUIContent("Global Event Dondur (Dönem)",
+                "Kadın eventleri HARİÇ tüm eventleri (savaş + random) bu kadar dönem boyunca durdurur."));
             EditorGUILayout.PropertyField(
                 choice.FindPropertyRelative("blocksCeasefire"),
                 new GUIContent("Ateşkes Engelle"));
@@ -1112,6 +1116,7 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("dealRewardRatio").floatValue = 0f;
         choice.FindPropertyRelative("blocksEvents").boolValue = false;
         choice.FindPropertyRelative("eventBlockCycles").intValue = 0;
+        choice.FindPropertyRelative("globalEventBlockCycles").intValue = 0;
         choice.FindPropertyRelative("blocksCeasefire").boolValue = false;
         choice.FindPropertyRelative("blocksEventGroup").boolValue = false;
         choice.FindPropertyRelative("blockedGroup").objectReferenceValue = null;
