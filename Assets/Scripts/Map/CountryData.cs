@@ -15,6 +15,7 @@ public class CountryData : MonoBehaviour
     private float educationIndex;
     private float climateFertility;
     private float naturalResourceWealth;
+    private float naturalEventsIndex; // 0–1; drives probability of natural disaster events
 
     public static event Action OnCountryDataReady;
 
@@ -63,9 +64,10 @@ public class CountryData : MonoBehaviour
         educationIndex        = GenerateWeightedRandom();
         climateFertility      = GenerateWeightedRandom();
         naturalResourceWealth = GenerateWeightedRandom();
+        naturalEventsIndex    = GenerateWeightedRandom() / 100f; // normalize to 0–1
     }
 
-    // %90 chance: 14-86 range, %10 chance: extremes (0-13 or 87-100)
+    // 90% chance: 14–86 range | 10% chance: extremes (0–13 or 87–100)
     private float GenerateWeightedRandom()
     {
         float roll = UnityEngine.Random.Range(0f, 1f);
@@ -116,7 +118,8 @@ public class CountryData : MonoBehaviour
             $"  Yozlaşma:     {corruptionIndex:F0}\n" +
             $"  Eğitim:       {educationIndex:F0}\n" +
             $"  İklim:        {climateFertility:F0}\n" +
-            $"  Doğal Kaynak: {naturalResourceWealth:F0}");
+            $"  Doğal Kaynak: {naturalResourceWealth:F0}\n" +
+            $"  Doğal Olaylar:{naturalEventsIndex:F2}");
     }
 
     #region Country Property Getters
@@ -125,6 +128,9 @@ public class CountryData : MonoBehaviour
     public float EducationIndex        => educationIndex;
     public float ClimateFertility      => climateFertility;
     public float NaturalResourceWealth => naturalResourceWealth;
+
+    /// <summary>0–1. Higher = more frequent and severe natural events (earthquakes, etc.).</summary>
+    public float NaturalEventsIndex    => naturalEventsIndex;
 
     #endregion
 }

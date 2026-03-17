@@ -24,25 +24,16 @@ public class MapDecorPlacer : MonoBehaviour
 
     [Header("Spawn Rates — Per Region")]
 
-    [Tooltip("Sprite placement attempts per cell for Cities region. 0 = none, 16 = dense.")]
-    [Range(0, 16)] public int citiesSpawnRate = 2;
-
-    [Tooltip("Sprite placement attempts per cell for Agricultural region. 0 = none, 16 = dense.")]
+    [Range(0, 16)] public int citiesSpawnRate      = 2;
     [Range(0, 16)] public int agriculturalSpawnRate = 2;
-
-    [Tooltip("Sprite placement attempts per cell for Urban / Nature region. 0 = none, 16 = dense.")]
-    [Range(0, 16)] public int urbanSpawnRate = 2;
-
-    [Tooltip("Sprite placement attempts per cell for Industrial region. 0 = none, 16 = dense.")]
-    [Range(0, 16)] public int industrialSpawnRate = 2;
+    [Range(0, 16)] public int urbanSpawnRate        = 2;
+    [Range(0, 16)] public int industrialSpawnRate   = 2;
 
     // -------------------------------------------------------------------------
     // SPRITE SCALE
     // -------------------------------------------------------------------------
 
     [Header("Sprite Scale — Applies to All Regions")]
-
-    [Tooltip("Minimum and maximum random scale applied to ALL sprites across every region.")]
     public Vector2 spriteScaleRange = new Vector2(0.75f, 1.25f);
 
     // -------------------------------------------------------------------------
@@ -51,30 +42,27 @@ public class MapDecorPlacer : MonoBehaviour
 
     [Header("Cities Decor — Road-Aware Placement")]
 
-    [Tooltip("Minimum distance from water (in tiles) before a building can spawn. Set 0 to disable.")]
-    [Range(0, 20)] public int cityShoreBuffer = 3;
-
-    [Tooltip("Minimum distance in tiles from any non-Cities biome tile.")]
-    [Range(0, 20)] public int cityRegionBorderBuffer = 5;
-
-    [Tooltip("When enabled, building sprites are rotated in 90-degree increments only.")]
-    public bool citySnapRotation = false;
-
-    [Tooltip("World-space radius around each building that blocks other buildings from spawning.")]
-    [Range(0.05f, 2f)] public float overlapRadius = 0.3f;
-
-    [Tooltip("Maximum tile distance from a road for a building to spawn. 0 = disable road constraint.")]
+    [Range(0, 20)] public int cityShoreBuffer          = 3;
+    [Range(0, 20)] public int cityRegionBorderBuffer   = 5;
+    public bool citySnapRotation                        = false;
+    [Range(0.05f, 2f)] public float overlapRadius      = 0.3f;
     [Range(0, 30)] public int cityBuildingMaxRoadDistance = 8;
-
-    [Tooltip("Buildings closer to roads are more likely to spawn. Higher = stricter clustering.")]
     [Range(0f, 1f)] public float cityRoadAffinityStrength = 0.7f;
 
     // -------------------------------------------------------------------------
     // PRIVATE STATE
     // -------------------------------------------------------------------------
 
-    private List<GameObject> decorObjects    = new List<GameObject>();
-    private List<Vector2>    occupiedCenters = new List<Vector2>();
+    /// <summary>Tracks a placed city building alongside its map tile position for earthquake damage checks.</summary>
+    private struct BuildingData
+    {
+        public GameObject go;
+        public int tileX, tileY;
+    }
+
+    private List<GameObject>   decorObjects    = new List<GameObject>();
+    private List<Vector2>      occupiedCenters = new List<Vector2>();
+    private List<BuildingData> cityBuildings   = new List<BuildingData>();
 
     // -------------------------------------------------------------------------
     // ENTRY POINT
@@ -90,7 +78,6 @@ public class MapDecorPlacer : MonoBehaviour
         float halfW = map.width  * 0.5f / pixelsPerUnit;
         float halfH = map.height * 0.5f / pixelsPerUnit;
 
-        // Build per-biome tile pools
         List<Vector2Int> cityTilePool = new List<Vector2Int>();
         Dictionary<int, List<Vector2Int>> biomeTilePools = new Dictionary<int, List<Vector2Int>>();
 
@@ -138,7 +125,7 @@ public class MapDecorPlacer : MonoBehaviour
             }
         }
 
-        Debug.Log($"MapDecorPlacer: decor={decorObjects.Count}");
+        Debug.Log($"MapDecorPlacer: decor={decorObjects.Count}, cityBuildings={cityBuildings.Count}");
     }
 
     int GetSpawnRate(int biome)
@@ -153,7 +140,7 @@ public class MapDecorPlacer : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // VISIBILITY TOGGLE — used by UndergroundMapManager
+    // VISIBILITY TOGGLE
     // -------------------------------------------------------------------------
 
     public void SetDecorVisible(bool visible)
@@ -163,7 +150,33 @@ public class MapDecorPlacer : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // PLACEMENT — CITIES (now road-aware)
+    // EARTHQUAKE — BUILDING DESTRUCTION
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Destroys all city buildings whose tile position sits on a fault line.
+    /// Called by EarthquakeSystem after an earthquake occurs.
+    /// </summary>
+    public void DestroyBuildingsOnFaultLines(FaultLineGenerator faultGen)
+    {
+        int destroyed = 0;
+
+        for (int i = cityBuildings.Count - 1; i >= 0; i--)
+        {
+            BuildingData bd = cityBuildings[i];
+            if (!faultGen.IsFault(bd.tileX, bd.tileY)) continue;
+
+            decorObjects.Remove(bd.go);
+            if (bd.go != null) Destroy(bd.go);
+            cityBuildings.RemoveAt(i);
+            destroyed++;
+        }
+
+        Debug.Log($"MapDecorPlacer: {destroyed} building(s) destroyed by earthquake.");
+    }
+
+    // -------------------------------------------------------------------------
+    // PLACEMENT — CITIES (road-aware)
     // -------------------------------------------------------------------------
 
     void TryPlaceCityBuilding(MapGenerator map, BiomePaintSettings settings,
@@ -172,19 +185,15 @@ public class MapDecorPlacer : MonoBehaviour
         if (settings.citiesDecor == null || settings.citiesDecor.Count == 0) return;
         if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) return;
 
-        // --- Road-aware placement ---
         if (cityBuildingMaxRoadDistance > 0 && RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated)
         {
             int roadDist = RoadGenerator.Instance.GetDistanceToRoad(tx, ty);
-
-            // Hard cutoff: don't place beyond max distance
             if (roadDist > cityBuildingMaxRoadDistance) return;
 
-            // Soft falloff: tiles further from roads have lower spawn chance
             if (cityRoadAffinityStrength > 0f && roadDist > 0)
             {
                 float normalizedDist = (float)roadDist / cityBuildingMaxRoadDistance;
-                float spawnChance = 1f - (normalizedDist * cityRoadAffinityStrength);
+                float spawnChance    = 1f - (normalizedDist * cityRoadAffinityStrength);
                 if (Random.value > spawnChance) return;
             }
         }
@@ -196,11 +205,13 @@ public class MapDecorPlacer : MonoBehaviour
         float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
 
         if (IsOverlapping(wx, wy)) return;
-
         occupiedCenters.Add(new Vector2(wx, wy));
 
-        float scale = Random.Range(spriteScaleRange.x, spriteScaleRange.y);
-        PlaceSprite("CityBuilding", sprite, wx, wy, scale, false, 10 + (int)(wy * -100f));
+        float      scale = Random.Range(spriteScaleRange.x, spriteScaleRange.y);
+        GameObject go    = PlaceSprite("CityBuilding", sprite, wx, wy, scale, false, 10 + (int)(wy * -100f));
+
+        // Track for earthquake damage
+        cityBuildings.Add(new BuildingData { go = go, tileX = tx, tileY = ty });
     }
 
     bool HasShoreBuffer(MapGenerator map, int tx, int ty)
@@ -266,8 +277,9 @@ public class MapDecorPlacer : MonoBehaviour
         return pool[Random.Range(0, pool.Count)];
     }
 
-    void PlaceSprite(string goName, Sprite sprite, float wx, float wy,
-                     float scale, bool flipX, int sortOrder)
+    /// <returns>The created GameObject, so callers can store a reference if needed.</returns>
+    GameObject PlaceSprite(string goName, Sprite sprite, float wx, float wy,
+                           float scale, bool flipX, int sortOrder)
     {
         GameObject go = new GameObject(goName);
         go.transform.SetParent(transform);
@@ -285,6 +297,7 @@ public class MapDecorPlacer : MonoBehaviour
             go.transform.rotation = Quaternion.Euler(0f, 0f, Random.Range(0, 4) * 90f);
 
         decorObjects.Add(go);
+        return go;
     }
 
     // -------------------------------------------------------------------------
@@ -297,5 +310,6 @@ public class MapDecorPlacer : MonoBehaviour
             if (go != null) Destroy(go);
         decorObjects.Clear();
         occupiedCenters.Clear();
+        cityBuildings.Clear();
     }
 }

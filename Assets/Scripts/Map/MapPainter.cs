@@ -92,6 +92,39 @@ public class MapPainter : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
+    // EARTHQUAKE CRACK APPLICATION
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Paints crack colors onto the surface texture at every land fault tile.
+    /// Called by EarthquakeSystem after an earthquake occurs.
+    /// </summary>
+    public void ApplyCracks(bool[,] faultMap, Color crackColor)
+    {
+        if (mapTexture == null || faultMap == null) return;
+
+        int w = mapGenerator.width;
+        int h = mapGenerator.height;
+
+        for (int x = 0; x < w; x++)
+        for (int y = 0; y < h; y++)
+        {
+            if (!faultMap[x, y])           continue;
+            if (!mapGenerator.IsLand(x, y)) continue;
+
+            // Blend crack over existing color for a more natural look
+            Color existing = mapTexture.GetPixel(x, y);
+            mapTexture.SetPixel(x, y, Color.Lerp(existing, crackColor, 0.75f));
+        }
+
+        mapTexture.Apply();
+
+        // Keep surface sprite reference in sync for UndergroundMapManager
+        if (UndergroundMapManager.Instance != null)
+            UndergroundMapManager.Instance.RefreshSurfaceSprite();
+    }
+
+    // -------------------------------------------------------------------------
     // SHORE DISTANCE FIELD
     // -------------------------------------------------------------------------
 
@@ -172,17 +205,8 @@ public class MapPainter : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // BORDER DISTANCE FIELD — FIXED FOR RELIABLE TRANSITIONS
+    // BORDER DISTANCE FIELD
     // -------------------------------------------------------------------------
-    //
-    // For each land tile, BFS finds distance to the nearest different-biome tile.
-    // borderDist = 0 at the border, 1.0 at transitionWidth away.
-    // nearestOther = which biome that nearest different neighbor belongs to.
-    //
-    // Fix vs original:
-    //   - Removed the `dist[x,y] > 0` guard that could skip valid seed tiles
-    //   - Ensures all border-adjacent tiles are properly seeded, including
-    //     triple-junctions and concave borders
 
     void BuildBorderDistanceField(int w, int h)
     {
@@ -204,7 +228,6 @@ public class MapPainter : MonoBehaviour
 
         Queue<Vector2Int> queue = new Queue<Vector2Int>();
 
-        // Seed: every land tile adjacent to a different biome
         for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
             {
@@ -236,7 +259,6 @@ public class MapPainter : MonoBehaviour
                 }
             }
 
-        // BFS propagation inward within same-biome regions
         while (queue.Count > 0)
         {
             Vector2Int pos = queue.Dequeue();
@@ -269,11 +291,8 @@ public class MapPainter : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // LAND PAINTING WITH TRANSITION — ONE-SIDED
+    // LAND PAINTING WITH TRANSITION
     // -------------------------------------------------------------------------
-    //
-    // Only the LOWER biome ID side blends. Higher ID stays pure.
-    // Result: A_pure → A_blending_to_B → B_pure  (single gradient, no double-band)
 
     Color PaintLandWithTransition(int x, int y, float seed)
     {
@@ -284,7 +303,6 @@ public class MapPainter : MonoBehaviour
         if (myBiome == 5)
             return PaintSeaRock(x, y, seed);
 
-        // Beach overrides transition
         float beachD = beachDistMap[x, y];
         if (beachD >= 0f)
         {
@@ -294,15 +312,12 @@ public class MapPainter : MonoBehaviour
             return Color.Lerp(beachColor, regionColor, blendT);
         }
 
-        // No border nearby or no other biome known — pure biome color
         if (d >= 1f || otherBiome == 0)
             return GetBiomeColor(myBiome, x, y, seed);
 
-        // ONE-SIDED: higher biome ID stays pure
         if (myBiome > otherBiome)
             return GetBiomeColor(myBiome, x, y, seed);
 
-        // Lower biome ID handles the full gradient toward the other biome
         float warp  = Perlin(x, y, seed + 3000f, 0.05f) * 0.4f - 0.2f;
         float t     = Mathf.Clamp01(d + warp);
         float chaos = Perlin(x, y, seed + 4000f, 0.09f) * 0.3f - 0.15f;
@@ -490,7 +505,7 @@ public class MapPainter : MonoBehaviour
         Sprite sprite = Sprite.Create(tex,
             new Rect(0, 0, mapGenerator.width, mapGenerator.height),
             new Vector2(0.5f, 0.5f), 100f);
-        mapRenderer.sprite = sprite;
+        mapRenderer.sprite  = sprite;
         mapRenderer.enabled = true;
     }
 }

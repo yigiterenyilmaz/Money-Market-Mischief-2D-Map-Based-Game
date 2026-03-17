@@ -402,6 +402,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 5718375045061896029, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1710072575}
+    - targetCorrespondingSourceObject: {fileID: 5718375045061896029, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1710072577}
+    - targetCorrespondingSourceObject: {fileID: 5718375045061896029, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1710072576}
   m_SourcePrefab: {fileID: 100100000, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
 --- !u!1001 &102576865
 PrefabInstance:
@@ -10335,6 +10341,7 @@ MonoBehaviour:
   discoveredLight: {r: 0.58, g: 0.45, b: 0.28, a: 1}
   petroleumColor: {r: 0.02, g: 0.02, b: 0.02, a: 1}
   undergroundWater: {r: 0.06, g: 0.08, b: 0.14, a: 1}
+  faultLineColor: {r: 0.55, g: 0.18, b: 0.1, a: 1}
   undergroundNoiseScale: 0.04
   blendSolidCore: 0.7
   undergroundFogColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
@@ -10449,21 +10456,61 @@ MonoBehaviour:
   carScale: 0.301
   carScaleVariation: 0.094
   carColors:
-  - color: {r: 0.7433963, g: 0.7433963, b: 0.7433963, a: 1}
+  - color: {r: 0.5924529, g: 0.5924529, b: 0.5924529, a: 1}
     spawnWeight: 1
   - color: {r: 0.17735851, g: 0.17501603, b: 0.17501603, a: 1}
     spawnWeight: 1
-  - color: {r: 0.5169811, g: 0, b: 0, a: 1}
+  - color: {r: 0.4037736, g: 0, b: 0, a: 1}
     spawnWeight: 0.83
   - color: {r: 1, g: 1, b: 1, a: 1}
     spawnWeight: 1
-  - color: {r: 0.062746845, g: 0, b: 0.5396226, a: 1}
+  - color: {r: 0.042439155, g: 0, b: 0.3660378, a: 1}
     spawnWeight: 0.6
-  baseSpeed: 0.23
+  baseSpeed: 0.1
   speedVariation: 0.219
   directionLookahead: 10
   directionSmoothSpeed: 17.3
   flipRotationSpeed: 94
+--- !u!114 &1710072576
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 744350989}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64659a7c60c2d5c4fa80d4e2e23bd7d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FaultLineGenerator
+  mapGenerator: {fileID: 1710072556}
+  faultLineCount: 2
+  faultSteps: 393
+  faultWidth: 2
+  jitterStrength: 0.315
+  kinkChance: 0.091
+  kinkAngle: 0.914
+  branchChance: 0.0178
+  branchSteps: 81
+  maxBranchDepth: 2
+  showFaultLinesAlways: 1
+--- !u!114 &1710072577
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 744350989}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 976965809f65692408885736ff67d21f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EarthquakeSystem
+  mapGenerator: {fileID: 1710072556}
+  mapPainter: {fileID: 1710072559}
+  mapDecorPlacer: {fileID: 1710072562}
+  baseEarthquakeProbability: 0.5
+  surfaceCrackColor: {r: 0.1, g: 0.07, b: 0.05, a: 1}
 --- !u!1 &1711406226
 GameObject:
   m_ObjectHideFlags: 0
