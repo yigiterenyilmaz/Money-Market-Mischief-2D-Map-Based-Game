@@ -35,7 +35,8 @@ public class WarForOilEventEditor : Editor
             "useTypewriterEffect",
             "hasPrecursorEvent", "precursorEventType", "precursorWarEvent", "precursorRandomEvent",
             "chainRole", "blocksSubChainBranching", "alsoBlockedBranchEvents",
-            "minWarTime", "maxWarTime"
+            "minWarTime", "maxWarTime",
+            "conditionalDescriptions"
         };
         if (serializedObject.FindProperty("useTypewriterEffect").boolValue)
             excludeList.Add("displayName");
@@ -85,6 +86,16 @@ public class WarForOilEventEditor : Editor
                 serializedObject.FindProperty("narrative"),
                 new GUIContent("Narrative"));
             EditorGUI.indentLevel--;
+        }
+
+        //koşullu açıklamalar — hikaye bayrağına göre farklı açıklama
+        SerializedProperty condDescs = serializedObject.FindProperty("conditionalDescriptions");
+        EditorGUILayout.PropertyField(condDescs, new GUIContent("Koşullu Açıklamalar"), true);
+        if (condDescs.arraySize > 0)
+        {
+            EditorGUILayout.HelpBox(
+                "Hikaye bayrağı aktifse event açıklaması alternatif metinle değiştirilir. İlk eşleşen bayrak geçerli olur.",
+                MessageType.Info);
         }
 
         EditorGUILayout.Space();
@@ -628,42 +639,34 @@ public class WarForOilEventEditor : Editor
                 EditorGUI.indentLevel++;
                 EditorGUILayout.Slider(
                     choice.FindPropertyRelative("immediateEventDelay"),
-                    0f, 5f, new GUIContent("Gecikme (sn)"));
-                SerializedProperty pool = choice.FindPropertyRelative("immediateEventPool");
-                for (int ei = 0; ei < pool.arraySize; ei++)
+                    0f, 10f, new GUIContent("Gecikme (sn)"));
+
+                SerializedProperty isTiered = choice.FindPropertyRelative("immediateEventIsTiered");
+                EditorGUILayout.PropertyField(isTiered, new GUIContent("Kadın Obsesyon Tier'ına Göre"));
+
+                if (isTiered.boolValue)
                 {
-                    SerializedProperty entry = pool.GetArrayElementAtIndex(ei);
                     EditorGUILayout.PropertyField(
-                        entry.FindPropertyRelative("targetEvent"),
-                        new GUIContent($"Event {ei + 1}"));
-                    EditorGUILayout.BeginHorizontal();
+                        choice.FindPropertyRelative("immediateEventTier1"),
+                        new GUIContent("Low Obsesyon Event"));
                     EditorGUILayout.PropertyField(
-                        entry.FindPropertyRelative("weight"),
-                        new GUIContent("  Ağırlık"));
-                    if (GUILayout.Button("-", EditorStyles.miniButtonRight, GUILayout.Width(22)))
-                    {
-                        pool.DeleteArrayElementAtIndex(ei);
-                        break;
-                    }
-                    EditorGUILayout.EndHorizontal();
-                    if (ei < pool.arraySize - 1)
-                        EditorGUILayout.Space(2);
+                        choice.FindPropertyRelative("immediateEventTier2"),
+                        new GUIContent("Mid Obsesyon Event"));
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("immediateEventTier3"),
+                        new GUIContent("High Obsesyon Event"));
                 }
-                //toplam yüzde hesapla
-                float totalWeight = 0f;
-                for (int ei2 = 0; ei2 < pool.arraySize; ei2++)
-                    totalWeight += pool.GetArrayElementAtIndex(ei2).FindPropertyRelative("weight").floatValue;
-                if (pool.arraySize > 0)
+                else
                 {
-                    if (Mathf.Abs(totalWeight - 100f) > 0.1f)
-                        EditorGUILayout.HelpBox($"Toplam: %{totalWeight:F0} (100 olmalı!)", MessageType.Warning);
-                    else
-                        EditorGUILayout.HelpBox($"Toplam: %{totalWeight:F0}", MessageType.Info);
+                    DrawImmediateEventPool(choice.FindPropertyRelative("immediateEventPool"));
                 }
-                if (GUILayout.Button("+ Event Ekle"))
-                    pool.InsertArrayElementAtIndex(pool.arraySize);
                 EditorGUI.indentLevel--;
             }
+
+            //hikaye bayrakları — bu choice seçildiğinde aktif edilen bayraklar
+            EditorGUILayout.PropertyField(
+                choice.FindPropertyRelative("setsStoryFlags"),
+                new GUIContent("Hikaye Bayrakları"), true);
 
             EditorGUI.indentLevel--;
         }
@@ -815,7 +818,7 @@ public class WarForOilEventEditor : Editor
                     {
                         EditorGUILayout.Slider(
                             branch.FindPropertyRelative("immediateEventDelay"),
-                            0f, 5f, new GUIContent("Gecikme (sn)"));
+                            0f, 10f, new GUIContent("Gecikme (sn)"));
                     }
                     EditorGUI.indentLevel--;
                     EditorGUILayout.Space(2);
@@ -1088,6 +1091,42 @@ public class WarForOilEventEditor : Editor
         return false;
     }
 
+    private void DrawImmediateEventPool(SerializedProperty pool)
+    {
+        for (int ei = 0; ei < pool.arraySize; ei++)
+        {
+            SerializedProperty entry = pool.GetArrayElementAtIndex(ei);
+            EditorGUILayout.PropertyField(
+                entry.FindPropertyRelative("targetEvent"),
+                new GUIContent($"Event {ei + 1}"));
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.PropertyField(
+                entry.FindPropertyRelative("weight"),
+                new GUIContent("  Ağırlık"));
+            if (GUILayout.Button("-", EditorStyles.miniButtonRight, GUILayout.Width(22)))
+            {
+                pool.DeleteArrayElementAtIndex(ei);
+                break;
+            }
+            EditorGUILayout.EndHorizontal();
+            if (ei < pool.arraySize - 1)
+                EditorGUILayout.Space(2);
+        }
+        //toplam yüzde hesapla
+        float totalWeight = 0f;
+        for (int ei2 = 0; ei2 < pool.arraySize; ei2++)
+            totalWeight += pool.GetArrayElementAtIndex(ei2).FindPropertyRelative("weight").floatValue;
+        if (pool.arraySize > 0)
+        {
+            if (Mathf.Abs(totalWeight - 100f) > 0.1f)
+                EditorGUILayout.HelpBox($"Toplam: %{totalWeight:F0} (100 olmalı!)", MessageType.Warning);
+            else
+                EditorGUILayout.HelpBox($"Toplam: %{totalWeight:F0}", MessageType.Info);
+        }
+        if (GUILayout.Button("+ Event Ekle"))
+            pool.InsertArrayElementAtIndex(pool.arraySize);
+    }
+
     private void ClearChoice(SerializedProperty choice)
     {
         choice.FindPropertyRelative("displayName").stringValue = "";
@@ -1171,7 +1210,12 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("permanentMultipliers").ClearArray();
         choice.FindPropertyRelative("hasImmediateEvent").boolValue = false;
         choice.FindPropertyRelative("immediateEventDelay").floatValue = 0f;
+        choice.FindPropertyRelative("immediateEventIsTiered").boolValue = false;
         choice.FindPropertyRelative("immediateEventPool").ClearArray();
+        choice.FindPropertyRelative("immediateEventTier1").objectReferenceValue = null;
+        choice.FindPropertyRelative("immediateEventTier2").objectReferenceValue = null;
+        choice.FindPropertyRelative("immediateEventTier3").objectReferenceValue = null;
+        choice.FindPropertyRelative("setsStoryFlags").ClearArray();
         choice.FindPropertyRelative("requiredSkills").ClearArray();
         choice.FindPropertyRelative("statConditions").ClearArray();
     }

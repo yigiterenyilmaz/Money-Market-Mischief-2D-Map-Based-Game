@@ -347,6 +347,10 @@ public class WarForOilManager : MonoBehaviour
             }
         }
 
+        //hikaye bayraklarını aktif et
+        if (choice.setsStoryFlags != null && choice.setsStoryFlags.Count > 0 && StoryFlagManager.Instance != null)
+            StoryFlagManager.Instance.SetFlags(choice.setsStoryFlags);
+
         //supportStat güncelle (kalıcı çarpan uygulanır)
         if (choice.supportModifier != 0f)
             supportStat = Mathf.Clamp(supportStat + choice.supportModifier * supportGainMultiplier, 0f, 100f);
@@ -529,9 +533,32 @@ public class WarForOilManager : MonoBehaviour
         }
 
         //anında event tetikleme — choice'a bağlı havuzdan rastgele biri gösterilir
-        if (choice.hasImmediateEvent && choice.immediateEventPool != null && choice.immediateEventPool.Count > 0)
+        if (choice.hasImmediateEvent)
         {
-            WarForOilEvent picked = PickImmediateEvent(choice.immediateEventPool);
+            WarForOilEvent picked = null;
+
+            //tier bazlı — kadın obsesyon seviyesine göre tek event
+            if (choice.immediateEventIsTiered && WomanProcessManager.Instance != null && WomanProcessManager.Instance.IsActive())
+            {
+                WomanProcessDatabase activeDb = WomanProcessManager.Instance.GetActiveDatabase();
+                if (activeDb != null)
+                {
+                    int tier = activeDb.GetTier(WomanProcessManager.Instance.GetObsession());
+                    switch (tier)
+                    {
+                        case 1: picked = choice.immediateEventTier1; break;
+                        case 2: picked = choice.immediateEventTier2; break;
+                        case 3: picked = choice.immediateEventTier3; break;
+                    }
+                }
+            }
+            else
+            {
+                //normal havuzdan seç
+                picked = (choice.immediateEventPool != null && choice.immediateEventPool.Count > 0)
+                    ? PickImmediateEvent(choice.immediateEventPool)
+                    : null;
+            }
             if (picked != null)
             {
                 if (choice.immediateEventDelay <= 0f)
@@ -842,9 +869,10 @@ public class WarForOilManager : MonoBehaviour
             }
         }
 
-        //event kontrol
+        //event kontrol — zincirdeyken ayrı interval kullanılır
+        float activeInterval = isInChain ? database.chainEventInterval : database.eventInterval;
         eventCheckTimer += Time.deltaTime;
-        if (eventCheckTimer >= database.eventInterval)
+        if (eventCheckTimer >= activeInterval)
         {
             eventCheckTimer = 0f;
 
@@ -854,38 +882,11 @@ public class WarForOilManager : MonoBehaviour
 
             if (isInChain)
             {
-                //3'lü döngü: chain slotları + random slotları
-                if (chainCycleCounter == 0)
-                {
-                    //yeni döngü başlat — 1 veya 2 chain slotu
-                    chainSlotsRemaining = UnityEngine.Random.value < database.chainDoubleChance ? 2 : 1;
-                }
-
-                //sampling without replacement
-                int slotsLeft = 3 - chainCycleCounter;
-                float chainChance = (float)chainSlotsRemaining / slotsLeft;
-
-                if (UnityEngine.Random.value < chainChance
-                    && pendingChainBranches != null && pendingChainBranches.Count > 0)
-                {
-                    //chain slotu
-                    chainSlotsRemaining--;
+                //zincir aktif — sadece chain eventleri gelir
+                if (pendingChainBranches != null && pendingChainBranches.Count > 0)
                     TryTriggerChainSlotEvent();
-                }
                 else
-                {
-                    //random slotu — eventBlockCycles ve globalEventBlockCycles kontrol
-                    if (remainingGlobalBlockCycles > 0)
-                        remainingGlobalBlockCycles--;
-                    else if (remainingBlockCycles > 0)
-                        remainingBlockCycles--;
-                    else
-                        TryTriggerWarEvent();
-                }
-
-                chainCycleCounter++;
-                if (chainCycleCounter >= 3)
-                    chainCycleCounter = 0;
+                    EndChain();
             }
             else
             {
@@ -984,6 +985,7 @@ public class WarForOilManager : MonoBehaviour
         pendingChainThreshold2 = 0f;
         chainCycleCounter = 0;
         chainSlotsRemaining = 0;
+        eventCheckTimer = 0f; //zincir interval'ı hemen başlasın
 
         OnChainStarted?.Invoke();
     }
@@ -1006,6 +1008,7 @@ public class WarForOilManager : MonoBehaviour
         currentEventIsChainEvent = false;
         pendingChainEndWeight = 0f;
         hasActiveChainTickEffect = false;
+        eventCheckTimer = 0f; //normal interval'a geri dön
 
         OnChainEnded?.Invoke();
     }

@@ -490,6 +490,14 @@ public class WomanProcessManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Aktif database'i döner (yönlendirilmiş varsa onu, yoksa ana database'i).
+    /// </summary>
+    public WomanProcessDatabase GetActiveDatabase()
+    {
+        return redirectedDatabase != null ? redirectedDatabase : database;
+    }
+
+    /// <summary>
     /// Kadın obsesyonu kalıcı kazanım çarpanını uygular. Çarpan birikimlidir (mevcut *= yeni).
     /// </summary>
     public void ApplyPermanentObsessionMultiplier(float multiplier)

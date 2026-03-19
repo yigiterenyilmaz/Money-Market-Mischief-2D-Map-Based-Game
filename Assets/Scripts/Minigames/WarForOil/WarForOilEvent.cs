@@ -9,6 +9,9 @@ public class WarForOilEvent : ScriptableObject
     [TextArea(1, 3)] public string displayName;
     [TextArea(2, 8)] public string description;
 
+    [Header("Koşullu Açıklamalar")]
+    public List<ConditionalDescription> conditionalDescriptions; //hikaye bayrağına göre değişen açıklamalar
+
     [Header("Geliştirici Notu")]
     [TextArea(3, 10)] public string devNote; //sadece Inspector'da görünür, oyuna etkisi yok
 
@@ -56,6 +59,25 @@ public class WarForOilEvent : ScriptableObject
     public ChainRole chainRole = ChainRole.None; //bu event zincirde mi (Head = zincir başlatıcı)
     public bool blocksSubChainBranching; //true ise bu event tetiklendikten sonra başka zincirlerden dallanma hedefi olarak seçilemez
     public List<WarForOilEvent> alsoBlockedBranchEvents; //blocksSubChainBranching tetiklenince bu event'ler de dallanma hedefi olarak engellenir
+
+    /// <summary>
+    /// Aktif hikaye bayraklarına göre uygun açıklamayı döner.
+    /// Koşullu açıklama varsa ve flag aktifse alternatif açıklama kullanılır (ilk eşleşen kazanır).
+    /// Yoksa default description döner.
+    /// </summary>
+    public string GetDescription()
+    {
+        if (conditionalDescriptions != null && conditionalDescriptions.Count > 0 && StoryFlagManager.Instance != null)
+        {
+            for (int i = 0; i < conditionalDescriptions.Count; i++)
+            {
+                var cd = conditionalDescriptions[i];
+                if (cd.requiredFlag != StoryFlag.None && StoryFlagManager.Instance.HasFlag(cd.requiredFlag))
+                    return cd.alternativeDescription;
+            }
+        }
+        return description;
+    }
 
     /// <summary>
     /// Şu an seçilebilir olan choice'ların listesini döner.
@@ -181,8 +203,15 @@ public class WarForOilEventChoice
 
     //anında tetiklenen event — choice seçildiğinde havuzdan biri gösterilir
     public bool hasImmediateEvent; //true ise seçildiğinde bir event tetiklenir
-    [Range(0f, 5f)] public float immediateEventDelay; //tetikleme gecikmesi (0 = anında, saniye cinsinden)
-    public List<ImmediateEventEntry> immediateEventPool; //ağırlıklı event havuzu — birinden biri rastgele seçilir
+    [Range(0f, 10f)] public float immediateEventDelay; //tetikleme gecikmesi (0 = anında, saniye cinsinden)
+    public bool immediateEventIsTiered; //true ise kadın obsesyon tier'ına göre farklı event seçilir
+    public List<ImmediateEventEntry> immediateEventPool; //ağırlıklı event havuzu (tier'sız mod)
+    public WarForOilEvent immediateEventTier1; //low obsesyon → bu event gelir
+    public WarForOilEvent immediateEventTier2; //mid obsesyon → bu event gelir
+    public WarForOilEvent immediateEventTier3; //high obsesyon → bu event gelir
+
+    //hikaye bayrakları — bu choice seçildiğinde aktif edilen bayraklar
+    public List<StoryFlag> setsStoryFlags;
 
     //ön koşullar (Editor tarafından foldout içinde çizilir)
     public List<Skill> requiredSkills; //bu seçenek için açılmış olması gereken skill'ler
@@ -259,7 +288,7 @@ public class ChainBranch
     [Range(0f, 1f)] public float weightRange2; //aralık 2 ağırlığı
     [Range(0f, 1f)] public float weightRange3; //aralık 3 ağırlığı
     public bool triggersAsImmediateEvent; //true ise zincir devamı yerine anında event olarak tetiklenir (zincir biter)
-    [Range(0f, 5f)] public float immediateEventDelay; //anında event gecikmesi (0 = anında, saniye cinsinden)
+    [Range(0f, 10f)] public float immediateEventDelay; //anında event gecikmesi (0 = anında, saniye cinsinden)
 }
 
 /// <summary>
@@ -340,4 +369,14 @@ public class ImmediateEventEntry
 {
     public WarForOilEvent targetEvent; //tetiklenecek event
     [Range(0f, 100f)] public float weight = 50f; //seçilme yüzdesi (tüm girişlerin toplamı %100 olmalı)
+}
+
+/// <summary>
+/// Koşullu açıklama girişi. Hikaye bayrağı aktifse default açıklama yerine alternatif gösterilir.
+/// </summary>
+[System.Serializable]
+public class ConditionalDescription
+{
+    public StoryFlag requiredFlag; //bu bayrak aktifse alternatif açıklama kullanılır
+    [TextArea(2, 8)] public string alternativeDescription; //bayrak aktifken gösterilecek açıklama
 }

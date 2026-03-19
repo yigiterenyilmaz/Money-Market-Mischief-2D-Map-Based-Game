@@ -188,6 +188,7 @@ Savas sirasinda tetiklenen karar olaylari. Ayni event sinifi normal eventler, zi
 | `displayName` | Event basligi |
 | `description` | Event aciklamasi (TextArea) |
 | `devNote` | Sadece Inspector'da gorunen gelistirici notu (oyuna etkisi yok) |
+| `conditionalDescriptions` | Hikaye bayragi aktifse default aciklama yerine alternatif metin gosterilir. Ilk eslesen bayrak gecerli olur. |
 | `minWarTime` | Savas suresinin yuzdesi olarak en erken tetiklenme (0-1, orn. 0.2 = %20, 300sn savasta 60sn) |
 | `maxWarTime` | Savas suresinin yuzdesi olarak en gec tetiklenme (-1 = sinirsiz, 0-1 arasi yuzde) |
 | `decisionTime` | Karar suresi (varsayilan 10 sn) |
@@ -260,6 +261,7 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `eventBlockCycles` | Gecici event engeli — bu kadar event donemi boyunca event gelmez (0-10, 0=etkisiz) |
 | `blocksCeasefire` | Secilirse savas sonuna kadar oyuncunun ateskes butonu engellenir |
 | `blocksEventGroup` | Secilirse bu event'in ait oldugu gruptaki (OFPC/WTETWC) tum eventler bir daha tetiklenmez |
+| `setsStoryFlags` | Bu choice secildiginde aktif edilen hikaye bayraklari (List&lt;StoryFlag&gt;). Kalici — bir kez aktif edildikten sonra oyun boyunca gecerli. |
 | `hasImmediateEvent` | Secildiginde hic beklemeden havuzdan rastgele bir event tetiklenir (WarProcess'e donmeden) |
 | `immediateEventPool` | Agirlikli event havuzu (List&lt;ImmediateEventEntry&gt;). Her giris: targetEvent + weight. Agirliga gore rastgele secilir |
 | `hasProbabilisticWarEnd` | Olasilik bazli savas bitirme (3 sonuc: savas biter / event yok olur / tekrar tetiklenir) |
@@ -1195,3 +1197,25 @@ Assets/Scripts/Minigames/WarForOil/
 │   └── WarForOilEventEditor.cs — Inspector custom editor
 └── warforoil-readme.md         — bu dosya
 ```
+
+---
+
+## Hikaye Bayraklari Sistemi (StoryFlag)
+
+Oyun icinde gerceklesmis onemli olaylari takip eden bayrak sistemi. Bir kez aktif edilen bayrak oyun boyunca kalicidir.
+
+### Dosyalar
+
+- `Assets/Scripts/Core/Enums/StoryFlag.cs` — enum tanimi (tum bayraklar burada)
+- `Assets/Scripts/Core/StoryFlagManager.cs` — singleton manager (HashSet ile takip)
+
+### Kullanim
+
+**Bayrak aktif etme (choice tarafinda):**
+- `WarForOilEventChoice.setsStoryFlags` — bu choice secildiginde listedeki bayraklar aktif olur
+- Inspector'da "Diger Sonuclar" foldout'unda "Hikaye Bayraklari" olarak gozukur
+
+**Aciklama degistirme (event tarafinda):**
+- `WarForOilEvent.conditionalDescriptions` — hikaye bayragi aktifse default aciklama yerine alternatif metin gosterilir
+- `GetDescription()` metodu ile alinir — ilk eslesen bayrak gecerli olur
+- Inspector'da "Kosullu Aciklamalar" olarak gozukur
