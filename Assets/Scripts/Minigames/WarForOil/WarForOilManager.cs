@@ -1193,9 +1193,8 @@ public class WarForOilManager : MonoBehaviour
 
         if (isImmediate)
         {
-            //anında event olarak tetikle — zincir biter, event non-chain olarak gösterilir
-            EndChain();
-            currentEventIsChainEvent = false;
+            //anında event olarak tetikle — zincir devam ediyor, sadece hemen gösterilecek
+            currentEventIsChainEvent = true; //zincirin parçası olmaya devam ediyor
 
             if (immDelay > 0f)
             {
