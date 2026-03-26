@@ -42,18 +42,16 @@ public class MapDecorPlacer : MonoBehaviour
     // =========================================================================
 
     [Header("Port Settings")]
-    [Tooltip("Maximum number of ports to spawn on city shorelines.")]
-    [Range(0, 8)] public int maxPortCount = 2;
     [Tooltip("Port day sprites. Each index is a port variant.")]
     public List<Sprite> portSpritesDay = new List<Sprite>();
     [Tooltip("Port night sprites. Index-matched to portSpritesDay.")]
     public List<Sprite> portSpritesNight = new List<Sprite>();
     [Tooltip("Scale applied to port sprites.")]
     public Vector2 portScaleRange = new Vector2(0.9f, 1.2f);
-    [Tooltip("Minimum tiles of city biome surrounding a port candidate.")]
-    [Range(1, 10)] public int portCityBackingRadius = 3;
-    [Tooltip("Minimum distance in tiles between two ports.")]
-    [Range(10, 80)] public int portMinSeparation = 30;
+    [Tooltip("Minimum tiles of region biome surrounding a port candidate.")]
+    [Range(1, 10)] public int portRegionBackingRadius = 3;
+    [Tooltip("Minimum straight-line (Euclidean) distance in tiles between the two ports.")]
+    [Range(10, 200)] public int portMinSeparation = 60;
 
     // =========================================================================
     // SHIP SETTINGS
@@ -75,9 +73,17 @@ public class MapDecorPlacer : MonoBehaviour
     [Tooltip("Seconds between ship spawn attempts.")]
     [Range(1f, 30f)] public float shipSpawnInterval = 5f;
     [Tooltip("How many tiles to downsample the pathfinding grid. Higher = faster but coarser.")]
-    [Range(2, 16)] public int shipPathGridStep = 4;
+    [Range(2, 16)] public int shipPathGridStep = 3;
     [Tooltip("Minimum clearance in tiles from land for ship waypoints.")]
-    [Range(1, 10)] public int shipLandClearance = 3;
+    [Range(3, 50)] public int shipLandClearance = 20;
+    [Tooltip("Minimum corridor width in nav cells. Cells without this many open neighbors in each axis are blocked. Prevents squeezing through narrow straits.")]
+    [Range(1, 7)] public int shipMinCorridorWidth = 3;
+    [Tooltip("How strongly ships prefer routes far from shore. 0 = no preference, 5 = strongly avoids coast.")]
+    [Range(0f, 5f)] public float shipShoreAvoidanceWeight = 2.5f;
+    [Tooltip("How fast ships turn toward their heading (degrees/sec). Lower = smoother, more graceful turns.")]
+    [Range(15f, 360f)] public float shipTurnSpeed = 45f;
+    [Tooltip("Chaikin corner-cutting passes applied to the path. More = rounder curves. 0 = raw A* path.")]
+    [Range(0, 6)] public int shipPathSmoothingPasses = 3;
 
     // -------------------------------------------------------------------------
 
@@ -113,11 +119,13 @@ public class MapDecorPlacer : MonoBehaviour
         public float          baseAlpha;
         public float          scale;
         public ShipState      state;
-        public List<Vector3>  path;
+        public List<Vector3>  path;         // Catmull-Rom smoothed path points
         public int            pathIndex;
+        public float          segmentT;     // 0–1 interpolation within current segment
         public float          waitTimer;
-        public int            portIndex;     // which port this ship targets
+        public int            portIndex;
         public float          speed;
+        public float          currentAngle; // current facing angle (degrees), smoothly lerped
     }
 
     private List<GameObject>   decorObjects    = new List<GameObject>();
@@ -139,6 +147,7 @@ public class MapDecorPlacer : MonoBehaviour
 
     // Downsampled water navigation grid for pathfinding
     private bool[,] navGrid;       // true = navigable water
+    private int[,]  navLandDist;   // per-cell minimum land distance (for cost biasing)
     private int     navW, navH;    // dimensions of the nav grid
 
     // -------------------------------------------------------------------------
@@ -618,114 +627,227 @@ public class MapDecorPlacer : MonoBehaviour
     /// </summary>
     void PlacePorts(MapGenerator map, float halfW, float halfH)
     {
-        if (maxPortCount <= 0) return;
         if (portSpritesDay == null || portSpritesDay.Count == 0) return;
 
-        // 1. Collect all city shore tiles (city biome tiles adjacent to water)
-        List<Vector2Int> cityShore = new List<Vector2Int>();
-        int edgeMargin = 8; // tiles from map edge considered "edge of island"
+        // 0. Build ocean mask: flood-fill from map edges through water tiles.
+        bool[,] isOcean = BuildOceanMask(map);
 
-        for (int x = 0; x < map.width; x++)
-        for (int y = 0; y < map.height; y++)
+        // 1. Collect ocean-shore candidates per biome, in priority order:
+        //    Cities (2) → Industrial (3) → Urban (4) → Agricultural (1)
+        int[] biomePriority = { 2, 3, 4, 1 };
+        int edgeMargin = 8;
+
+        var candidatesByBiome = new Dictionary<int, List<Vector2Int>>();
+        foreach (int b in biomePriority)
+            candidatesByBiome[b] = new List<Vector2Int>();
+
+        for (int x = edgeMargin; x < map.width - edgeMargin; x++)
+        for (int y = edgeMargin; y < map.height - edgeMargin; y++)
         {
             if (!map.IsLand(x, y)) continue;
-            if (map.GetBiome(x, y) != 2) continue;
             if (map.GetFog(x, y) > 0.4f) continue;
 
-            // Skip tiles too close to map edges
-            if (x < edgeMargin || x >= map.width - edgeMargin ||
-                y < edgeMargin || y >= map.height - edgeMargin)
-                continue;
+            int biome = map.GetBiome(x, y);
+            if (!candidatesByBiome.ContainsKey(biome)) continue;
 
-            // Must be adjacent to water (4-connected)
-            if (!IsAdjacentToWater(map, x, y)) continue;
+            // Must be adjacent to ocean
+            if (!IsAdjacentToOcean(map, x, y, isOcean)) continue;
 
-            // Must have enough city backing inland
-            if (!HasCityBacking(map, x, y)) continue;
+            // Must have enough backing of same biome inland
+            if (!HasRegionBacking(map, x, y, biome)) continue;
 
-            cityShore.Add(new Vector2Int(x, y));
+            candidatesByBiome[biome].Add(new Vector2Int(x, y));
         }
 
-        if (cityShore.Count == 0)
+        // 2. Try to place both ports in the highest-priority biome that works.
+        //    "Works" = we can find 2 candidates with portMinSeparation Euclidean distance.
+        //    If a biome can't satisfy both, fall through to the next.
+        List<Vector2Int> portTiles = null;
+
+        foreach (int biome in biomePriority)
         {
-            Debug.Log("MapDecorPlacer: No valid city shoreline for ports.");
+            var candidates = candidatesByBiome[biome];
+            if (candidates.Count < 2) continue;
+
+            portTiles = TryPickTwoPorts(candidates);
+            if (portTiles != null)
+            {
+                Debug.Log($"MapDecorPlacer: Both ports placed in biome {biome}.");
+                break;
+            }
+        }
+
+        // 3. If no single biome could hold both, try mixed: place first in highest
+        //    priority available, second in next available biome that satisfies distance.
+        if (portTiles == null)
+        {
+            portTiles = TryPickTwoPortsMixed(candidatesByBiome, biomePriority);
+            if (portTiles != null)
+                Debug.Log("MapDecorPlacer: Ports placed across different biomes.");
+        }
+
+        if (portTiles == null || portTiles.Count < 2)
+        {
+            Debug.Log("MapDecorPlacer: Could not place 2 ports with required separation.");
             return;
         }
 
-        // 2. Shuffle and greedily pick port sites with minimum separation
-        ShuffleList(cityShore);
-        List<Vector2Int> portTiles = new List<Vector2Int>();
-
-        foreach (var tile in cityShore)
-        {
-            if (portTiles.Count >= maxPortCount) break;
-
-            bool tooClose = false;
-            foreach (var existing in portTiles)
-            {
-                int dx = tile.x - existing.x, dy = tile.y - existing.y;
-                if (dx * dx + dy * dy < portMinSeparation * portMinSeparation)
-                { tooClose = true; break; }
-            }
-            if (tooClose) continue;
-
-            portTiles.Add(tile);
-        }
-
-        // 3. Instantiate port GameObjects
+        // 4. Instantiate the 2 port GameObjects
         foreach (var tile in portTiles)
+            InstantiatePort(tile, halfW, halfH);
+
+        Debug.Log($"MapDecorPlacer: Placed {ports.Count} port(s), separation={TileDistance(portTiles[0], portTiles[1]):F0} tiles.");
+    }
+
+    /// <summary>
+    /// Tries to pick 2 candidates from a single list with at least portMinSeparation Euclidean distance.
+    /// Shuffles and greedily searches.
+    /// </summary>
+    List<Vector2Int> TryPickTwoPorts(List<Vector2Int> candidates)
+    {
+        ShuffleList(candidates);
+
+        // Try each candidate as first port, find a second that's far enough
+        for (int i = 0; i < Mathf.Min(candidates.Count, 80); i++)
         {
-            int spriteIdx = Random.Range(0, portSpritesDay.Count);
-            Sprite daySprite = portSpritesDay[spriteIdx];
-            if (daySprite == null) continue;
-
-            float wx = transform.position.x + (tile.x / pixelsPerUnit) - halfW;
-            float wy = transform.position.y + (tile.y / pixelsPerUnit) - halfH;
-
-            float scale   = Random.Range(portScaleRange.x, portScaleRange.y);
-            float baseA   = Random.Range(0.9f, 1f);
-            int sortOrder = 12 + (int)(wy * -100f);
-
-            GameObject go = new GameObject("Port");
-            go.transform.SetParent(transform);
-            go.transform.position   = new Vector3(wx, wy, spriteZ);
-            go.transform.localScale = new Vector3(scale, scale, 1f);
-
-            SpriteRenderer daySR = go.AddComponent<SpriteRenderer>();
-            daySR.sprite       = daySprite;
-            daySR.sortingOrder = sortOrder;
-            daySR.color        = new Color(1f, 1f, 1f, baseA);
-
-            SpriteRenderer nightSR = null;
-            if (portSpritesNight != null && spriteIdx < portSpritesNight.Count &&
-                portSpritesNight[spriteIdx] != null)
+            Vector2Int first = candidates[i];
+            for (int j = i + 1; j < candidates.Count; j++)
             {
-                GameObject nightGo = new GameObject("PortNight");
-                nightGo.transform.SetParent(go.transform, false);
-                nightGo.transform.localPosition = Vector3.zero;
-                nightGo.transform.localScale    = Vector3.one;
-                nightGo.transform.localRotation = Quaternion.identity;
-
-                nightSR              = nightGo.AddComponent<SpriteRenderer>();
-                nightSR.sprite       = portSpritesNight[spriteIdx];
-                nightSR.sortingOrder = sortOrder + 1;
-                nightSR.color        = new Color(1f, 1f, 1f, 0f);
+                if (TileDistance(first, candidates[j]) >= portMinSeparation)
+                    return new List<Vector2Int> { first, candidates[j] };
             }
+        }
+        return null;
+    }
 
-            decorObjects.Add(go);
-            ports.Add(new PortData
+    /// <summary>
+    /// Picks first port from highest-priority biome, second from any other biome
+    /// that satisfies the distance constraint.
+    /// </summary>
+    List<Vector2Int> TryPickTwoPortsMixed(Dictionary<int, List<Vector2Int>> candidatesByBiome, int[] biomePriority)
+    {
+        // Pick first port from highest priority biome that has candidates
+        Vector2Int first = Vector2Int.zero;
+        bool foundFirst = false;
+
+        foreach (int biome in biomePriority)
+        {
+            var list = candidatesByBiome[biome];
+            if (list.Count > 0)
             {
-                go           = go,
-                dayRenderer  = daySR,
-                nightRenderer = nightSR,
-                tileX        = tile.x,
-                tileY        = tile.y,
-                baseAlpha    = baseA,
-                worldPos     = new Vector3(wx, wy, spriteZ)
-            });
+                first = list[Random.Range(0, list.Count)];
+                foundFirst = true;
+                break;
+            }
         }
 
-        Debug.Log($"MapDecorPlacer: Placed {ports.Count} port(s).");
+        if (!foundFirst) return null;
+
+        // Pick second from any biome (in priority order) that satisfies distance
+        foreach (int biome in biomePriority)
+        {
+            var list = candidatesByBiome[biome];
+            ShuffleList(list);
+            foreach (var candidate in list)
+            {
+                if (TileDistance(first, candidate) >= portMinSeparation)
+                    return new List<Vector2Int> { first, candidate };
+            }
+        }
+
+        return null;
+    }
+
+    float TileDistance(Vector2Int a, Vector2Int b)
+    {
+        float dx = a.x - b.x, dy = a.y - b.y;
+        return Mathf.Sqrt(dx * dx + dy * dy);
+    }
+
+    void InstantiatePort(Vector2Int tile, float halfW, float halfH)
+    {
+        int spriteIdx = Random.Range(0, portSpritesDay.Count);
+        Sprite daySprite = portSpritesDay[spriteIdx];
+        if (daySprite == null) return;
+
+        float wx = transform.position.x + (tile.x / pixelsPerUnit) - halfW;
+        float wy = transform.position.y + (tile.y / pixelsPerUnit) - halfH;
+
+        float scale   = Random.Range(portScaleRange.x, portScaleRange.y);
+        float baseA   = Random.Range(0.9f, 1f);
+        int sortOrder = 12 + (int)(wy * -100f);
+
+        GameObject go = new GameObject("Port");
+        go.transform.SetParent(transform);
+        go.transform.position   = new Vector3(wx, wy, spriteZ);
+        go.transform.localScale = new Vector3(scale, scale, 1f);
+
+        SpriteRenderer daySR = go.AddComponent<SpriteRenderer>();
+        daySR.sprite       = daySprite;
+        daySR.sortingOrder = sortOrder;
+        daySR.color        = new Color(1f, 1f, 1f, baseA);
+
+        SpriteRenderer nightSR = null;
+        if (portSpritesNight != null && spriteIdx < portSpritesNight.Count &&
+            portSpritesNight[spriteIdx] != null)
+        {
+            GameObject nightGo = new GameObject("PortNight");
+            nightGo.transform.SetParent(go.transform, false);
+            nightGo.transform.localPosition = Vector3.zero;
+            nightGo.transform.localScale    = Vector3.one;
+            nightGo.transform.localRotation = Quaternion.identity;
+
+            nightSR              = nightGo.AddComponent<SpriteRenderer>();
+            nightSR.sprite       = portSpritesNight[spriteIdx];
+            nightSR.sortingOrder = sortOrder + 1;
+            nightSR.color        = new Color(1f, 1f, 1f, 0f);
+        }
+
+        decorObjects.Add(go);
+        ports.Add(new PortData
+        {
+            go           = go,
+            dayRenderer  = daySR,
+            nightRenderer = nightSR,
+            tileX        = tile.x,
+            tileY        = tile.y,
+            baseAlpha    = baseA,
+            worldPos     = new Vector3(wx, wy, spriteZ)
+        });
+    }
+
+    bool[,] BuildOceanMask(MapGenerator map)
+    {
+        bool[,] isOcean = new bool[map.width, map.height];
+        Queue<Vector2Int> oceanQueue = new Queue<Vector2Int>();
+
+        for (int x = 0; x < map.width; x++)
+        {
+            if (!map.IsLand(x, 0))              { isOcean[x, 0] = true;              oceanQueue.Enqueue(new Vector2Int(x, 0)); }
+            if (!map.IsLand(x, map.height - 1)) { isOcean[x, map.height - 1] = true; oceanQueue.Enqueue(new Vector2Int(x, map.height - 1)); }
+        }
+        for (int y = 1; y < map.height - 1; y++)
+        {
+            if (!map.IsLand(0, y))              { isOcean[0, y] = true;              oceanQueue.Enqueue(new Vector2Int(0, y)); }
+            if (!map.IsLand(map.width - 1, y))  { isOcean[map.width - 1, y] = true; oceanQueue.Enqueue(new Vector2Int(map.width - 1, y)); }
+        }
+
+        int[] odx = { 1, -1, 0, 0 };
+        int[] ody = { 0, 0, 1, -1 };
+        while (oceanQueue.Count > 0)
+        {
+            var pos = oceanQueue.Dequeue();
+            for (int i = 0; i < 4; i++)
+            {
+                int nx = pos.x + odx[i], ny = pos.y + ody[i];
+                if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
+                if (isOcean[nx, ny] || map.IsLand(nx, ny)) continue;
+                isOcean[nx, ny] = true;
+                oceanQueue.Enqueue(new Vector2Int(nx, ny));
+            }
+        }
+
+        return isOcean;
     }
 
     bool IsAdjacentToWater(MapGenerator map, int x, int y)
@@ -735,28 +857,43 @@ public class MapDecorPlacer : MonoBehaviour
     }
 
     /// <summary>
-    /// Checks that behind this shore tile there are enough city-biome tiles,
-    /// ensuring the port isn't on a thin sliver of city coast.
+    /// True if at least one 4-connected neighbor is ocean water (not an inland lake).
     /// </summary>
-    bool HasCityBacking(MapGenerator map, int x, int y)
+    bool IsAdjacentToOcean(MapGenerator map, int x, int y, bool[,] isOcean)
+    {
+        int[] dx4 = { 1, -1, 0, 0 };
+        int[] dy4 = { 0, 0, 1, -1 };
+        for (int i = 0; i < 4; i++)
+        {
+            int nx = x + dx4[i], ny = y + dy4[i];
+            if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
+            if (!map.IsLand(nx, ny) && isOcean[nx, ny]) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Checks that behind this shore tile there are enough tiles of the given biome,
+    /// ensuring the port isn't on a thin sliver of coast.
+    /// </summary>
+    bool HasRegionBacking(MapGenerator map, int x, int y, int biome)
     {
         int count = 0;
-        int r = portCityBackingRadius;
+        int r = portRegionBackingRadius;
         for (int dx = -r; dx <= r; dx++)
         for (int dy = -r; dy <= r; dy++)
         {
             if (dx * dx + dy * dy > r * r) continue;
             int nx = x + dx, ny = y + dy;
             if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
-            if (map.IsLand(nx, ny) && map.GetBiome(nx, ny) == 2) count++;
+            if (map.IsLand(nx, ny) && map.GetBiome(nx, ny) == biome) count++;
         }
-        // Require at least 60% of the circle to be city
         int totalInCircle = 0;
         for (int dx = -r; dx <= r; dx++)
         for (int dy = -r; dy <= r; dy++)
             if (dx * dx + dy * dy <= r * r) totalInCircle++;
 
-        return count >= totalInCircle * 0.6f;
+        return count >= totalInCircle * 0.5f;
     }
 
     // =========================================================================
@@ -766,8 +903,10 @@ public class MapDecorPlacer : MonoBehaviour
     /// <summary>
     /// Builds a coarse navigation grid for A* pathfinding.
     /// Each nav cell is shipPathGridStep × shipPathGridStep tiles.
-    /// A cell is navigable only if ALL tiles in it are water AND at least
-    /// shipLandClearance tiles from any land.
+    /// A cell is navigable only if EVERY tile in the cell is water AND
+    /// every tile has at least shipLandClearance distance from any land.
+    /// Also stores per-cell minimum land distance for A* cost biasing
+    /// so ships strongly prefer routes that keep well away from shore.
     /// </summary>
     void BuildNavGrid(MapGenerator map)
     {
@@ -775,10 +914,10 @@ public class MapDecorPlacer : MonoBehaviour
         navW = Mathf.CeilToInt((float)map.width / step);
         navH = Mathf.CeilToInt((float)map.height / step);
         navGrid = new bool[navW, navH];
+        navLandDist = new int[navW, navH]; // minimum land distance in each cell
 
-        // First build a land distance field (BFS from land outward)
-        // We reuse a lightweight version — only need distances up to shipLandClearance + step
-        int maxDist = shipLandClearance + step + 1;
+        // Build full-resolution land distance field via BFS
+        int maxBfsDist = shipLandClearance * 3 + step; // propagate well beyond clearance for cost biasing
         int[,] landDist = new int[map.width, map.height];
         Queue<Vector2Int> bfsQueue = new Queue<Vector2Int>();
 
@@ -802,7 +941,7 @@ public class MapDecorPlacer : MonoBehaviour
         {
             var pos = bfsQueue.Dequeue();
             int d = landDist[pos.x, pos.y];
-            if (d >= maxDist) continue;
+            if (d >= maxBfsDist) continue;
             for (int i = 0; i < 4; i++)
             {
                 int nx = pos.x + dx4[i], ny = pos.y + dy4[i];
@@ -813,23 +952,71 @@ public class MapDecorPlacer : MonoBehaviour
             }
         }
 
-        // Now build the nav grid: each cell is navigable if all sampled points
-        // are water and far enough from land
+        // Build nav grid: check EVERY tile in the cell, not just center
         for (int gx = 0; gx < navW; gx++)
         for (int gy = 0; gy < navH; gy++)
         {
-            int tileX = gx * step + step / 2;
-            int tileY = gy * step + step / 2;
-            tileX = Mathf.Clamp(tileX, 0, map.width - 1);
-            tileY = Mathf.Clamp(tileY, 0, map.height - 1);
+            int startX = gx * step;
+            int startY = gy * step;
+            int endX   = Mathf.Min(startX + step, map.width);
+            int endY   = Mathf.Min(startY + step, map.height);
 
-            if (map.IsLand(tileX, tileY))
+            bool passable = true;
+            int minDist   = int.MaxValue;
+
+            for (int tx = startX; tx < endX && passable; tx++)
+            for (int ty = startY; ty < endY && passable; ty++)
             {
-                navGrid[gx, gy] = false;
-                continue;
+                if (map.IsLand(tx, ty))
+                {
+                    passable = false;
+                    minDist  = 0;
+                    break;
+                }
+                int d = landDist[tx, ty];
+                if (d < minDist) minDist = d;
+                if (d < shipLandClearance) passable = false;
             }
 
-            navGrid[gx, gy] = landDist[tileX, tileY] >= shipLandClearance;
+            navGrid[gx, gy]     = passable;
+            navLandDist[gx, gy] = minDist;
+        }
+
+        // Corridor width enforcement: erode narrow passages.
+        // A cell is only truly navigable if it has at least shipMinCorridorWidth
+        // contiguous open cells in BOTH the X and Y axes (centered on itself).
+        // This prevents ships from threading through 1-cell-wide gaps between
+        // land masses or between land and the map edge.
+        if (shipMinCorridorWidth > 1)
+        {
+            bool[,] eroded = new bool[navW, navH];
+            int halfCorridor = shipMinCorridorWidth / 2;
+
+            for (int gx = 0; gx < navW; gx++)
+            for (int gy = 0; gy < navH; gy++)
+            {
+                if (!navGrid[gx, gy]) { eroded[gx, gy] = false; continue; }
+
+                // Check horizontal span
+                bool hOk = true;
+                for (int dx = -halfCorridor; dx <= halfCorridor && hOk; dx++)
+                {
+                    int nx = gx + dx;
+                    if (nx < 0 || nx >= navW || !navGrid[nx, gy]) hOk = false;
+                }
+
+                // Check vertical span
+                bool vOk = true;
+                for (int dy = -halfCorridor; dy <= halfCorridor && vOk; dy++)
+                {
+                    int ny = gy + dy;
+                    if (ny < 0 || ny >= navH || !navGrid[gx, ny]) vOk = false;
+                }
+
+                eroded[gx, gy] = hOk && vOk;
+            }
+
+            navGrid = eroded;
         }
     }
 
@@ -878,6 +1065,7 @@ public class MapDecorPlacer : MonoBehaviour
                         {
                             ship.path      = depPath;
                             ship.pathIndex = 0;
+                            ship.segmentT  = 0f;
                             ship.state     = ShipState.Departing;
                         }
                         else
@@ -909,34 +1097,87 @@ public class MapDecorPlacer : MonoBehaviour
 
     void MoveAlongPath(ShipInstance ship)
     {
-        if (ship.path == null || ship.pathIndex >= ship.path.Count) return;
+        if (ship.path == null || ship.path.Count < 2) { ship.pathIndex = ship.path != null ? ship.path.Count : 0; return; }
 
-        Vector3 target = ship.path[ship.pathIndex];
-        Vector3 pos    = ship.go.transform.position;
-        float step     = ship.speed * Time.deltaTime;
-        Vector3 dir    = target - pos;
+        float totalSegments = ship.path.Count - 1;
+        float distThisFrame = ship.speed * Time.deltaTime;
 
-        if (dir.sqrMagnitude <= step * step)
+        // Estimate segment length for t-step conversion
+        while (distThisFrame > 0f && ship.pathIndex < totalSegments)
         {
-            ship.go.transform.position = target;
-            ship.pathIndex++;
+            Vector3 segStart = ship.path[ship.pathIndex];
+            Vector3 segEnd   = ship.path[ship.pathIndex + 1];
+            float segLen     = Vector3.Distance(segStart, segEnd);
+            if (segLen < 0.0001f) { ship.pathIndex++; ship.segmentT = 0f; continue; }
 
-            // Face next waypoint
-            if (ship.pathIndex < ship.path.Count)
-                RotateShipToward(ship, ship.path[ship.pathIndex] - target);
+            float remainingInSeg = (1f - ship.segmentT) * segLen;
+            if (distThisFrame < remainingInSeg)
+            {
+                ship.segmentT += distThisFrame / segLen;
+                distThisFrame = 0f;
+            }
+            else
+            {
+                distThisFrame -= remainingInSeg;
+                ship.pathIndex++;
+                ship.segmentT = 0f;
+            }
         }
-        else
+
+        if (ship.pathIndex >= totalSegments)
         {
-            ship.go.transform.position = pos + dir.normalized * step;
-            RotateShipToward(ship, dir);
+            ship.go.transform.position = ship.path[ship.path.Count - 1];
+            ship.pathIndex = ship.path.Count; // signal done
+            return;
         }
+
+        // Catmull-Rom interpolation using 4 control points
+        int i1 = ship.pathIndex;
+        int i0 = Mathf.Max(0, i1 - 1);
+        int i2 = Mathf.Min(ship.path.Count - 1, i1 + 1);
+        int i3 = Mathf.Min(ship.path.Count - 1, i1 + 2);
+
+        Vector3 pos = CatmullRom(ship.path[i0], ship.path[i1], ship.path[i2], ship.path[i3], ship.segmentT);
+        ship.go.transform.position = pos;
+
+        // Compute tangent for facing direction
+        Vector3 tangent = CatmullRomTangent(ship.path[i0], ship.path[i1], ship.path[i2], ship.path[i3], ship.segmentT);
+        if (tangent.sqrMagnitude > 0.0001f)
+        {
+            float targetAngle = Mathf.Atan2(tangent.y, tangent.x) * Mathf.Rad2Deg - 90f;
+            ship.currentAngle = Mathf.MoveTowardsAngle(ship.currentAngle, targetAngle, shipTurnSpeed * Time.deltaTime);
+            ship.go.transform.rotation = Quaternion.Euler(0f, 0f, ship.currentAngle);
+        }
+    }
+
+    /// <summary>Catmull-Rom spline position at parameter t ∈ [0,1].</summary>
+    Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+    {
+        float t2 = t * t, t3 = t2 * t;
+        return 0.5f * (
+            (2f * p1) +
+            (-p0 + p2) * t +
+            (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
+            (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
+    }
+
+    /// <summary>Catmull-Rom spline tangent (derivative) at parameter t ∈ [0,1].</summary>
+    Vector3 CatmullRomTangent(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+    {
+        float t2 = t * t;
+        return 0.5f * (
+            (-p0 + p2) +
+            (4f * p0 - 10f * p1 + 8f * p2 - 2f * p3) * t +
+            (-3f * p0 + 9f * p1 - 9f * p2 + 3f * p3) * t2);
     }
 
     void RotateShipToward(ShipInstance ship, Vector3 direction)
     {
+        // Kept for initial facing setup; runtime rotation now uses smooth lerp in MoveAlongPath
         if (direction.sqrMagnitude < 0.0001f) return;
         float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-        ship.go.transform.rotation = Quaternion.Euler(0f, 0f, angle - 90f);
+        ship.currentAngle = angle - 90f;
+        ship.go.transform.rotation = Quaternion.Euler(0f, 0f, ship.currentAngle);
     }
 
     void TrySpawnShip()
@@ -996,14 +1237,15 @@ public class MapDecorPlacer : MonoBehaviour
         if (nightSR != null)
             nightSR.color = new Color(1f, 1f, 1f, baseA * ratio);
 
-        // Face first waypoint
+        // Set initial facing angle from first path direction
+        float initAngle = 0f;
         if (path.Count > 1)
         {
             Vector3 dir = path[1] - path[0];
             if (dir.sqrMagnitude > 0.001f)
             {
-                float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-                go.transform.rotation = Quaternion.Euler(0f, 0f, angle - 90f);
+                initAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - 90f;
+                go.transform.rotation = Quaternion.Euler(0f, 0f, initAngle);
             }
         }
 
@@ -1018,9 +1260,11 @@ public class MapDecorPlacer : MonoBehaviour
             state         = ShipState.Arriving,
             path          = path,
             pathIndex     = 0,
+            segmentT      = 0f,
             waitTimer     = 0f,
             portIndex     = portIdx,
-            speed         = shipSpeed * Random.Range(0.8f, 1.2f)
+            speed         = shipSpeed * Random.Range(0.8f, 1.2f),
+            currentAngle  = initAngle
         });
     }
 
@@ -1092,7 +1336,8 @@ public class MapDecorPlacer : MonoBehaviour
 
     /// <summary>
     /// Finds a path in world-space from 'from' to 'to', navigating around the island.
-    /// Uses A* on the downsampled navGrid, then converts back to world coordinates.
+    /// Uses A* on the downsampled navGrid, simplifies collinear points, then applies
+    /// Chaikin corner-cutting subdivision to produce smooth, round sailing curves.
     /// </summary>
     List<Vector3> FindShipPath(Vector3 from, Vector3 to)
     {
@@ -1122,7 +1367,6 @@ public class MapDecorPlacer : MonoBehaviour
 
         // Convert grid path → world positions
         List<Vector3> worldPath = new List<Vector3>();
-        // Start with exact origin
         worldPath.Add(from);
 
         for (int i = 0; i < gridPath.Count; i++)
@@ -1137,11 +1381,16 @@ public class MapDecorPlacer : MonoBehaviour
             worldPath.Add(new Vector3(wx, wy, spriteZ));
         }
 
-        // End with exact destination
         worldPath.Add(to);
 
-        // Simplify: remove collinear points to smooth the path
+        // 1. Simplify: remove collinear points
         worldPath = SimplifyPath(worldPath);
+
+        // 2. Chaikin corner-cutting subdivision: rounds off sharp corners
+        //    Each pass replaces every segment AB with two points at 25% and 75%,
+        //    progressively smoothing the curve while preserving start/end.
+        for (int pass = 0; pass < shipPathSmoothingPasses; pass++)
+            worldPath = ChaikinSmooth(worldPath);
 
         return worldPath;
     }
@@ -1239,6 +1488,20 @@ public class MapDecorPlacer : MonoBehaviour
                 }
 
                 float tentG = gScore[cx, cy] + cost8[i];
+
+                // Shore avoidance: cells closer to land are penalized
+                // navLandDist stores the minimum land distance for each cell
+                if (shipShoreAvoidanceWeight > 0f && navLandDist != null)
+                {
+                    int ld = navLandDist[nx, ny];
+                    if (ld < shipLandClearance * 3)
+                    {
+                        // Inverse: closer to shore = higher penalty
+                        float proximity = 1f - ((float)ld / (shipLandClearance * 3));
+                        tentG += proximity * proximity * shipShoreAvoidanceWeight * cost8[i];
+                    }
+                }
+
                 if (tentG >= gScore[nx, ny]) continue;
 
                 gScore[nx, ny]    = tentG;
@@ -1295,14 +1558,51 @@ public class MapDecorPlacer : MonoBehaviour
             Vector3 next = path[i + 1];
             Vector3 curr = path[i];
 
-            // If the angle change is significant, keep this waypoint
+            // Keep waypoints where direction changes noticeably (lower threshold = keep more)
             Vector3 d1 = (curr - prev).normalized;
             Vector3 d2 = (next - curr).normalized;
-            if (Vector3.Dot(d1, d2) < 0.95f)
+            if (Vector3.Dot(d1, d2) < 0.98f)
                 simplified.Add(curr);
         }
         simplified.Add(path[path.Count - 1]);
         return simplified;
+    }
+
+    /// <summary>
+    /// Chaikin corner-cutting: for each segment A→B, insert two new points
+    /// at 25% and 75% along the segment.  Preserves first and last points.
+    /// Each pass doubles point count and progressively rounds all corners.
+    /// </summary>
+    List<Vector3> ChaikinSmooth(List<Vector3> path)
+    {
+        if (path.Count <= 2) return path;
+
+        var smooth = new List<Vector3>();
+        smooth.Add(path[0]); // keep start
+
+        for (int i = 0; i < path.Count - 1; i++)
+        {
+            Vector3 a = path[i];
+            Vector3 b = path[i + 1];
+
+            // Skip cutting the very first and last segments to anchor endpoints
+            if (i == 0)
+            {
+                smooth.Add(Vector3.Lerp(a, b, 0.75f));
+            }
+            else if (i == path.Count - 2)
+            {
+                smooth.Add(Vector3.Lerp(a, b, 0.25f));
+            }
+            else
+            {
+                smooth.Add(Vector3.Lerp(a, b, 0.25f));
+                smooth.Add(Vector3.Lerp(a, b, 0.75f));
+            }
+        }
+
+        smooth.Add(path[path.Count - 1]); // keep end
+        return smooth;
     }
 
     /// <summary>
@@ -1366,6 +1666,7 @@ public class MapDecorPlacer : MonoBehaviour
         prevRatio = -1f;
         cachedMap = null;
         navGrid   = null;
+        navLandDist = null;
         shipSpawnTimer = 0f;
     }
 }
