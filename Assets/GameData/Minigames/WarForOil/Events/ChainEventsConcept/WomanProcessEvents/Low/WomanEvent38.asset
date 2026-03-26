@@ -27,7 +27,7 @@ MonoBehaviour:
   eventNote: 
   minWarTime: 0
   maxWarTime: -1
-  decisionTime: 10
+  decisionTime: 40
   isRepeatable: 0
   isUnlimitedRepeat: 0
   maxRepeatCount: 1
@@ -92,9 +92,21 @@ MonoBehaviour:
     chainThreshold0: 20
     chainThreshold1: 50
     chainThreshold2: 75
-    chainBranches: []
+    chainBranches:
+    - targetEvent: {fileID: 11400000, guid: 9638917142ab3204197675fb75177bad, type: 2}
+      weightRange0: 1
+      weightRange1: 0
+      weightRange2: 0
+      weightRange3: 0
+      triggersAsImmediateEvent: 0
+      immediateEventDelay: 0
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -190,6 +202,11 @@ MonoBehaviour:
     chainBranches: []
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -212,10 +229,12 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
-    hasImmediateEvent: 0
+    hasImmediateEvent: 1
     immediateEventDelay: 0
     immediateEventIsTiered: 0
-    immediateEventPool: []
+    immediateEventPool:
+    - targetEvent: {fileID: 11400000, guid: b1163cc7d2a459d4fbdc77c0ea5e7756, type: 2}
+      weight: 100
     immediateEventTier1: {fileID: 0}
     immediateEventTier2: {fileID: 0}
     immediateEventTier3: {fileID: 0}

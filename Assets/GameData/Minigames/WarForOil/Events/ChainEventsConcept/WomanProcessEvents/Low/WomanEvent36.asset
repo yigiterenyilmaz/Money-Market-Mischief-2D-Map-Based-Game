@@ -28,7 +28,7 @@ MonoBehaviour:
   isUnlimitedRepeat: 0
   maxRepeatCount: 1
   choices:
-  - displayName: Tell Her What Happened
+  - displayName: Calm Her Down
     description: 
     supportModifier: 0
     suspicionModifier: 0
@@ -91,6 +91,11 @@ MonoBehaviour:
     chainBranches: []
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -113,10 +118,12 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
-    hasImmediateEvent: 0
-    immediateEventDelay: 0
+    hasImmediateEvent: 1
+    immediateEventDelay: 10
     immediateEventIsTiered: 0
-    immediateEventPool: []
+    immediateEventPool:
+    - targetEvent: {fileID: 11400000, guid: 87fc84b110d46e44585367f4ee784be9, type: 2}
+      weight: 100
     immediateEventTier1: {fileID: 0}
     immediateEventTier2: {fileID: 0}
     immediateEventTier3: {fileID: 0}

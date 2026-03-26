@@ -27,7 +27,7 @@ MonoBehaviour:
   eventNote: 
   minWarTime: 0
   maxWarTime: -1
-  decisionTime: 20
+  decisionTime: 0
   isRepeatable: 0
   isUnlimitedRepeat: 0
   maxRepeatCount: 1
@@ -92,20 +92,14 @@ MonoBehaviour:
     chainThreshold0: 20
     chainThreshold1: 50
     chainThreshold2: 75
-    chainBranches:
-    - targetEvent: {fileID: 0}
-      weightRange0: 0
-      weightRange1: 0
-      weightRange2: 0
-      weightRange3: 0
-      triggersAsImmediateEvent: 0
-      immediateEventDelay: 0
-      hasCounterCondition: 0
-      counterConditionKey: 
-      minCounterValue: 0
-      maxCounterValue: -1
+    chainBranches: []
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -128,10 +122,12 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
-    hasImmediateEvent: 0
-    immediateEventDelay: 0
+    hasImmediateEvent: 1
+    immediateEventDelay: 7
     immediateEventIsTiered: 0
-    immediateEventPool: []
+    immediateEventPool:
+    - targetEvent: {fileID: 11400000, guid: e08035e1bdb89fe4dbe9aa6e7e9d316c, type: 2}
+      weight: 100
     immediateEventTier1: {fileID: 0}
     immediateEventTier2: {fileID: 0}
     immediateEventTier3: {fileID: 0}
@@ -140,12 +136,12 @@ MonoBehaviour:
     statConditions: []
   - displayName: Decline
     description: 
-    supportModifier: 0
+    supportModifier: -5
     suspicionModifier: 0
-    reputationModifier: 0
+    reputationModifier: -1
     hasReputationFloor: 0
     reputationFloor: 0
-    politicalInfluenceModifier: 0
+    politicalInfluenceModifier: -10
     costModifier: 0
     wealthModifier: 0
     cornerGrabModifier: 0
@@ -198,9 +194,21 @@ MonoBehaviour:
     chainThreshold0: 20
     chainThreshold1: 50
     chainThreshold2: 75
-    chainBranches: []
+    chainBranches:
+    - targetEvent: {fileID: 11400000, guid: 76d0eba095a94384ea664c995f87b031, type: 2}
+      weightRange0: 1
+      weightRange1: 0
+      weightRange2: 0
+      weightRange3: 0
+      triggersAsImmediateEvent: 0
+      immediateEventDelay: 0
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0

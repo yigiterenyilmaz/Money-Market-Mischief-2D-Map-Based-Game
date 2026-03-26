@@ -16,6 +16,8 @@ MonoBehaviour:
   displayName: 
   description: "I don\u2019t belong in your world. I don't want to live this life
     that I\u2019m not a part of anymore. I just want to leave now. Please. Please..."
+  useTypewriterEffect: 1
+  conditionalDescriptions: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -62,6 +64,7 @@ MonoBehaviour:
     dealRewardRatio: 0
     blocksEvents: 0
     eventBlockCycles: 0
+    globalEventBlockCycles: 0
     blocksCeasefire: 0
     blocksEventGroup: 0
     blockedGroup: {fileID: 0}
@@ -73,6 +76,12 @@ MonoBehaviour:
     probWarEndChance: 0
     probDismissChance: 0
     probWarEndDelay: 0
+    incrementsChainCounter: 0
+    chainCounterKey: 
+    chainCounterIncrement: 1
+    hasEarlyChainTrigger: 0
+    earlyTriggerThreshold: 0
+    earlyTriggerEvent: {fileID: 0}
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
@@ -83,6 +92,11 @@ MonoBehaviour:
     chainBranches: []
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -107,7 +121,12 @@ MonoBehaviour:
     permanentMultipliers: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
+    immediateEventIsTiered: 0
     immediateEventPool: []
+    immediateEventTier1: {fileID: 0}
+    immediateEventTier2: {fileID: 0}
+    immediateEventTier3: {fileID: 0}
+    setsStoryFlags: 
     requiredSkills: []
     statConditions: []
   - displayName: Breakup
@@ -147,6 +166,7 @@ MonoBehaviour:
     dealRewardRatio: 0
     blocksEvents: 0
     eventBlockCycles: 0
+    globalEventBlockCycles: 0
     blocksCeasefire: 0
     blocksEventGroup: 0
     blockedGroup: {fileID: 0}
@@ -158,6 +178,12 @@ MonoBehaviour:
     probWarEndChance: 0
     probDismissChance: 0
     probWarEndDelay: 0
+    incrementsChainCounter: 0
+    chainCounterKey: 
+    chainCounterIncrement: 1
+    hasEarlyChainTrigger: 0
+    earlyTriggerThreshold: 0
+    earlyTriggerEvent: {fileID: 0}
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
@@ -168,6 +194,11 @@ MonoBehaviour:
     chainBranches: []
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -192,7 +223,12 @@ MonoBehaviour:
     permanentMultipliers: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
+    immediateEventIsTiered: 0
     immediateEventPool: []
+    immediateEventTier1: {fileID: 0}
+    immediateEventTier2: {fileID: 0}
+    immediateEventTier3: {fileID: 0}
+    setsStoryFlags: 
     requiredSkills: []
     statConditions: []
   defaultChoiceIndex: -1
@@ -204,11 +240,11 @@ MonoBehaviour:
   forcesVandalismStart: 0
   isMediaPursuitEvent: 0
   mediaPursuitLevelOnTrigger: 0
+  requiresBothProcessesActive: 0
   isWomanProcessEvent: 1
   minObsession: 0
   maxObsession: 15
   blockedWomanProcessEvents: []
-  useTypewriterEffect: 1
   hasPrecursorEvent: 0
   precursorEventType: 0
   precursorWarEvent: {fileID: 0}

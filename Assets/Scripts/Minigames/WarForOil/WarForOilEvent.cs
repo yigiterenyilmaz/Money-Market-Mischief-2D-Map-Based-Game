@@ -22,7 +22,7 @@ public class WarForOilEvent : ScriptableObject
 
     [Range(0f, 1f)] public float minWarTime = 0f; //savaş süresinin yüzdesi olarak en erken tetiklenme (0.2 = %20, 300sn savaşta 60sn)
     [Range(-1f, 1f)] public float maxWarTime = -1f; //savaş süresinin yüzdesi olarak en geç tetiklenme (-1 = sınırsız, 0.8 = %80)
-    public float decisionTime = 10f; //karar süresi (saniye)
+    public float decisionTime = 45f; //karar süresi (saniye)
     public bool isRepeatable; //aynı savaşta tekrar tetiklenebilir mi
     public bool isUnlimitedRepeat; //sınırsız tekrar (isRepeatable true ise)
     public int maxRepeatCount = 1; //en fazla kaç kez tekrar edebilir (isRepeatable true ve isUnlimitedRepeat false ise)

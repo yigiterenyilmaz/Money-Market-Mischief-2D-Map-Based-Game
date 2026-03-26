@@ -6,4 +6,5 @@
 public enum StoryFlag
 {
     None = 0,
+    BetrayedAgentsToTheirDeath = 1,
 }

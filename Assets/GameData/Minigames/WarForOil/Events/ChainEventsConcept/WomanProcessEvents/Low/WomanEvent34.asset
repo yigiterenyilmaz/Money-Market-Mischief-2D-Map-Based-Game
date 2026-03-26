@@ -25,7 +25,7 @@ MonoBehaviour:
   eventNote: 
   minWarTime: 0
   maxWarTime: -1
-  decisionTime: 10
+  decisionTime: 45
   isRepeatable: 0
   isUnlimitedRepeat: 0
   maxRepeatCount: 1
@@ -94,6 +94,11 @@ MonoBehaviour:
     chainBranches: []
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -116,10 +121,12 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
-    hasImmediateEvent: 0
+    hasImmediateEvent: 1
     immediateEventDelay: 0
     immediateEventIsTiered: 0
-    immediateEventPool: []
+    immediateEventPool:
+    - targetEvent: {fileID: 11400000, guid: 7e8c3c0d5561c924a97d9f27ff7383bc, type: 2}
+      weight: 100
     immediateEventTier1: {fileID: 0}
     immediateEventTier2: {fileID: 0}
     immediateEventTier3: {fileID: 0}

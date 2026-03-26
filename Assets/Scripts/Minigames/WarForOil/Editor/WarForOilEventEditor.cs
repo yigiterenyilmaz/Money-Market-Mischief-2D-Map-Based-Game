@@ -572,10 +572,12 @@ public class WarForOilEventEditor : Editor
 
             EditorGUILayout.PropertyField(
                 choice.FindPropertyRelative("blocksEvents"),
-                new GUIContent("Event Engelle"));
+                new GUIContent("WFO Engelle",
+                "Tiklenirse bu savaş bitene kadar hiçbir savaş eventi gelmez."));
             EditorGUILayout.IntSlider(
                 choice.FindPropertyRelative("eventBlockCycles"),
-                0, 10, new GUIContent("Savaş Event Dondur (Dönem)"));
+                0, 10, new GUIContent("Savaş Event Dondur (Dönem)",
+                "Bu kadar event dönemi boyunca savaş eventleri gelmez."));
             EditorGUILayout.IntSlider(
                 choice.FindPropertyRelative("globalEventBlockCycles"),
                 0, 10, new GUIContent("Global Event Dondur (Dönem)",

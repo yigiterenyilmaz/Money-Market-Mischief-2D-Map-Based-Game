@@ -17,6 +17,8 @@ MonoBehaviour:
   description: The government no longer trusts you. As a result, they are pushing
     you to the background regarding the war effort and no longer seek your support.
     Consequently, if the war is won, your share of the rewards will be reduced accordingly.
+  useTypewriterEffect: 0
+  conditionalDescriptions: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -59,7 +61,7 @@ MonoBehaviour:
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
-    blocksEvents: 0
+    blocksEvents: 1
     eventBlockCycles: 0
     globalEventBlockCycles: 0
     blocksCeasefire: 0
@@ -73,6 +75,12 @@ MonoBehaviour:
     probWarEndChance: 0
     probDismissChance: 0
     probWarEndDelay: 0
+    incrementsChainCounter: 0
+    chainCounterKey: 
+    chainCounterIncrement: 1
+    hasEarlyChainTrigger: 0
+    earlyTriggerThreshold: 0
+    earlyTriggerEvent: {fileID: 0}
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
@@ -83,6 +91,11 @@ MonoBehaviour:
     chainBranches: []
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -112,6 +125,7 @@ MonoBehaviour:
     immediateEventTier1: {fileID: 0}
     immediateEventTier2: {fileID: 0}
     immediateEventTier3: {fileID: 0}
+    setsStoryFlags: 
     requiredSkills: []
     statConditions: []
   defaultChoiceIndex: -1
@@ -123,11 +137,11 @@ MonoBehaviour:
   forcesVandalismStart: 0
   isMediaPursuitEvent: 0
   mediaPursuitLevelOnTrigger: 0
+  requiresBothProcessesActive: 0
   isWomanProcessEvent: 0
   minObsession: 0
   maxObsession: 100
   blockedWomanProcessEvents: []
-  useTypewriterEffect: 0
   hasPrecursorEvent: 0
   precursorEventType: 0
   precursorWarEvent: {fileID: 0}

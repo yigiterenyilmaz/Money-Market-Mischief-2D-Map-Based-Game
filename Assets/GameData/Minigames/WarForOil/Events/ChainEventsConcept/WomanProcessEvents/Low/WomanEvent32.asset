@@ -87,9 +87,21 @@ MonoBehaviour:
     chainThreshold0: 20
     chainThreshold1: 50
     chainThreshold2: 75
-    chainBranches: []
+    chainBranches:
+    - targetEvent: {fileID: 11400000, guid: 96f073b15d1cd714ea415edaf56dd918, type: 2}
+      weightRange0: 1
+      weightRange1: 0
+      weightRange2: 0
+      weightRange3: 0
+      triggersAsImmediateEvent: 0
+      immediateEventDelay: 0
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -170,9 +182,9 @@ MonoBehaviour:
     probWarEndChance: 0
     probDismissChance: 0
     probWarEndDelay: 0
-    incrementsChainCounter: 0
-    chainCounterKey: 
-    chainCounterIncrement: 1
+    incrementsChainCounter: 1
+    chainCounterKey: acele
+    chainCounterIncrement: 2
     hasEarlyChainTrigger: 0
     earlyTriggerThreshold: 0
     earlyTriggerEvent: {fileID: 0}
@@ -183,9 +195,21 @@ MonoBehaviour:
     chainThreshold0: 20
     chainThreshold1: 50
     chainThreshold2: 75
-    chainBranches: []
+    chainBranches:
+    - targetEvent: {fileID: 11400000, guid: 96f073b15d1cd714ea415edaf56dd918, type: 2}
+      weightRange0: 1
+      weightRange1: 0
+      weightRange2: 0
+      weightRange3: 0
+      triggersAsImmediateEvent: 0
+      immediateEventDelay: 0
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
