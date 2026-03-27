@@ -1383,17 +1383,15 @@ public class MapDecorPlacer : MonoBehaviour
 
         Vector3 exitPoint = GetRandomOceanEdgePoint();
 
-        //A* ile deniz noktasından okyanus kenarına — asenkron
+        //A* ile mevcut konumdan okyanus kenarına — asenkron
+        Vector3 shipPos = ship.go.transform.position;
         List<Vector3> toExit = null;
-        yield return StartCoroutine(FindShipPathAsync(seaPoint, exitPoint, (result) => { toExit = result; }));
+        yield return StartCoroutine(FindShipPathAsync(shipPos, exitPoint, (result) => { toExit = result; }));
 
         // Gemi beklerken yok edilmiş olabilir
         if (ship.go == null || ship.state != ShipState.Waiting) { isDepartPathPending = false; yield break; }
 
         List<Vector3> depPath = new List<Vector3>();
-        depPath.Add(ship.go.transform.position);
-        depPath.Add(seaPoint);
-
         if (toExit != null && toExit.Count > 0)
             depPath.AddRange(toExit);
 
@@ -1532,7 +1530,7 @@ public class MapDecorPlacer : MonoBehaviour
         Vector2 sea = port.seaDirection;
 
         //deniz yönünde adım adım ilerle, suya ulaşana kadar
-        for (int i = 1; i <= 20; i++)
+        for (int i = 1; i <= 30; i++)
         {
             Vector3 candidate = pos + new Vector3(sea.x, sea.y, 0f) * (i * 0.05f);
             int tileX = Mathf.RoundToInt((candidate.x - transform.position.x + cachedHalfW) * pixelsPerUnit);
@@ -1541,12 +1539,12 @@ public class MapDecorPlacer : MonoBehaviour
             if (cachedMap != null && tileX >= 0 && tileX < cachedMap.width && tileY >= 0 && tileY < cachedMap.height
                 && !cachedMap.IsLand(tileX, tileY))
             {
-                //biraz daha denize aç ki kesinlikle güvenli olsun
-                return candidate + new Vector3(sea.x, sea.y, 0f) * 0.1f;
+                //suya ulaştıktan sonra biraz daha aç
+                return candidate + new Vector3(sea.x, sea.y, 0f) * 0.15f;
             }
         }
 
-        //fallback — eskisi gibi offset
+        //fallback
         return pos + new Vector3(sea.x, sea.y, 0f) * 0.3f;
     }
 

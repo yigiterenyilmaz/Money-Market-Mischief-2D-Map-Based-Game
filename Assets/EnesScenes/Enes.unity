@@ -310,6 +310,10 @@ PrefabInstance:
       value: 0.235
       objectReference: {fileID: 0}
     - target: {fileID: 4450646308301582934, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
+      propertyPath: islandMaxExtent
+      value: 0.85
+      objectReference: {fileID: 0}
+    - target: {fileID: 4450646308301582934, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       propertyPath: minSpawnThreshold
       value: 0.015
       objectReference: {fileID: 0}
@@ -411,6 +415,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 5718375045061896029, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1710072578}
+    - targetCorrespondingSourceObject: {fileID: 5718375045061896029, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1710072580}
   m_SourcePrefab: {fileID: 100100000, guid: 0db640ce4dba7f84288299145cda16db, type: 3}
 --- !u!1001 &102576865
 PrefabInstance:
@@ -10574,6 +10581,35 @@ MonoBehaviour:
   dawnColor: {r: 0.8792453, g: 0.5793354, b: 0.49602705, a: 1}
   mapRenderer: {fileID: 598282585}
   paused: 0
+--- !u!114 &1710072580
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 744350989}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46bf5f2a4cdecb644bfd6fb949107075, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TornadoSystem
+  mapGenerator: {fileID: 1710072556}
+  mapPainter: {fileID: 1710072559}
+  mapDecorPlacer: {fileID: 1710072562}
+  roadGenerator: {fileID: 1710072573}
+  tornadoSprite: {fileID: 5648747525888280027, guid: 282999ac7fbedd448939ed71c8110d39, type: 3}
+  tornadoScale: 1.5
+  tornadoSortingOrder: 50
+  spinSpeed: 360
+  traverseTime: 12
+  arcStrength: 0.4
+  damageRadius: 5
+  damageCheckInterval: 0.3
+  crackColor: {r: 0.06, g: 0.04, b: 0.02, a: 1}
+  baseTornadoProbability: 0.02
+  maxTornadoesPerSession: 2
+  debugCanvas: {fileID: 1943374661}
+  debugButtonFont: {fileID: 0}
 --- !u!1 &1711406226
 GameObject:
   m_ObjectHideFlags: 0

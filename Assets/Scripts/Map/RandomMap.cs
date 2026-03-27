@@ -174,6 +174,7 @@ public class MapGenerator : MonoBehaviour
     {
         float safeHalfW = width  * 0.5f * islandMaxExtent;
         float safeHalfH = height * 0.5f * islandMaxExtent;
+        float noiseOffset = Random.Range(0f, 9999f);
 
         for (int i = 0; i < polygon.Count; i++)
         {
@@ -181,8 +182,16 @@ public class MapGenerator : MonoBehaviour
             float dx = p.x - center.x;
             float dy = p.y - center.y;
 
-            float scaleX = (Mathf.Abs(dx) > safeHalfW) ? safeHalfW / Mathf.Abs(dx) : 1f;
-            float scaleY = (Mathf.Abs(dy) > safeHalfH) ? safeHalfH / Mathf.Abs(dy) : 1f;
+            //her nokta için farklı noise — sınırda düz çizgi oluşmasını engeller
+            float angle = Mathf.Atan2(dy, dx);
+            float noise = Mathf.PerlinNoise(angle * 2f + noiseOffset, noiseOffset * 0.3f);
+            float noiseScale = 0.7f + noise * 0.25f; //0.7 - 0.95 arası rastgele daralma
+
+            float effectiveHalfW = safeHalfW * noiseScale;
+            float effectiveHalfH = safeHalfH * noiseScale;
+
+            float scaleX = (Mathf.Abs(dx) > effectiveHalfW) ? effectiveHalfW / Mathf.Abs(dx) : 1f;
+            float scaleY = (Mathf.Abs(dy) > effectiveHalfH) ? effectiveHalfH / Mathf.Abs(dy) : 1f;
             float scale = Mathf.Min(scaleX, scaleY);
 
             if (scale < 1f)
@@ -192,37 +201,35 @@ public class MapGenerator : MonoBehaviour
 
     void ClampLandToSafeZone()
     {
-        float safeMinX = width  * (1f - islandMaxExtent) * 0.5f;
-        float safeMaxX = width  - safeMinX;
-        float safeMinY = height * (1f - islandMaxExtent) * 0.5f;
-        float safeMaxY = height - safeMinY;
-
-        //sınıra yaklaşınca noise ile doğal kıyı oluştur
-        float edgeFadeZone = Mathf.Min(width, height) * 0.08f; //sınır yumuşatma bölgesi
+        float halfW = width * 0.5f;
+        float halfH = height * 0.5f;
+        Vector2 center = new Vector2(halfW, halfH);
         float noiseOffset = Random.Range(0f, 9999f);
+
+        //harita merkezinden maksimum kara mesafesi (eliptik)
+        float maxExtentW = halfW * islandMaxExtent;
+        float maxExtentH = halfH * islandMaxExtent;
 
         for (int x = 0; x < width; x++)
             for (int y = 0; y < height; y++)
             {
                 if (!landMap[x, y]) continue;
 
-                //sınıra olan mesafe (her kenardan)
-                float distToEdge = Mathf.Min(
-                    x - safeMinX, safeMaxX - x,
-                    y - safeMinY, safeMaxY - y
-                );
+                //merkezden normalize mesafe (eliptik)
+                float dx = (x - center.x) / maxExtentW;
+                float dy = (y - center.y) / maxExtentH;
+                float dist = Mathf.Sqrt(dx * dx + dy * dy); //0 = merkez, 1 = sınır
 
-                if (distToEdge < -edgeFadeZone)
+                //sınıra yakınsa noise ile doğal kenar oluştur
+                if (dist > 0.75f)
                 {
-                    //tamamen dışarıda
-                    landMap[x, y] = false;
-                }
-                else if (distToEdge < edgeFadeZone)
-                {
-                    //geçiş bölgesi — noise ile doğal kenar
-                    float t = (distToEdge + edgeFadeZone) / (edgeFadeZone * 2f); //0-1
-                    float noise = Mathf.PerlinNoise((x + noiseOffset) / 15f, (y + noiseOffset) / 15f);
-                    if (noise > t)
+                    float n1 = Mathf.PerlinNoise((x + noiseOffset) / 10f, (y + noiseOffset) / 10f);
+                    float n2 = Mathf.PerlinNoise((x + noiseOffset) / 25f, (y + noiseOffset * 0.7f) / 25f);
+                    float noise = n1 * 0.35f + n2 * 0.65f; //büyük şekillere ağırlık
+
+                    //noise ile kesim eşiği — sınıra yaklaştıkça daha agresif
+                    float threshold = 0.85f + noise * 0.2f; //0.85 - 1.05 arası
+                    if (dist > threshold)
                         landMap[x, y] = false;
                 }
             }
