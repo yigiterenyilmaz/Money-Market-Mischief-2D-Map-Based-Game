@@ -10217,29 +10217,22 @@ MonoBehaviour:
   cityRoadAffinityStrength: 0.7
   brokenBuildingSprites: []
   brokenBuildingTint: {r: 0.55, g: 0.45, b: 0.4, a: 1}
-  citiesDecorNight:
-  - {fileID: 3834655240685627621, guid: f0c697cccc64dd64781ae2a1745cdbec, type: 3}
-  - {fileID: -6403729262106653617, guid: 225c74fb84a61dc439987a4766ee66f0, type: 3}
-  - {fileID: 5181080380521267736, guid: 136fd4eb5a4c40a4db017c68656871db, type: 3}
-  - {fileID: -8861456951337905395, guid: a6f9e9e598212b248a2f137fb85432c8, type: 3}
+  citiesDecorNight: []
   brokenBuildingSpritesNight: []
-  portSpritesDay:
-  - {fileID: 694149444081068427, guid: 5a6b1038ce244cc46806321c64af4317, type: 3}
+  portSpritesDay: []
   portSpritesNight: []
   portScaleRange: {x: 0.9, y: 1.2}
   portRegionBackingRadius: 3
-  portMinSeparation: 80
-  maxActiveShips: 3
-  shipSpritesDay:
-  - {fileID: -4360530552843628718, guid: 3ca3c663470315144ace4d40f19a1d08, type: 3}
-  shipSpritesNight:
-  - {fileID: -4360530552843628718, guid: 3ca3c663470315144ace4d40f19a1d08, type: 3}
-  shipSpeed: 1
+  portMinSeparation: 60
+  maxActiveShips: 4
+  shipSpritesDay: []
+  shipSpritesNight: []
+  shipSpeed: 0.3
   shipScaleRange: {x: 0.6, y: 1}
   shipWaitTimeRange: {x: 3, y: 8}
   shipSpawnInterval: 5
-  shipPathGridStep: 16
-  shipLandClearance: 40
+  shipPathGridStep: 3
+  shipLandClearance: 20
   shipMinCorridorWidth: 3
   shipShoreAvoidanceWeight: 2.5
   shipTurnSpeed: 45
@@ -10454,7 +10447,7 @@ MonoBehaviour:
   branchStartThickness: 3
   branchEndThickness: 2
   branchOutlineWidth: 0
-  branchShoreBuffer: 30
+  branchShoreBuffer: 12
   agriculturalFill: {r: 0.4867924, g: 0.4437594, b: 0.27462438, a: 1}
   agriculturalOutline: {r: 0.38, g: 0.32, b: 0.2, a: 1}
   citiesFill: {r: 0.42, g: 0.4, b: 0.37, a: 1}
