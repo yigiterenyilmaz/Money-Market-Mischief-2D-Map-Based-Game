@@ -63,6 +63,12 @@ public class RoadTrafficSystem : MonoBehaviour
         public Quaternion     currentRotation;
         public Vector2        smoothedDir;
         public Vector3        smoothedWorldPos;
+        public float          fadeAlpha;      // 0=görünmez, 1=tamamen görünür
+        public bool           isFadingOut;    // yok olma geçişinde mi
+        public bool           isFadingIn;     // belirme geçişinde mi
+        public bool           pendingRespawn; // fade-out bittikten sonra yeniden spawn olacak mı
+        public float          switchCooldown; // yol değiştirdikten sonra tekrar değiştiremez (piksel)
+        public int            previousPathIndex; // son geldiği yol — hemen geri dönmeyi engeller
     }
 
     private List<List<Vector2Int>>    allPaths       = new List<List<Vector2Int>>();
@@ -186,7 +192,9 @@ public class RoadTrafficSystem : MonoBehaviour
                     color            = col,
                     scaleFactor      = scale,
                     smoothedDir      = GetDirectionAtIndex(p, idx, pixelSpd),
-                    smoothedWorldPos = InterpolatedWorldPos(p, pos)
+                    smoothedWorldPos = InterpolatedWorldPos(p, pos),
+                    fadeAlpha        = 1f,
+                    previousPathIndex = -1
                 };
                 car.currentRotation = DirToRotation(car.smoothedDir);
 
@@ -292,10 +300,61 @@ public class RoadTrafficSystem : MonoBehaviour
         UpdateCarCrossfade();
 
         float dt = Time.deltaTime;
+        float fadeSpeed = 2f; //saniyede alpha değişim hızı (0.5sn tam geçiş)
 
-        for (int i = 0; i < activeCars.Count; i++)
+        for (int i = activeCars.Count - 1; i >= 0; i--)
         {
             Car car = activeCars[i];
+
+            //fade-out işleme
+            if (car.isFadingOut)
+            {
+                car.fadeAlpha = Mathf.Max(0f, car.fadeAlpha - fadeSpeed * dt);
+                ApplyCarAlpha(car);
+
+                if (car.fadeAlpha <= 0f)
+                {
+                    car.isFadingOut = false;
+
+                    if (car.pendingRespawn)
+                    {
+                        //rastgele başka bir branch yolun ucundan fade-in ile spawn
+                        car.pendingRespawn = false;
+
+                        //rastgele bir branch yolun çıkmaz ucundan fade-in ile spawn
+                        var deadEnd = FindRandomDeadEnd(car.pathIndex);
+                        if (deadEnd.pathIndex >= 0)
+                        {
+                            car.pathIndex = deadEnd.pathIndex;
+                            car.position = deadEnd.pixelIndex;
+                            float spd = baseSpeed / worldUnitsPerPixel * Random.Range(0.8f, 1.2f);
+                            //çıkmaz uçtan içeri doğru git
+                            car.speedInPixels = deadEnd.pixelIndex == 0 ? spd : -spd;
+
+                            car.color = PickCarColor();
+                            car.daySR.color = car.color;
+                            car.previousPathIndex = -1;
+                            car.switchCooldown = 0f;
+
+                            car.smoothedWorldPos = InterpolatedWorldPos(car.pathIndex, car.position);
+                            car.go.transform.position = car.smoothedWorldPos;
+                            car.isFadingIn = true;
+                        }
+                    }
+                }
+
+                activeCars[i] = car;
+                continue;
+            }
+
+            //fade-in işleme
+            if (car.isFadingIn)
+            {
+                car.fadeAlpha = Mathf.Min(1f, car.fadeAlpha + fadeSpeed * dt);
+                ApplyCarAlpha(car);
+                if (car.fadeAlpha >= 1f)
+                    car.isFadingIn = false;
+            }
 
             if (Mathf.Approximately(car.speedInPixels, 0f))
             {
@@ -330,20 +389,27 @@ public class RoadTrafficSystem : MonoBehaviour
 
             bool didFlip = false;
 
+            //yol değiştirme cooldown'unu azalt
+            if (car.switchCooldown > 0f)
+                car.switchCooldown -= Mathf.Abs(car.speedInPixels) * dt;
+
             int currentIdx = Mathf.Clamp(Mathf.RoundToInt(car.position), 0, path.Count - 1);
-            if (car.pathIndex < highwayPathCount && Random.value < 0.002f)
+            if (car.switchCooldown <= 0f && car.pathIndex < highwayPathCount && Random.value < 0.002f)
             {
                 var midConns = FindConnections(car.pathIndex, currentIdx, 5);
+                //önceki yolu filtrele
+                midConns.RemoveAll(e => e.pathIndex == car.previousPathIndex);
                 if (midConns.Count > 0)
                 {
                     var target    = midConns[Random.Range(0, midConns.Count)];
                     var currentPx = path[currentIdx];
+                    float absSpd = Mathf.Abs(car.speedInPixels);
+                    car.previousPathIndex = car.pathIndex;
                     car.pathIndex = target.pathIndex;
                     car.position  = FindNearestPixelOnPath(allPaths[car.pathIndex], currentPx);
-                    path          = allPaths[car.pathIndex];
-                    int nl        = path.Count;
-                    if      (car.position < nl * 0.3f) car.speedInPixels =  Mathf.Abs(car.speedInPixels);
-                    else if (car.position > nl * 0.7f) car.speedInPixels = -Mathf.Abs(car.speedInPixels);
+                    car.speedInPixels = AlignSpeedAwayFromJunction(car.pathIndex, Mathf.RoundToInt(car.position), currentPx, absSpd);
+                    path = allPaths[car.pathIndex];
+                    car.switchCooldown = 150f;
                     didFlip = true;
                 }
             }
@@ -358,21 +424,47 @@ public class RoadTrafficSystem : MonoBehaviour
                 var connections = FindConnections(car.pathIndex, endIdx, 3);
                 float turnChance = car.pathIndex < highwayPathCount ? 0.8f : 0.5f;
 
-                if (connections.Count > 0 && Random.value < turnChance)
+                //önceki yolu filtrele — hemen geri dönmeyi engelle (cooldown aktifken filtrele)
+                var unfilteredCount = connections.Count;
+                if (car.switchCooldown > 0f)
+                    connections.RemoveAll(e => e.pathIndex == car.previousPathIndex);
+
+                //branch arabalar kavşakta her zaman yol değiştirir, highway arabalar %80 şansla
+                bool shouldSwitch;
+                if (car.pathIndex >= highwayPathCount)
+                    shouldSwitch = connections.Count > 0; //branch: her zaman geç
+                else
+                    shouldSwitch = connections.Count > 0 && Random.value < turnChance; //highway: şansla
+
+                if (shouldSwitch && car.switchCooldown <= 0f)
                 {
                     var target    = connections[Random.Range(0, connections.Count)];
                     var currentPx = path[endIdx];
+                    float absSpd = Mathf.Abs(car.speedInPixels);
+                    car.previousPathIndex = car.pathIndex;
                     car.pathIndex = target.pathIndex;
                     car.position  = FindNearestPixelOnPath(allPaths[car.pathIndex], currentPx);
-                    path          = allPaths[car.pathIndex];
-                    int nl        = allPaths[car.pathIndex].Count;
-                    if      (car.position < nl * 0.3f) car.speedInPixels =  Mathf.Abs(car.speedInPixels);
-                    else if (car.position > nl * 0.7f) car.speedInPixels = -Mathf.Abs(car.speedInPixels);
+                    car.speedInPixels = AlignSpeedAwayFromJunction(car.pathIndex, Mathf.RoundToInt(car.position), currentPx, absSpd);
+                    path = allPaths[car.pathIndex];
+                    car.switchCooldown = 150f;
+                }
+                else if (unfilteredCount > 0 || car.pathIndex < highwayPathCount)
+                {
+                    //kavşak var ama dönmedi veya ana otoban — geri dön
+                    if (reachedEnd)   { car.position = pathLen - 1; car.speedInPixels = -Mathf.Abs(car.speedInPixels); }
+                    else              { car.position = 0;           car.speedInPixels =  Mathf.Abs(car.speedInPixels); }
                 }
                 else
                 {
-                    if (reachedEnd)   { car.position = pathLen - 1; car.speedInPixels = -Mathf.Abs(car.speedInPixels); }
-                    else              { car.position = 0;           car.speedInPixels =  Mathf.Abs(car.speedInPixels); }
+                    //çıkmaz yolun sonunda — fade-out başlat, sonra yeniden spawn
+                    if (!car.isFadingOut)
+                    {
+                        car.isFadingOut = true;
+                        car.pendingRespawn = true;
+                        car.speedInPixels = 0f;
+                        if (reachedEnd)   car.position = pathLen - 1;
+                        else              car.position = 0;
+                    }
                 }
                 didFlip = true;
             }
@@ -418,6 +510,28 @@ public class RoadTrafficSystem : MonoBehaviour
         prevLightingRatio = ratio;
 
         ApplyCarCrossfade(ratio);
+    }
+
+    void ApplyCarAlpha(Car car)
+    {
+        if (car.daySR != null)
+        {
+            Color c = car.daySR.color;
+            c.a = car.fadeAlpha * (1f - prevLightingRatio);
+            car.daySR.color = c;
+        }
+        if (car.nightSR != null)
+        {
+            Color c = car.nightSR.color;
+            c.a = car.fadeAlpha * Mathf.Max(0f, prevLightingRatio);
+            car.nightSR.color = c;
+        }
+        if (car.headlightSR != null)
+        {
+            Color c = car.headlightSR.color;
+            c.a = car.fadeAlpha * Mathf.Max(0f, prevLightingRatio);
+            car.headlightSR.color = c;
+        }
     }
 
     void ApplyCarCrossfade(float ratio)
@@ -489,6 +603,55 @@ public class RoadTrafficSystem : MonoBehaviour
         int idxB  = Mathf.Clamp(idxA + 1, 0, count - 1);
         float t   = position - Mathf.FloorToInt(position);
         return Vector3.Lerp(TileToWorld(path[idxA]), TileToWorld(path[idxB]), t);
+    }
+
+    /// <summary>
+    /// Branch yolların çıkmaz uçlarından (bağlantısız) rastgele birini bulur.
+    /// excludePathIndex: aynı yoldan spawn etmemek için hariç tutulacak path.
+    /// </summary>
+    JunctionEntry FindRandomDeadEnd(int excludePathIndex)
+    {
+        var candidates = new List<JunctionEntry>();
+
+        for (int p = highwayPathCount; p < allPaths.Count; p++)
+        {
+            if (p == excludePathIndex) continue;
+
+            //yolun başı çıkmaz mı?
+            var startConns = FindConnections(p, 0, 3);
+            if (startConns.Count == 0)
+                candidates.Add(new JunctionEntry { pathIndex = p, pixelIndex = 0 });
+
+            //yolun sonu çıkmaz mı?
+            var endConns = FindConnections(p, allPaths[p].Count - 1, 3);
+            if (endConns.Count == 0)
+                candidates.Add(new JunctionEntry { pathIndex = p, pixelIndex = allPaths[p].Count - 1 });
+        }
+
+        if (candidates.Count == 0)
+            return new JunctionEntry { pathIndex = -1, pixelIndex = 0 };
+
+        return candidates[Random.Range(0, candidates.Count)];
+    }
+
+    /// <summary>
+    /// Yol değiştirdikten sonra hız yönünü junction noktasından uzaklaşan yöne göre belirler.
+    /// Yeni yolun iki yönünden hangisi junction'dan daha uzağa gidiyorsa onu seçer.
+    /// </summary>
+    float AlignSpeedAwayFromJunction(int newPathIndex, int posOnNewPath, Vector2Int junctionTile, float absSpeed)
+    {
+        var newPath = allPaths[newPathIndex];
+        int count = newPath.Count;
+        int lookAhead = Mathf.Min(30, count / 3);
+
+        int fwdIdx = Mathf.Clamp(posOnNewPath + lookAhead, 0, count - 1);
+        int bwdIdx = Mathf.Clamp(posOnNewPath - lookAhead, 0, count - 1);
+
+        //hangi yön junction'dan daha uzağa gidiyor?
+        float fwdDist = Vector2Int.Distance(newPath[fwdIdx], junctionTile);
+        float bwdDist = Vector2Int.Distance(newPath[bwdIdx], junctionTile);
+
+        return fwdDist >= bwdDist ? absSpeed : -absSpeed;
     }
 
     int FindNearestPixelOnPath(List<Vector2Int> path, Vector2Int fromPixel)
@@ -616,8 +779,33 @@ public class RoadTrafficSystem : MonoBehaviour
                 if (e.pathIndex == pathIndex && Mathf.Abs(e.pixelIndex - pixelIndex) <= tolerance)
                 { matched = true; break; }
             if (matched)
+            {
                 foreach (var e in group)
-                    if (e.pathIndex != pathIndex) results.Add(e);
+                {
+                    if (e.pathIndex == pathIndex) continue;
+
+                    //iki uç arasında kırık yol var mı kontrol et
+                    if (brokenRoadTiles.Count > 0)
+                    {
+                        Vector2Int myTile = allPaths[pathIndex][Mathf.Clamp(pixelIndex, 0, allPaths[pathIndex].Count - 1)];
+                        Vector2Int otherTile = allPaths[e.pathIndex][Mathf.Clamp(e.pixelIndex, 0, allPaths[e.pathIndex].Count - 1)];
+
+                        bool blocked = false;
+                        int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2Int.Distance(myTile, otherTile)));
+                        for (int s = 0; s <= steps; s++)
+                        {
+                            float t = (float)s / steps;
+                            Vector2Int check = new Vector2Int(
+                                Mathf.RoundToInt(Mathf.Lerp(myTile.x, otherTile.x, t)),
+                                Mathf.RoundToInt(Mathf.Lerp(myTile.y, otherTile.y, t)));
+                            if (brokenRoadTiles.Contains(check)) { blocked = true; break; }
+                        }
+                        if (blocked) continue;
+                    }
+
+                    results.Add(e);
+                }
+            }
         }
         return results;
     }
