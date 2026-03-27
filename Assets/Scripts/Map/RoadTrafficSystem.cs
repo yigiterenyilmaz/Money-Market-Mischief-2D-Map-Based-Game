@@ -470,9 +470,10 @@ public class RoadTrafficSystem : MonoBehaviour
             }
 
             Vector3 targetWorld = InterpolatedWorldPos(car.pathIndex, car.position);
-            car.smoothedWorldPos = didFlip
-                ? targetWorld
-                : Vector3.Lerp(car.smoothedWorldPos, targetWorld, dt * directionSmoothSpeed * 2f);
+            if (didFlip)
+                car.smoothedWorldPos = targetWorld;
+            else
+                car.smoothedWorldPos = Vector3.Lerp(car.smoothedWorldPos, targetWorld, dt * 8f);
             car.go.transform.position = car.smoothedWorldPos;
 
             int     finalIdx = Mathf.Clamp(Mathf.RoundToInt(car.position), 0, path.Count - 1);

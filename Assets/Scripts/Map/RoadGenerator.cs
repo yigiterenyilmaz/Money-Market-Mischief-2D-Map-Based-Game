@@ -938,11 +938,13 @@ public class RoadGenerator : MonoBehaviour
                 roadDist[bp.x, bp.y] = 0;
                 bfsQueue.Enqueue(bp);
             }
+            //branch kapsama yarıçapı — çok yüksek olursa az branch üretilir
+            int branchCoverageRadius = 150;
             while (bfsQueue.Count > 0)
             {
                 var pos = bfsQueue.Dequeue();
                 int d = roadDist[pos.x, pos.y];
-                if (d >= 600) continue;
+                if (d >= branchCoverageRadius) continue;
                 for (int i = 0; i < 4; i++)
                 {
                     int nx = pos.x + dx4[i], ny = pos.y + dy4[i];
