@@ -21,6 +21,8 @@ public class RoadTrafficSystem : MonoBehaviour
     public Sprite carSprite;
     [Tooltip("Night variant of the car sprite (headlights on). Leave empty to skip crossfade.")]
     public Sprite carSpriteNight;
+    [Tooltip("Headlight-only sprite (pre-colored lights on transparent bg). Rendered untinted, fades in at night.")]
+    public Sprite carSpriteHeadlights;
     public string carSortingLayer = "Default";
     public int    carSortingOrder = 20;
     public float  pixelsPerUnit   = 100f;
@@ -56,7 +58,8 @@ public class RoadTrafficSystem : MonoBehaviour
         public float scaleFactor;
         public GameObject     go;
         public SpriteRenderer daySR;
-        public SpriteRenderer nightSR;   // null if no night sprite assigned
+        public SpriteRenderer nightSR;       // null if no night sprite assigned
+        public SpriteRenderer headlightSR;   // null if no headlight sprite assigned
         public Quaternion     currentRotation;
         public Vector2        smoothedDir;
         public Vector3        smoothedWorldPos;
@@ -157,7 +160,8 @@ public class RoadTrafficSystem : MonoBehaviour
 
     void SpawnCars()
     {
-        bool hasNight = carSpriteNight != null;
+        bool hasNight      = carSpriteNight      != null;
+        bool hasHeadlights = carSpriteHeadlights != null;
 
         for (int p = 0; p < allPaths.Count; p++)
         {
@@ -195,7 +199,7 @@ public class RoadTrafficSystem : MonoBehaviour
                 car.daySR.sortingLayerName = carSortingLayer;
                 car.daySR.sortingOrder     = carSortingOrder;
 
-                // --- Night overlay renderer (child) ---
+                // --- Night overlay renderer (child, tinted with car color) ---
                 if (hasNight)
                 {
                     Transform nightChild = car.go.transform.Find("NightOverlay");
@@ -221,6 +225,34 @@ public class RoadTrafficSystem : MonoBehaviour
                 else
                 {
                     car.nightSR = null;
+                }
+
+                // --- Headlight overlay (child, UNTINTED, fades in at night) ---
+                if (hasHeadlights)
+                {
+                    Transform hlChild = car.go.transform.Find("HeadlightOverlay");
+                    if (hlChild == null)
+                    {
+                        GameObject hlGo = new GameObject("HeadlightOverlay");
+                        hlGo.transform.SetParent(car.go.transform, false);
+                        hlGo.transform.localPosition = Vector3.zero;
+                        hlGo.transform.localScale    = Vector3.one;
+                        hlGo.transform.localRotation = Quaternion.identity;
+                        car.headlightSR = hlGo.AddComponent<SpriteRenderer>();
+                    }
+                    else
+                    {
+                        car.headlightSR = hlChild.GetComponent<SpriteRenderer>();
+                    }
+
+                    car.headlightSR.sprite           = carSpriteHeadlights;
+                    car.headlightSR.color            = new Color(1f, 1f, 1f, 0f); // untinted, start invisible
+                    car.headlightSR.sortingLayerName = carSortingLayer;
+                    car.headlightSR.sortingOrder     = carSortingOrder + 2; // on top of both day & night
+                }
+                else
+                {
+                    car.headlightSR = null;
                 }
 
                 car.go.transform.localScale = new Vector3(scale, scale, 1f);
@@ -376,7 +408,7 @@ public class RoadTrafficSystem : MonoBehaviour
 
     void UpdateCarCrossfade()
     {
-        if (carSpriteNight == null) return;
+        if (carSpriteNight == null && carSpriteHeadlights == null) return;
 
         var dn = DayNightCycle.Instance;
         if (dn == null) return;
@@ -397,12 +429,18 @@ public class RoadTrafficSystem : MonoBehaviour
 
             Color col = car.color;
 
-            // Day fades out
+            // Day layer: tinted with car color, fades out as night approaches
             car.daySR.color = new Color(col.r, col.g, col.b, 1f - ratio);
 
-            // Night fades in
+            // Night layer: tinted with car color, fades in as night approaches
             if (car.nightSR != null)
                 car.nightSR.color = new Color(col.r, col.g, col.b, ratio);
+
+            // Headlight layer: UNTINTED (white), fades in with LightingRatio
+            // Since LightingRatio uses SmoothStep in DayNightCycle, the
+            // headlights ramp on smoothly during dusk and off during dawn.
+            if (car.headlightSR != null)
+                car.headlightSR.color = new Color(1f, 1f, 1f, ratio);
         }
     }
 
