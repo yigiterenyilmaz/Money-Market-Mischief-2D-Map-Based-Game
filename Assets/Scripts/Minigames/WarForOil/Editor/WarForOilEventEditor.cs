@@ -17,6 +17,7 @@ public class WarForOilEventEditor : Editor
     private Dictionary<int, bool> feedFoldouts = new Dictionary<int, bool>();
     private Dictionary<int, bool> rewardFoldouts = new Dictionary<int, bool>();
     private Dictionary<int, bool> permanentEffectFoldouts = new Dictionary<int, bool>();
+    private Dictionary<int, bool> statCeilingFoldouts = new Dictionary<int, bool>();
     private Dictionary<int, bool> womanProcessFoldouts = new Dictionary<int, bool>();
     private bool chainFoldout;
 
@@ -25,7 +26,8 @@ public class WarForOilEventEditor : Editor
         serializedObject.Update();
 
         //choices, repeat alanları, defaultChoiceIndex, narrative ve zincir alanları hariç tüm alanları çiz
-        DrawPropertiesExcluding(serializedObject,
+        //yazı makinesi efekti açıksa displayName gizlenir (typewriter modunda başlık yok)
+        List<string> excludeList = new List<string> {
             "choices", "isUnlimitedRepeat", "maxRepeatCount", "defaultChoiceIndex",
             "hasNarrative", "narrative",
             "isVandalismEvent", "vandalismLevelOnTrigger", "startsVandalism", "forcesVandalismStart",
@@ -34,7 +36,14 @@ public class WarForOilEventEditor : Editor
             "useTypewriterEffect",
             "hasPrecursorEvent", "precursorEventType", "precursorWarEvent", "precursorRandomEvent",
             "chainRole", "blocksSubChainBranching", "alsoBlockedBranchEvents",
-            "minWarTime", "maxWarTime");
+            "minWarTime", "maxWarTime",
+            "conditionalDescriptions",
+            "useTypewriterEffect",
+            "requiresBothProcessesActive"
+        };
+        if (serializedObject.FindProperty("useTypewriterEffect").boolValue)
+            excludeList.Add("displayName");
+        DrawPropertiesExcluding(serializedObject, excludeList.ToArray());
 
         //isRepeatable açıksa tekrar seçeneklerini göster
         SerializedProperty isRepeatable = serializedObject.FindProperty("isRepeatable");
@@ -80,6 +89,21 @@ public class WarForOilEventEditor : Editor
                 serializedObject.FindProperty("narrative"),
                 new GUIContent("Narrative"));
             EditorGUI.indentLevel--;
+        }
+
+        //yazı makinesi efekti — açıklama harf harf akar
+        EditorGUILayout.PropertyField(
+            serializedObject.FindProperty("useTypewriterEffect"),
+            new GUIContent("Yazı Makinesi Efekti", "Açıklama harf harf akar. Kapalıysa direkt paragraf gösterilir."));
+
+        //koşullu açıklamalar — hikaye bayrağına göre farklı açıklama
+        SerializedProperty condDescs = serializedObject.FindProperty("conditionalDescriptions");
+        EditorGUILayout.PropertyField(condDescs, new GUIContent("Koşullu Açıklamalar"), true);
+        if (condDescs.arraySize > 0)
+        {
+            EditorGUILayout.HelpBox(
+                "Hikaye bayrağı aktifse event açıklaması alternatif metinle değiştirilir. İlk eşleşen bayrak geçerli olur.",
+                MessageType.Info);
         }
 
         EditorGUILayout.Space();
@@ -143,6 +167,11 @@ public class WarForOilEventEditor : Editor
 
         EditorGUILayout.Space();
 
+        //ikili süreç koşulu
+        EditorGUILayout.PropertyField(
+            serializedObject.FindProperty("requiresBothProcessesActive"),
+            new GUIContent("İkili Süreç Gerekli", "Sadece hem savaş hem kadın süreci aktifken tetiklenebilir."));
+
         //kadın süreci eventi
         SerializedProperty isWomanProcessEvent = serializedObject.FindProperty("isWomanProcessEvent");
         EditorGUILayout.PropertyField(isWomanProcessEvent, new GUIContent("Kadın Süreci Eventi"));
@@ -167,10 +196,6 @@ public class WarForOilEventEditor : Editor
             EditorGUILayout.PropertyField(
                 serializedObject.FindProperty("blockedWomanProcessEvents"),
                 new GUIContent("Yasaklanan Eventler"), true);
-
-            EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("useTypewriterEffect"),
-                new GUIContent("Yazı Makinesi Efekti", "Açıklama harf harf akar. Kapalıysa direkt paragraf gösterilir."));
 
             //öncü event
             EditorGUILayout.Space(4);
@@ -261,7 +286,9 @@ public class WarForOilEventEditor : Editor
         EditorGUI.indentLevel++;
 
         //temel alanlar
-        EditorGUILayout.PropertyField(choice.FindPropertyRelative("displayName"));
+        SerializedProperty dispName = choice.FindPropertyRelative("displayName");
+        EditorGUILayout.LabelField("Display Name");
+        dispName.stringValue = EditorGUILayout.TextArea(dispName.stringValue, GUILayout.MinHeight(EditorGUIUtility.singleLineHeight * 2));
         EditorGUILayout.PropertyField(choice.FindPropertyRelative("description"));
 
         EditorGUILayout.Space(2);
@@ -281,6 +308,22 @@ public class WarForOilEventEditor : Editor
                 new GUIContent("Şüphe"));
             EditorGUILayout.PropertyField(choice.FindPropertyRelative("reputationModifier"),
                 new GUIContent("İtibar"));
+
+            //itibar tabanı — itibar'ın hemen altında
+            SerializedProperty hasRepFloor = choice.FindPropertyRelative("hasReputationFloor");
+            EditorGUILayout.PropertyField(hasRepFloor, new GUIContent("İtibar Tabanı"));
+            if (hasRepFloor.boolValue)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(
+                    choice.FindPropertyRelative("reputationFloor"),
+                    new GUIContent("Minimum İtibar"));
+                EditorGUILayout.HelpBox(
+                    "Bu choice yüzünden itibar bu değerin altına düşmez.",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
+            }
+
             EditorGUILayout.PropertyField(choice.FindPropertyRelative("politicalInfluenceModifier"),
                 new GUIContent("Politik Nüfuz"));
             EditorGUILayout.PropertyField(choice.FindPropertyRelative("costModifier"),
@@ -295,6 +338,20 @@ public class WarForOilEventEditor : Editor
             {
                 EditorGUILayout.PropertyField(choice.FindPropertyRelative("womanObsessionModifier"),
                     new GUIContent("Kadın Obsesyonu"));
+
+                SerializedProperty hasObsFloor = choice.FindPropertyRelative("hasObsessionFloor");
+                EditorGUILayout.PropertyField(hasObsFloor, new GUIContent("Obsesyon Tabanı"));
+                if (hasObsFloor.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("obsessionFloor"),
+                        new GUIContent("Minimum Obsesyon"));
+                    EditorGUILayout.HelpBox(
+                        "Bu choice yüzünden obsesyon bu değerin altına düşmez.",
+                        MessageType.Info);
+                    EditorGUI.indentLevel--;
+                }
             }
 
             EditorGUI.indentLevel--;
@@ -359,14 +416,64 @@ public class WarForOilEventEditor : Editor
             EditorGUILayout.PrefixLabel("Kadın Süreci");
             SerializedProperty startsWP = choice.FindPropertyRelative("startsWomanProcess");
             SerializedProperty endsWP = choice.FindPropertyRelative("endsWomanProcess");
+            SerializedProperty freezesWP = choice.FindPropertyRelative("freezesWomanProcess");
             bool newStarts = GUILayout.Toggle(startsWP.boolValue, "Başlat", EditorStyles.miniButtonLeft, GUILayout.Width(60));
-            bool newEnds = GUILayout.Toggle(endsWP.boolValue, "Bitir", EditorStyles.miniButtonRight, GUILayout.Width(60));
-            //biri aktifleşince diğerini kapat
-            if (newStarts && !startsWP.boolValue) newEnds = false;
-            if (newEnds && !endsWP.boolValue) newStarts = false;
+            bool newEnds = GUILayout.Toggle(endsWP.boolValue, "Bitir", EditorStyles.miniButtonMid, GUILayout.Width(60));
+            bool newFreezes = GUILayout.Toggle(freezesWP.boolValue, "Dondur", EditorStyles.miniButtonRight, GUILayout.Width(60));
+            //biri aktifleşince diğerlerini kapat
+            if (newStarts && !startsWP.boolValue) { newEnds = false; newFreezes = false; }
+            if (newEnds && !endsWP.boolValue) { newStarts = false; newFreezes = false; }
+            if (newFreezes && !freezesWP.boolValue) { newStarts = false; newEnds = false; }
             startsWP.boolValue = newStarts;
             endsWP.boolValue = newEnds;
+            freezesWP.boolValue = newFreezes;
             EditorGUILayout.EndHorizontal();
+
+            if (freezesWP.boolValue)
+            {
+                EditorGUI.indentLevel++;
+                SerializedProperty freezeCycles = choice.FindPropertyRelative("womanProcessFreezeCycles");
+                freezeCycles.intValue = EditorGUILayout.IntField(
+                    new GUIContent("Dondurma (döngü)"), freezeCycles.intValue);
+                if (freezeCycles.intValue < 1) freezeCycles.intValue = 1;
+                EditorGUILayout.HelpBox(
+                    $"Kadın süreci {freezeCycles.intValue} döngü boyunca tetiklenmez. Mevcut dondurma varsa üstüne eklenir.",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
+            }
+
+            //kadın süreci havuz yönlendirme — sadece kadın süreci eventlerinde göster
+            if (serializedObject.FindProperty("isWomanProcessEvent").boolValue)
+            {
+                SerializedProperty redirectsPool = choice.FindPropertyRelative("redirectsWomanPool");
+                EditorGUILayout.PropertyField(redirectsPool, new GUIContent("Havuzu Yönlendir"));
+                if (redirectsPool.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("womanPoolDatabase"),
+                        new GUIContent("Hedef Database"));
+                    EditorGUILayout.HelpBox(
+                        "Bu choice seçildiğinde kadın süreci kalıcı olarak bu database'deki havuzlardan event çekmeye başlar.",
+                        MessageType.Info);
+                    EditorGUI.indentLevel--;
+                }
+
+                SerializedProperty hasDropLimit = choice.FindPropertyRelative("hasObsessionDropLimit");
+                EditorGUILayout.PropertyField(hasDropLimit, new GUIContent("Obsesyon Düşüş Limiti"));
+                if (hasDropLimit.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    SerializedProperty dropLimit = choice.FindPropertyRelative("obsessionDropLimit");
+                    dropLimit.floatValue = EditorGUILayout.FloatField(
+                        new GUIContent("Düşüş Miktarı"), dropLimit.floatValue);
+                    if (dropLimit.floatValue < 0f) dropLimit.floatValue = 0f;
+                    EditorGUILayout.HelpBox(
+                        $"Bu choice seçildiğinde obsesyon o anki değerinden {dropLimit.floatValue} düşerse kadın süreci otomatik sona erer.",
+                        MessageType.Info);
+                    EditorGUI.indentLevel--;
+                }
+            }
 
             SerializedProperty endsWar = choice.FindPropertyRelative("endsWar");
             EditorGUILayout.PropertyField(endsWar, new GUIContent("Savaş Bitir"));
@@ -376,6 +483,33 @@ public class WarForOilEventEditor : Editor
                 EditorGUILayout.PropertyField(
                     choice.FindPropertyRelative("warEndDelay"),
                     new GUIContent("Gecikme (sn)"));
+                EditorGUI.indentLevel--;
+            }
+
+            SerializedProperty winsWar = choice.FindPropertyRelative("winsWar");
+            EditorGUILayout.PropertyField(winsWar, new GUIContent("Savaşı Kazan",
+                "Savaşı direkt kazandırır. Zar atılmaz, garanti zafer."));
+            if (winsWar.boolValue)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(
+                    choice.FindPropertyRelative("winWarDelay"),
+                    new GUIContent("Gecikme (sn)"));
+
+                SerializedProperty customReward = choice.FindPropertyRelative("winWarCustomReward");
+                string[] rewardOptions = { "War Support Tabanlı", "Direkt Oran Gir" };
+                int rewardSel = customReward.boolValue ? 1 : 0;
+                rewardSel = EditorGUILayout.Popup("Ödül Hesaplama", rewardSel, rewardOptions);
+                customReward.boolValue = rewardSel == 1;
+
+                if (customReward.boolValue)
+                {
+                    EditorGUILayout.Slider(
+                        choice.FindPropertyRelative("winWarRewardRatio"),
+                        0f, 1f, new GUIContent("Ödül Oranı",
+                        "1 = tam ödül, 0.5 = yarı ödül"));
+                }
+
                 EditorGUI.indentLevel--;
             }
 
@@ -467,10 +601,16 @@ public class WarForOilEventEditor : Editor
 
             EditorGUILayout.PropertyField(
                 choice.FindPropertyRelative("blocksEvents"),
-                new GUIContent("Event Engelle"));
+                new GUIContent("WFO Engelle",
+                "Tiklenirse bu savaş bitene kadar hiçbir savaş eventi gelmez."));
             EditorGUILayout.IntSlider(
                 choice.FindPropertyRelative("eventBlockCycles"),
-                0, 10, new GUIContent("Event Dondur (Dönem)"));
+                0, 10, new GUIContent("Savaş Event Dondur (Dönem)",
+                "Bu kadar event dönemi boyunca savaş eventleri gelmez."));
+            EditorGUILayout.IntSlider(
+                choice.FindPropertyRelative("globalEventBlockCycles"),
+                0, 10, new GUIContent("Global Event Dondur (Dönem)",
+                "Kadın eventleri HARİÇ tüm eventleri (savaş + random) bu kadar dönem boyunca durdurur."));
             EditorGUILayout.PropertyField(
                 choice.FindPropertyRelative("blocksCeasefire"),
                 new GUIContent("Ateşkes Engelle"));
@@ -530,6 +670,43 @@ public class WarForOilEventEditor : Editor
 
                 EditorGUI.indentLevel--;
             }
+
+            //anında event tetikleme — choice seçildiğinde havuzdan biri direkt gösterilir
+            SerializedProperty hasImmediate = choice.FindPropertyRelative("hasImmediateEvent");
+            EditorGUILayout.PropertyField(hasImmediate, new GUIContent("Anında Event Tetikle"));
+            if (hasImmediate.boolValue)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.Slider(
+                    choice.FindPropertyRelative("immediateEventDelay"),
+                    0f, 15f, new GUIContent("Gecikme (sn)"));
+
+                SerializedProperty isTiered = choice.FindPropertyRelative("immediateEventIsTiered");
+                EditorGUILayout.PropertyField(isTiered, new GUIContent("Kadın Obsesyon Tier'ına Göre"));
+
+                if (isTiered.boolValue)
+                {
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("immediateEventTier1"),
+                        new GUIContent("Low Obsesyon Event"));
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("immediateEventTier2"),
+                        new GUIContent("Mid Obsesyon Event"));
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("immediateEventTier3"),
+                        new GUIContent("High Obsesyon Event"));
+                }
+                else
+                {
+                    DrawImmediateEventPool(choice.FindPropertyRelative("immediateEventPool"));
+                }
+                EditorGUI.indentLevel--;
+            }
+
+            //hikaye bayrakları — bu choice seçildiğinde aktif edilen bayraklar
+            EditorGUILayout.PropertyField(
+                choice.FindPropertyRelative("setsStoryFlags"),
+                new GUIContent("Hikaye Bayrakları"), true);
 
             EditorGUI.indentLevel--;
         }
@@ -674,6 +851,15 @@ public class WarForOilEventEditor : Editor
                             branch.FindPropertyRelative("weightRange3"),
                             0f, 1f, new GUIContent(range3Label));
                     }
+                    SerializedProperty triggersImmediate = branch.FindPropertyRelative("triggersAsImmediateEvent");
+                    EditorGUILayout.PropertyField(triggersImmediate,
+                        new GUIContent("Anında Event Olarak Tetikle"));
+                    if (triggersImmediate.boolValue)
+                    {
+                        EditorGUILayout.Slider(
+                            branch.FindPropertyRelative("immediateEventDelay"),
+                            0f, 15f, new GUIContent("Gecikme (sn)"));
+                    }
                     EditorGUI.indentLevel--;
                     EditorGUILayout.Space(2);
                 }
@@ -688,6 +874,8 @@ public class WarForOilEventEditor : Editor
                 newBranch.FindPropertyRelative("weightRange1").floatValue = 0f;
                 newBranch.FindPropertyRelative("weightRange2").floatValue = 0f;
                 newBranch.FindPropertyRelative("weightRange3").floatValue = 0f;
+                newBranch.FindPropertyRelative("triggersAsImmediateEvent").boolValue = false;
+                newBranch.FindPropertyRelative("immediateEventDelay").floatValue = 0f;
             }
 
             //chain bitme şansı — dallanma varsa göster
@@ -703,6 +891,141 @@ public class WarForOilEventEditor : Editor
                     SerializedProperty endWeightProp = choice.FindPropertyRelative("chainEndWeight");
                     EditorGUILayout.Slider(endWeightProp, 0f, 1f, new GUIContent("Bitme Ağırlığı"));
                     endWeight = endWeightProp.floatValue;
+                    EditorGUI.indentLevel--;
+                }
+            }
+
+            //koşullu dallanma tanımı — choice seviyesinde tek koşul
+            if (chainBranches.arraySize > 0)
+            {
+                EditorGUILayout.Space(2);
+                SerializedProperty hasCondBranch = choice.FindPropertyRelative("hasConditionalBranching");
+                EditorGUILayout.PropertyField(hasCondBranch, new GUIContent("Koşullu Dallanma"));
+                if (hasCondBranch.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("branchCounterKey"),
+                        new GUIContent("Sayaç Adı"));
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("branchCounterMin"),
+                        new GUIContent("Min Değer"));
+                    SerializedProperty maxVal = choice.FindPropertyRelative("branchCounterMax");
+                    EditorGUILayout.PropertyField(maxVal, new GUIContent("Max Değer (-1 = sınırsız)"));
+                    EditorGUILayout.HelpBox(
+                        "Sayaç bu aralıktaysa koşullu dallardan, değilse yukarıdaki normal dallardan seçilir.",
+                        MessageType.Info);
+
+                    //koşullu dallar listesi
+                    EditorGUILayout.Space(4);
+                    EditorGUILayout.LabelField("Koşullu Dallar", EditorStyles.boldLabel);
+                    SerializedProperty condBranches = choice.FindPropertyRelative("conditionalChainBranches");
+                    for (int cb = 0; cb < condBranches.arraySize; cb++)
+                    {
+                        SerializedProperty condBranch = condBranches.GetArrayElementAtIndex(cb);
+                        EditorGUILayout.BeginHorizontal();
+                        EditorGUILayout.PropertyField(
+                            condBranch.FindPropertyRelative("targetEvent"),
+                            new GUIContent("Hedef " + cb));
+                        if (GUILayout.Button("-", GUILayout.Width(20)))
+                        {
+                            //object reference varsa önce null'la, sonra sil
+                            SerializedProperty targetRef = condBranches.GetArrayElementAtIndex(cb).FindPropertyRelative("targetEvent");
+                            if (targetRef != null && targetRef.objectReferenceValue != null)
+                                targetRef.objectReferenceValue = null;
+                            condBranches.DeleteArrayElementAtIndex(cb);
+                            cb--;
+                            EditorGUILayout.EndHorizontal();
+                            continue;
+                        }
+                        EditorGUILayout.EndHorizontal();
+
+                        if (cb >= 0 && cb < condBranches.arraySize)
+                        {
+                            EditorGUI.indentLevel++;
+                            if (isJustLuck)
+                            {
+                                EditorGUILayout.Slider(
+                                    condBranch.FindPropertyRelative("weightRange0"),
+                                    0f, 1f, new GUIContent("Ağırlık"));
+                            }
+                            else
+                            {
+                                EditorGUILayout.Slider(
+                                    condBranch.FindPropertyRelative("weightRange0"),
+                                    0f, 1f, new GUIContent(range0Label));
+                                EditorGUILayout.Slider(
+                                    condBranch.FindPropertyRelative("weightRange1"),
+                                    0f, 1f, new GUIContent(range1Label));
+                                EditorGUILayout.Slider(
+                                    condBranch.FindPropertyRelative("weightRange2"),
+                                    0f, 1f, new GUIContent(range2Label));
+                                EditorGUILayout.Slider(
+                                    condBranch.FindPropertyRelative("weightRange3"),
+                                    0f, 1f, new GUIContent(range3Label));
+                            }
+                            SerializedProperty condTriggersImmediate = condBranch.FindPropertyRelative("triggersAsImmediateEvent");
+                            EditorGUILayout.PropertyField(condTriggersImmediate,
+                                new GUIContent("Anında Event Olarak Tetikle"));
+                            if (condTriggersImmediate.boolValue)
+                            {
+                                EditorGUILayout.Slider(
+                                    condBranch.FindPropertyRelative("immediateEventDelay"),
+                                    0f, 15f, new GUIContent("Gecikme (sn)"));
+                            }
+                            EditorGUI.indentLevel--;
+                            EditorGUILayout.Space(2);
+                        }
+                    }
+
+                    if (GUILayout.Button("+ Koşullu Dal Ekle"))
+                    {
+                        condBranches.InsertArrayElementAtIndex(condBranches.arraySize);
+                        SerializedProperty newCond = condBranches.GetArrayElementAtIndex(condBranches.arraySize - 1);
+                        newCond.FindPropertyRelative("targetEvent").objectReferenceValue = null;
+                        newCond.FindPropertyRelative("weightRange0").floatValue = 0f;
+                        newCond.FindPropertyRelative("weightRange1").floatValue = 0f;
+                        newCond.FindPropertyRelative("weightRange2").floatValue = 0f;
+                        newCond.FindPropertyRelative("weightRange3").floatValue = 0f;
+                        newCond.FindPropertyRelative("triggersAsImmediateEvent").boolValue = false;
+                        newCond.FindPropertyRelative("immediateEventDelay").floatValue = 0f;
+                    }
+
+                    EditorGUI.indentLevel--;
+                }
+            }
+
+            //zincir sayaç sistemi
+            {
+                EditorGUILayout.Space(2);
+                SerializedProperty incCounter = choice.FindPropertyRelative("incrementsChainCounter");
+                EditorGUILayout.PropertyField(incCounter, new GUIContent("Zincir Sayacı Artır"));
+                if (incCounter.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("chainCounterKey"),
+                        new GUIContent("Sayaç Adı"));
+                    EditorGUILayout.PropertyField(
+                        choice.FindPropertyRelative("chainCounterIncrement"),
+                        new GUIContent("Artış Miktarı"));
+
+                    SerializedProperty hasEarly = choice.FindPropertyRelative("hasEarlyChainTrigger");
+                    EditorGUILayout.PropertyField(hasEarly, new GUIContent("Erken Tetikleme"));
+                    if (hasEarly.boolValue)
+                    {
+                        EditorGUI.indentLevel++;
+                        EditorGUILayout.PropertyField(
+                            choice.FindPropertyRelative("earlyTriggerThreshold"),
+                            new GUIContent("Eşik Değeri"));
+                        EditorGUILayout.PropertyField(
+                            choice.FindPropertyRelative("earlyTriggerEvent"),
+                            new GUIContent("Hedef Event"));
+                        EditorGUILayout.HelpBox(
+                            "Sayaç bu eşiğe ulaşırsa zincir atlanıp direkt hedef event tetiklenir.",
+                            MessageType.Info);
+                        EditorGUI.indentLevel--;
+                    }
                     EditorGUI.indentLevel--;
                 }
             }
@@ -925,6 +1248,80 @@ public class WarForOilEventEditor : Editor
 
         EditorGUILayout.Space(2);
 
+        //dinamik stat tavanı — foldout
+        if (!statCeilingFoldouts.ContainsKey(index))
+            statCeilingFoldouts[index] = false;
+
+        SerializedProperty ceilingList = choice.FindPropertyRelative("statCeilingEffects");
+        string ceilingLabel = ceilingList.arraySize > 0
+            ? $"Stat Tavan Etkileri ({ceilingList.arraySize})"
+            : "Stat Tavan Etkileri";
+        statCeilingFoldouts[index] = EditorGUILayout.Foldout(
+            statCeilingFoldouts[index], ceilingLabel, true);
+
+        if (statCeilingFoldouts[index])
+        {
+            EditorGUI.indentLevel++;
+
+            for (int c = 0; c < ceilingList.arraySize; c++)
+            {
+                SerializedProperty entry = ceilingList.GetArrayElementAtIndex(c);
+                SerializedProperty modeProp = entry.FindPropertyRelative("mode");
+                SerializedProperty stat = entry.FindPropertyRelative("stat");
+                SerializedProperty val = entry.FindPropertyRelative("ceilingValue");
+                SerializedProperty mult = entry.FindPropertyRelative("ceilingMultiplier");
+
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField($"Etki {c}", EditorStyles.boldLabel);
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("Kaldır", GUILayout.Width(60)))
+                {
+                    ceilingList.DeleteArrayElementAtIndex(c);
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.EndVertical();
+                    break;
+                }
+                EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.PropertyField(stat, new GUIContent("Stat"));
+
+                string[] options = { "Direkt Ata", "Çarpanla Düşür", "Tavanı Kaldır" };
+                modeProp.enumValueIndex = EditorGUILayout.Popup("İşlem", modeProp.enumValueIndex, options);
+
+                StatCeilingMode mode = (StatCeilingMode)modeProp.enumValueIndex;
+                if (mode == StatCeilingMode.Set)
+                {
+                    EditorGUILayout.PropertyField(val, new GUIContent("Tavan Değeri"));
+                }
+                else if (mode == StatCeilingMode.Multiply)
+                {
+                    EditorGUILayout.Slider(mult, 0f, 1f, new GUIContent("Çarpan"));
+                    EditorGUILayout.HelpBox("Mevcut tavan × çarpan = yeni tavan.\nÖrn: tavan 100, çarpan 0.5 → yeni tavan 50.", MessageType.Info);
+                }
+
+                EditorGUILayout.EndVertical();
+                EditorGUILayout.Space(2);
+            }
+
+            if (GUILayout.Button("+ Stat Tavanı Ekle"))
+            {
+                ceilingList.InsertArrayElementAtIndex(ceilingList.arraySize);
+                SerializedProperty newEntry = ceilingList.GetArrayElementAtIndex(ceilingList.arraySize - 1);
+                newEntry.FindPropertyRelative("stat").enumValueIndex = 0;
+                newEntry.FindPropertyRelative("mode").enumValueIndex = 0;
+                newEntry.FindPropertyRelative("ceilingValue").floatValue = 50f;
+                newEntry.FindPropertyRelative("ceilingMultiplier").floatValue = 1f;
+            }
+
+            EditorGUILayout.HelpBox("Tavan Koy: Stat bu değerin üzerine çıkamaz.\nTavanı Kaldır: Önceden konmuş tavanı kaldırır, doğal sınıra döner.", MessageType.Info);
+
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space(2);
+
         //ön koşullar — foldout
         if (!prerequisiteFoldouts.ContainsKey(index))
             prerequisiteFoldouts[index] = false;
@@ -943,6 +1340,42 @@ public class WarForOilEventEditor : Editor
         return false;
     }
 
+    private void DrawImmediateEventPool(SerializedProperty pool)
+    {
+        for (int ei = 0; ei < pool.arraySize; ei++)
+        {
+            SerializedProperty entry = pool.GetArrayElementAtIndex(ei);
+            EditorGUILayout.PropertyField(
+                entry.FindPropertyRelative("targetEvent"),
+                new GUIContent($"Event {ei + 1}"));
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.PropertyField(
+                entry.FindPropertyRelative("weight"),
+                new GUIContent("  Ağırlık"));
+            if (GUILayout.Button("-", EditorStyles.miniButtonRight, GUILayout.Width(22)))
+            {
+                pool.DeleteArrayElementAtIndex(ei);
+                break;
+            }
+            EditorGUILayout.EndHorizontal();
+            if (ei < pool.arraySize - 1)
+                EditorGUILayout.Space(2);
+        }
+        //toplam yüzde hesapla
+        float totalWeight = 0f;
+        for (int ei2 = 0; ei2 < pool.arraySize; ei2++)
+            totalWeight += pool.GetArrayElementAtIndex(ei2).FindPropertyRelative("weight").floatValue;
+        if (pool.arraySize > 0)
+        {
+            if (Mathf.Abs(totalWeight - 100f) > 0.1f)
+                EditorGUILayout.HelpBox($"Toplam: %{totalWeight:F0} (100 olmalı!)", MessageType.Warning);
+            else
+                EditorGUILayout.HelpBox($"Toplam: %{totalWeight:F0}", MessageType.Info);
+        }
+        if (GUILayout.Button("+ Event Ekle"))
+            pool.InsertArrayElementAtIndex(pool.arraySize);
+    }
+
     private void ClearChoice(SerializedProperty choice)
     {
         choice.FindPropertyRelative("displayName").stringValue = "";
@@ -950,6 +1383,8 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("supportModifier").floatValue = 0f;
         choice.FindPropertyRelative("suspicionModifier").floatValue = 0f;
         choice.FindPropertyRelative("reputationModifier").floatValue = 0f;
+        choice.FindPropertyRelative("hasReputationFloor").boolValue = false;
+        choice.FindPropertyRelative("reputationFloor").floatValue = 0f;
         choice.FindPropertyRelative("politicalInfluenceModifier").floatValue = 0f;
         choice.FindPropertyRelative("costModifier").intValue = 0;
         choice.FindPropertyRelative("wealthModifier").floatValue = 0f;
@@ -962,6 +1397,10 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("protestIncreaseAmount").floatValue = 0f;
         choice.FindPropertyRelative("endsWar").boolValue = false;
         choice.FindPropertyRelative("warEndDelay").floatValue = 0f;
+        choice.FindPropertyRelative("winsWar").boolValue = false;
+        choice.FindPropertyRelative("winWarDelay").floatValue = 0f;
+        choice.FindPropertyRelative("winWarCustomReward").boolValue = false;
+        choice.FindPropertyRelative("winWarRewardRatio").floatValue = 1f;
         choice.FindPropertyRelative("reducesReward").boolValue = false;
         choice.FindPropertyRelative("baseRewardReduction").floatValue = 0f;
         choice.FindPropertyRelative("endsWarWithDeal").boolValue = false;
@@ -969,6 +1408,7 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("dealRewardRatio").floatValue = 0f;
         choice.FindPropertyRelative("blocksEvents").boolValue = false;
         choice.FindPropertyRelative("eventBlockCycles").intValue = 0;
+        choice.FindPropertyRelative("globalEventBlockCycles").intValue = 0;
         choice.FindPropertyRelative("blocksCeasefire").boolValue = false;
         choice.FindPropertyRelative("blocksEventGroup").boolValue = false;
         choice.FindPropertyRelative("blockedGroup").objectReferenceValue = null;
@@ -994,8 +1434,19 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("chainThreshold1").floatValue = 50f;
         choice.FindPropertyRelative("chainThreshold2").floatValue = 75f;
         choice.FindPropertyRelative("chainBranches").ClearArray();
+        choice.FindPropertyRelative("conditionalChainBranches").ClearArray();
         choice.FindPropertyRelative("chainCanEnd").boolValue = false;
         choice.FindPropertyRelative("chainEndWeight").floatValue = 1f;
+        choice.FindPropertyRelative("hasConditionalBranching").boolValue = false;
+        choice.FindPropertyRelative("branchCounterKey").stringValue = "";
+        choice.FindPropertyRelative("branchCounterMin").intValue = 0;
+        choice.FindPropertyRelative("branchCounterMax").intValue = -1;
+        choice.FindPropertyRelative("incrementsChainCounter").boolValue = false;
+        choice.FindPropertyRelative("chainCounterKey").stringValue = "";
+        choice.FindPropertyRelative("chainCounterIncrement").intValue = 1;
+        choice.FindPropertyRelative("hasEarlyChainTrigger").boolValue = false;
+        choice.FindPropertyRelative("earlyTriggerThreshold").intValue = 0;
+        choice.FindPropertyRelative("earlyTriggerEvent").objectReferenceValue = null;
         choice.FindPropertyRelative("hasChainTickEffect").boolValue = false;
         choice.FindPropertyRelative("chainTickStat").enumValueIndex = 0;
         choice.FindPropertyRelative("chainTickAmount").floatValue = 0f;
@@ -1012,7 +1463,24 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("startsWomanProcess").boolValue = false;
         choice.FindPropertyRelative("endsWomanProcess").boolValue = false;
         choice.FindPropertyRelative("womanObsessionModifier").floatValue = 0f;
+        choice.FindPropertyRelative("hasObsessionFloor").boolValue = false;
+        choice.FindPropertyRelative("obsessionFloor").floatValue = 0f;
+        choice.FindPropertyRelative("redirectsWomanPool").boolValue = false;
+        choice.FindPropertyRelative("freezesWomanProcess").boolValue = false;
+        choice.FindPropertyRelative("womanProcessFreezeCycles").intValue = 1;
+        choice.FindPropertyRelative("hasObsessionDropLimit").boolValue = false;
+        choice.FindPropertyRelative("obsessionDropLimit").floatValue = 0f;
+        choice.FindPropertyRelative("womanPoolDatabase").objectReferenceValue = null;
         choice.FindPropertyRelative("permanentMultipliers").ClearArray();
+        choice.FindPropertyRelative("statCeilingEffects").ClearArray();
+        choice.FindPropertyRelative("hasImmediateEvent").boolValue = false;
+        choice.FindPropertyRelative("immediateEventDelay").floatValue = 0f;
+        choice.FindPropertyRelative("immediateEventIsTiered").boolValue = false;
+        choice.FindPropertyRelative("immediateEventPool").ClearArray();
+        choice.FindPropertyRelative("immediateEventTier1").objectReferenceValue = null;
+        choice.FindPropertyRelative("immediateEventTier2").objectReferenceValue = null;
+        choice.FindPropertyRelative("immediateEventTier3").objectReferenceValue = null;
+        choice.FindPropertyRelative("setsStoryFlags").ClearArray();
         choice.FindPropertyRelative("requiredSkills").ClearArray();
         choice.FindPropertyRelative("statConditions").ClearArray();
     }

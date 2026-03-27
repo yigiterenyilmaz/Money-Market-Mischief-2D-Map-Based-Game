@@ -33,15 +33,46 @@ public class WomanProcessManager : MonoBehaviour
     private Event currentPrecursorRandomEvent; //gösterilen öncü random event
     private float precursorDecisionTimer;
 
+    //havuz yönlendirme — bir choice ile kalıcı olarak başka database'e geçiş
+    private WomanProcessDatabase redirectedDatabase; //null ise normal database kullanılır
+
+    //kalıcı obsesyon kazanım çarpanı — çarpımsal birikir (1.0 = etkisiz)
+    private float obsessionGainMultiplier = 1f;
+
+    //son chain branch seçiminin anında event olup olmadığı
+    private bool lastChainPickWasImmediate;
+    private float lastChainPickImmediateDelay;
+
+    //gecikmeli anında event (chain branch'ten)
+    private WarForOilEvent pendingImmediateEvent;
+    private float immediateEventTimer;
+
+    //dondurma — belirli sayıda döngü boyunca kadın eventi tetiklenmez
+    private int freezeRemainingCycles;
+
+    //döngü başına birden fazla kadın eventi desteği
+    private int remainingWomanEventsInCycle;
+
+    //obsesyon düşüş limiti — aktifse obsesyon zirve değerinden belirli miktar düşünce süreç biter
+    private bool hasActiveDropLimit;
+    private float dropLimitDelta; //zirve obsesyondan bu kadar düşerse süreç biter
+    private float dropLimitPeakObsession; //limit aktifken ulaşılan en yüksek obsesyon
+
     //zincir durumu
     private bool isInWomanChain;
-    private List<ChainBranch> pendingWomanChainBranches;
+    private List<ChainBranch> pendingWomanChainBranches; //koşulsuz dallar
+    private List<ChainBranch> pendingWomanConditionalBranches; //koşullu dallar
     private ChainInfluenceStat pendingWomanChainInfluenceStat;
     private float pendingWomanChainThreshold0;
     private float pendingWomanChainThreshold1;
     private float pendingWomanChainThreshold2;
     private bool pendingWomanChainCanEnd;
     private float pendingWomanChainEndWeight;
+    private bool pendingWomanConditionalBranching;
+    private string pendingWomanBranchCounterKey;
+    private int pendingWomanBranchCounterMin;
+    private int pendingWomanBranchCounterMax = -1;
+    private Dictionary<string, int> womanChainCounters = new Dictionary<string, int>();
 
     //events — UI dinleyecek
     public static event Action OnWomanProcessStarted; //süreç başladı
@@ -85,6 +116,19 @@ public class WomanProcessManager : MonoBehaviour
     private void Update()
     {
         if (currentState == WomanProcessState.Inactive) return;
+
+        //gecikmeli anında event (chain branch'ten)
+        if (pendingImmediateEvent != null && currentState == WomanProcessState.Active)
+        {
+            immediateEventTimer -= Time.deltaTime;
+            if (immediateEventTimer <= 0f)
+            {
+                WarForOilEvent evt = pendingImmediateEvent;
+                pendingImmediateEvent = null;
+                ShowWomanEvent(evt);
+                return;
+            }
+        }
 
         //bekleyen tetikleme — uygun an gelince kadın eventini göster
         if (pendingTrigger && currentState == WomanProcessState.Active)
@@ -226,9 +270,18 @@ public class WomanProcessManager : MonoBehaviour
         currentWomanEvent = null;
         womanEventTriggerCounts.Clear();
         dismissedWomanEvents.Clear();
+        redirectedDatabase = null;
+        obsessionGainMultiplier = 1f;
         isInWomanChain = false;
         pendingWomanChainBranches = null;
         pendingWomanEventAfterPrecursor = null;
+        pendingImmediateEvent = null;
+        immediateEventTimer = 0f;
+        freezeRemainingCycles = 0;
+        remainingWomanEventsInCycle = 0;
+        hasActiveDropLimit = false;
+        dropLimitDelta = 0f;
+        dropLimitPeakObsession = 0f;
         currentPrecursorWarEvent = null;
         currentPrecursorRandomEvent = null;
         currentState = WomanProcessState.Active;
@@ -253,7 +306,28 @@ public class WomanProcessManager : MonoBehaviour
         //womanObsession güncelle
         if (choice.womanObsessionModifier != 0f)
         {
-            womanObsession = Mathf.Clamp(womanObsession + choice.womanObsessionModifier, 0f, 100f);
+            float obsessionAmount = choice.womanObsessionModifier;
+            if (obsessionAmount > 0f)
+                obsessionAmount *= obsessionGainMultiplier;
+
+            if (choice.hasObsessionFloor && obsessionAmount < 0f)
+            {
+                if (womanObsession < choice.obsessionFloor)
+                {
+                    //zaten floor'un altında — sadece 0.1 düşür
+                    womanObsession = Mathf.Max(womanObsession - 0.1f, 0f);
+                }
+                else
+                {
+                    womanObsession = Mathf.Clamp(womanObsession + obsessionAmount, 0f, 100f);
+                    if (womanObsession < choice.obsessionFloor)
+                        womanObsession = choice.obsessionFloor;
+                }
+            }
+            else
+            {
+                womanObsession = Mathf.Clamp(womanObsession + obsessionAmount, 0f, 100f);
+            }
             OnObsessionChanged?.Invoke(womanObsession);
         }
 
@@ -263,7 +337,23 @@ public class WomanProcessManager : MonoBehaviour
             if (choice.suspicionModifier != 0f)
                 GameStatManager.Instance.AddSuspicion(choice.suspicionModifier);
             if (choice.reputationModifier != 0f)
-                GameStatManager.Instance.AddReputation(choice.reputationModifier);
+            {
+                if (choice.hasReputationFloor && choice.reputationModifier < 0f)
+                {
+                    if (GameStatManager.Instance.Reputation < choice.reputationFloor)
+                        GameStatManager.Instance.AddReputation(-0.1f);
+                    else
+                    {
+                        GameStatManager.Instance.AddReputation(choice.reputationModifier);
+                        if (GameStatManager.Instance.Reputation < choice.reputationFloor)
+                            GameStatManager.Instance.SetStat(StatType.Reputation, choice.reputationFloor);
+                    }
+                }
+                else
+                {
+                    GameStatManager.Instance.AddReputation(choice.reputationModifier);
+                }
+            }
             if (choice.politicalInfluenceModifier != 0f)
                 GameStatManager.Instance.AddPoliticalInfluence(choice.politicalInfluenceModifier);
             if (choice.wealthModifier != 0f)
@@ -290,6 +380,28 @@ public class WomanProcessManager : MonoBehaviour
         if (isInWar && WarForOilManager.Instance != null)
             WarForOilManager.Instance.ApplyExternalWarEffects(choice);
 
+        //dinamik stat tavanı uygula
+        if (choice.statCeilingEffects != null && choice.statCeilingEffects.Count > 0 && GameStatManager.Instance != null)
+        {
+            for (int i = 0; i < choice.statCeilingEffects.Count; i++)
+            {
+                var entry = choice.statCeilingEffects[i];
+                switch (entry.mode)
+                {
+                    case StatCeilingMode.Set:
+                        GameStatManager.Instance.SetStatCeiling(entry.stat, entry.ceilingValue);
+                        break;
+                    case StatCeilingMode.Multiply:
+                        float currentMax = GameStatManager.Instance.GetEffectiveMax(entry.stat);
+                        GameStatManager.Instance.SetStatCeiling(entry.stat, currentMax * entry.ceilingMultiplier);
+                        break;
+                    case StatCeilingMode.Remove:
+                        GameStatManager.Instance.RemoveStatCeiling(entry.stat);
+                        break;
+                }
+            }
+        }
+
         //kalıcı stat çarpanları
         if (choice.permanentMultipliers != null && choice.permanentMultipliers.Count > 0)
         {
@@ -301,9 +413,35 @@ public class WomanProcessManager : MonoBehaviour
                     if (WarForOilManager.Instance != null)
                         WarForOilManager.Instance.ApplyPermanentSupportMultiplier(entry.multiplier);
                 }
+                else if (entry.stat == PermanentMultiplierStatType.WomanObsession)
+                {
+                    ApplyPermanentObsessionMultiplier(entry.multiplier);
+                }
                 else if (GameStatManager.Instance != null)
                     GameStatManager.Instance.ApplyPermanentGainMultiplier((StatType)entry.stat, entry.multiplier);
             }
+        }
+
+        //havuz yönlendirme — kalıcı olarak başka database'e geçiş
+        if (choice.redirectsWomanPool && choice.womanPoolDatabase != null)
+        {
+            redirectedDatabase = choice.womanPoolDatabase;
+        }
+
+        //kadın sürecini dondurma
+        if (choice.freezesWomanProcess && choice.womanProcessFreezeCycles > 0)
+        {
+            FreezeProcess(choice.womanProcessFreezeCycles);
+        }
+
+        //obsesyon düşüş limiti — zirve obsesyondan belirli miktar düşerse süreç biter
+        if (choice.hasObsessionDropLimit && choice.obsessionDropLimit > 0f)
+        {
+            //daha sıkı (küçük delta) olan geçerli
+            if (!hasActiveDropLimit || choice.obsessionDropLimit < dropLimitDelta)
+                dropLimitDelta = choice.obsessionDropLimit;
+            hasActiveDropLimit = true;
+            dropLimitPeakObsession = Mathf.Max(dropLimitPeakObsession, womanObsession);
         }
 
         OnWomanEventResolved?.Invoke(choice);
@@ -324,29 +462,112 @@ public class WomanProcessManager : MonoBehaviour
             return;
         }
 
-        //zincir dallanması kontrolü
-        if (choice.chainBranches != null && choice.chainBranches.Count > 0)
+        //zincir sayaç artırma
+        if (isInWomanChain && choice.incrementsChainCounter && !string.IsNullOrEmpty(choice.chainCounterKey))
         {
-            //zincir başlat veya devam ettir
-            isInWomanChain = true;
-            pendingWomanChainBranches = choice.chainBranches;
-            pendingWomanChainInfluenceStat = choice.chainInfluenceStat;
-            pendingWomanChainThreshold0 = choice.chainThreshold0;
-            pendingWomanChainThreshold1 = choice.chainThreshold1;
-            pendingWomanChainThreshold2 = choice.chainThreshold2;
-            pendingWomanChainCanEnd = choice.chainCanEnd;
-            pendingWomanChainEndWeight = choice.chainCanEnd ? choice.chainEndWeight : 0f;
+            if (!womanChainCounters.ContainsKey(choice.chainCounterKey))
+                womanChainCounters[choice.chainCounterKey] = 0;
+            womanChainCounters[choice.chainCounterKey] += choice.chainCounterIncrement;
         }
-        else if (isInWomanChain)
+
+        //zincir erken tetikleme — sayaç eşiğe ulaştıysa zinciri atlayıp direkt event'e geç
+        if (isInWomanChain && choice.hasEarlyChainTrigger && choice.earlyTriggerEvent != null
+            && !string.IsNullOrEmpty(choice.chainCounterKey))
         {
-            //choice'ta branch yok — zincir biter
-            EndWomanChain();
+            int currentCount = 0;
+            womanChainCounters.TryGetValue(choice.chainCounterKey, out currentCount);
+            if (currentCount >= choice.earlyTriggerThreshold)
+            {
+                WarForOilEvent earlyEvent = choice.earlyTriggerEvent;
+                EndWomanChain();
+                ShowWomanEvent(earlyEvent);
+                return;
+            }
+        }
+
+        //anında event tetikleme — choice'a bağlı havuzdan veya tier'a göre event gösterilir
+        bool immediateEventTriggered = false;
+        if (choice.hasImmediateEvent)
+        {
+            WarForOilEvent picked = null;
+
+            //tier bazlı — kadın obsesyon seviyesine göre tek event
+            if (choice.immediateEventIsTiered)
+            {
+                WomanProcessDatabase activeDb = redirectedDatabase != null ? redirectedDatabase : database;
+                int tier = activeDb.GetTier(womanObsession);
+                switch (tier)
+                {
+                    case 1: picked = choice.immediateEventTier1; break;
+                    case 2: picked = choice.immediateEventTier2; break;
+                    case 3: picked = choice.immediateEventTier3; break;
+                }
+            }
+            else
+            {
+                //normal havuzdan seç
+                picked = (choice.immediateEventPool != null && choice.immediateEventPool.Count > 0)
+                    ? PickImmediateEvent(choice.immediateEventPool)
+                    : null;
+            }
+
+            if (picked != null)
+            {
+                immediateEventTriggered = true;
+                if (choice.immediateEventDelay > 0f)
+                {
+                    pendingImmediateEvent = picked;
+                    immediateEventTimer = choice.immediateEventDelay;
+                }
+                else
+                {
+                    currentState = WomanProcessState.Active;
+                    CheckEndConditions();
+                    ShowWomanEvent(picked);
+                    return;
+                }
+            }
+        }
+
+        //anında event yoksa veya gecikmeli tetikleniyorsa — zincir dallanması kontrolü
+        if (!immediateEventTriggered)
+        {
+            bool hasAnyBranches = (choice.chainBranches != null && choice.chainBranches.Count > 0)
+                || (choice.conditionalChainBranches != null && choice.conditionalChainBranches.Count > 0);
+            if (hasAnyBranches)
+            {
+                //zincir başlat veya devam ettir
+                isInWomanChain = true;
+                pendingWomanChainBranches = choice.chainBranches != null ? new List<ChainBranch>(choice.chainBranches) : new List<ChainBranch>();
+                pendingWomanConditionalBranches = choice.conditionalChainBranches != null ? new List<ChainBranch>(choice.conditionalChainBranches) : new List<ChainBranch>();
+                pendingWomanChainInfluenceStat = choice.chainInfluenceStat;
+                pendingWomanChainThreshold0 = choice.chainThreshold0;
+                pendingWomanChainThreshold1 = choice.chainThreshold1;
+                pendingWomanChainThreshold2 = choice.chainThreshold2;
+                pendingWomanChainCanEnd = choice.chainCanEnd;
+                pendingWomanChainEndWeight = choice.chainCanEnd ? choice.chainEndWeight : 0f;
+                pendingWomanConditionalBranching = choice.hasConditionalBranching;
+                pendingWomanBranchCounterKey = choice.branchCounterKey;
+                pendingWomanBranchCounterMin = choice.branchCounterMin;
+                pendingWomanBranchCounterMax = choice.branchCounterMax;
+            }
+            else if (isInWomanChain)
+            {
+                //choice'ta branch yok — zincir biter
+                EndWomanChain();
+            }
         }
 
         currentState = WomanProcessState.Active;
 
         //bitiş kontrolleri
         CheckEndConditions();
+
+        //döngüde bekleyen kadın eventi varsa bir sonrakini tetikle
+        if (currentState == WomanProcessState.Active && remainingWomanEventsInCycle > 0)
+        {
+            pendingTrigger = true;
+        }
     }
 
     /// <summary>
@@ -371,6 +592,30 @@ public class WomanProcessManager : MonoBehaviour
     public float GetObsession()
     {
         return womanObsession;
+    }
+
+    /// <summary>
+    /// Aktif database'i döner (yönlendirilmiş varsa onu, yoksa ana database'i).
+    /// </summary>
+    public WomanProcessDatabase GetActiveDatabase()
+    {
+        return redirectedDatabase != null ? redirectedDatabase : database;
+    }
+
+    /// <summary>
+    /// Kadın obsesyonu kalıcı kazanım çarpanını uygular. Çarpan birikimlidir (mevcut *= yeni).
+    /// </summary>
+    public void ApplyPermanentObsessionMultiplier(float multiplier)
+    {
+        obsessionGainMultiplier *= multiplier;
+    }
+
+    /// <summary>
+    /// Kadın sürecini belirli döngü sayısı kadar dondurur. Mevcut freeze varsa üstüne eklenir.
+    /// </summary>
+    public void FreezeProcess(int cycles)
+    {
+        freezeRemainingCycles += cycles;
     }
 
     /// <summary>
@@ -414,14 +659,28 @@ public class WomanProcessManager : MonoBehaviour
 
     private void IncrementEventCounter()
     {
+        //döngüde bekleyen kadın eventi varsa normal event sayacını artırma
+        if (remainingWomanEventsInCycle > 0) return;
+
         eventCounter++;
 
-        int tier = database.GetTier(womanObsession);
-        int frequency = database.GetTierFrequency(tier);
+        WomanProcessDatabase activeDb = redirectedDatabase != null ? redirectedDatabase : database;
+        int tier = activeDb.GetTier(womanObsession);
+        int frequency = activeDb.GetTierFrequency(tier);
 
         if (eventCounter >= frequency)
         {
             eventCounter = 0;
+
+            //dondurma aktifse bu döngüde kadın eventi tetiklenmez
+            if (freezeRemainingCycles > 0)
+            {
+                freezeRemainingCycles--;
+                return;
+            }
+
+            int womanCount = activeDb.GetTierWomanCount(tier);
+            remainingWomanEventsInCycle = womanCount;
             pendingTrigger = true;
         }
     }
@@ -429,6 +688,17 @@ public class WomanProcessManager : MonoBehaviour
     /// <summary>
     /// Şu an kadın eventi tetiklenebilir mi (başka event gösterilmiyor).
     /// </summary>
+    private bool IsStoryFlagsSatisfied(WarForOilEvent evt)
+    {
+        if (evt.requiredStoryFlags == null || evt.requiredStoryFlags.Count == 0) return true;
+        if (StoryFlagManager.Instance == null) return false;
+        for (int i = 0; i < evt.requiredStoryFlags.Count; i++)
+        {
+            if (!StoryFlagManager.Instance.HasFlag(evt.requiredStoryFlags[i])) return false;
+        }
+        return true;
+    }
+
     private bool CanTriggerNow()
     {
         //EventCoordinator ile çakışma kontrolü
@@ -447,17 +717,38 @@ public class WomanProcessManager : MonoBehaviour
 
     private void TriggerWomanEvent()
     {
+        //freeze aktifse zincir dahil hiçbir kadın eventi tetiklenmez — zincir askıda kalır
+        if (freezeRemainingCycles > 0)
+        {
+            freezeRemainingCycles--;
+            remainingWomanEventsInCycle = 0;
+            pendingTrigger = false;
+            return;
+        }
+
         WarForOilEvent evt;
 
         if (isInWomanChain)
         {
             //zincir aktif — chain branch'lerinden seç
+            lastChainPickWasImmediate = false;
             evt = PickEventFromChainBranches();
             if (evt == null)
             {
                 //uygun branch kalmadı — zincir biter, havuzdan devam et
                 EndWomanChain();
                 evt = PickEventFromTierPool();
+            }
+            else if (lastChainPickWasImmediate)
+            {
+                //anında event olarak seçildi — zincir devam ediyor, sadece hemen gösterilecek
+                if (lastChainPickImmediateDelay > 0f)
+                {
+                    //gecikmeli tetikle
+                    pendingImmediateEvent = evt;
+                    immediateEventTimer = lastChainPickImmediateDelay;
+                    return;
+                }
             }
         }
         else
@@ -466,14 +757,26 @@ public class WomanProcessManager : MonoBehaviour
             evt = PickEventFromTierPool();
         }
 
-        if (evt == null) return;
+        if (evt == null)
+        {
+            remainingWomanEventsInCycle = 0;
+            return;
+        }
+
+        //döngü sayacını düşür
+        if (remainingWomanEventsInCycle > 0)
+            remainingWomanEventsInCycle--;
 
         //öncü event kontrolü
         if (evt.hasPrecursorEvent)
         {
-            //war for oil öncüsü ve savaşta değilsek — ikisi de tetiklenmez
+            //war for oil öncüsü ve savaşta değilsek — bu eventi atla, havuzdan başka bir event seç
             if (evt.precursorEventType == PrecursorEventType.WarForOil && !isInWar)
-                return;
+            {
+                WarForOilEvent fallback = PickEventFromTierPool(evt);
+                if (fallback == null) return;
+                evt = fallback;
+            }
 
             pendingWomanEventAfterPrecursor = evt;
             precursorWasWarEvent = evt.precursorEventType == PrecursorEventType.WarForOil;
@@ -543,14 +846,57 @@ public class WomanProcessManager : MonoBehaviour
         OnWomanEventTriggered?.Invoke(evt);
     }
 
-    private WarForOilEvent PickEventFromTierPool()
+    private WarForOilEvent PickEventFromTierPool(WarForOilEvent exclude = null)
     {
-        int tier = database.GetTier(womanObsession);
-        List<WarForOilEvent> pool = database.GetTierEvents(tier);
+        //yönlendirilmiş database varsa onu kullan
+        WomanProcessDatabase activeDb = redirectedDatabase != null ? redirectedDatabase : database;
+
+        int tier = activeDb.GetTier(womanObsession);
+        List<WarForOilEvent> pool = activeDb.GetTierEvents(tier);
         if (pool == null || pool.Count == 0) return null;
 
-        database.GetTierRange(tier, out float tierMin, out float tierMax);
-        return PickEventFromPool(pool, tierMin, tierMax);
+        activeDb.GetTierRange(tier, out float tierMin, out float tierMax);
+        return PickEventFromPool(pool, tierMin, tierMax, exclude);
+    }
+
+    /// <summary>
+    /// Anında event havuzundan ağırlıklı seçim yapar.
+    /// </summary>
+    private WarForOilEvent PickImmediateEvent(List<ImmediateEventEntry> pool)
+    {
+        if (pool == null || pool.Count == 0) return null;
+
+        float totalWeight = 0f;
+        for (int i = 0; i < pool.Count; i++)
+        {
+            if (pool[i].targetEvent != null)
+                totalWeight += pool[i].weight;
+        }
+
+        if (totalWeight <= 0f)
+        {
+            //tüm ağırlıklar 0 — eşit dağıt
+            Debug.LogWarning("WOMAN PROCESS: ANINDA EVENT HAVUZUNDA TÜM AĞIRLIKLAR 0! EŞİT DAĞITIM YAPILIYOR.");
+            var valid = new List<WarForOilEvent>();
+            for (int i = 0; i < pool.Count; i++)
+            {
+                if (pool[i].targetEvent != null)
+                    valid.Add(pool[i].targetEvent);
+            }
+            return valid.Count > 0 ? valid[UnityEngine.Random.Range(0, valid.Count)] : null;
+        }
+
+        float roll = UnityEngine.Random.Range(0f, totalWeight);
+        float cumulative = 0f;
+        for (int i = 0; i < pool.Count; i++)
+        {
+            if (pool[i].targetEvent == null) continue;
+            cumulative += pool[i].weight;
+            if (roll <= cumulative)
+                return pool[i].targetEvent;
+        }
+
+        return pool[^1].targetEvent;
     }
 
     /// <summary>
@@ -558,7 +904,9 @@ public class WomanProcessManager : MonoBehaviour
     /// </summary>
     private WarForOilEvent PickEventFromChainBranches()
     {
-        if (pendingWomanChainBranches == null || pendingWomanChainBranches.Count == 0) return null;
+        bool hasUnconditioned = pendingWomanChainBranches != null && pendingWomanChainBranches.Count > 0;
+        bool hasConditioned = pendingWomanConditionalBranches != null && pendingWomanConditionalBranches.Count > 0;
+        if (!hasUnconditioned && !hasConditioned) return null;
 
         //hangi aralıkta olduğumuzu belirle
         int rangeIndex = 0;
@@ -571,45 +919,94 @@ public class WomanProcessManager : MonoBehaviour
             else rangeIndex = 0;
         }
 
-        //ağırlıkları topla
+        //koşullu dallanma aktifse sayaç kontrolü yap
+        bool conditionMet = false;
+        if (pendingWomanConditionalBranching && !string.IsNullOrEmpty(pendingWomanBranchCounterKey)
+            && pendingWomanConditionalBranches != null && pendingWomanConditionalBranches.Count > 0)
+        {
+            int counterVal = 0;
+            womanChainCounters.TryGetValue(pendingWomanBranchCounterKey, out counterVal);
+            bool meetsMin = counterVal >= pendingWomanBranchCounterMin;
+            bool meetsMax = pendingWomanBranchCounterMax < 0 || counterVal <= pendingWomanBranchCounterMax;
+            conditionMet = meetsMin && meetsMax;
+        }
+
+        List<ChainBranch> activePool = conditionMet ? pendingWomanConditionalBranches : pendingWomanChainBranches;
+        if (activePool == null || activePool.Count == 0) return null;
+
+        float[] weights = new float[activePool.Count];
         float endWeight = pendingWomanChainCanEnd ? pendingWomanChainEndWeight : 0f;
         float totalWeight = endWeight;
-        float[] weights = new float[pendingWomanChainBranches.Count];
 
-        for (int i = 0; i < pendingWomanChainBranches.Count; i++)
+        for (int i = 0; i < activePool.Count; i++)
         {
-            if (pendingWomanChainBranches[i].targetEvent == null
-                || dismissedWomanEvents.Contains(pendingWomanChainBranches[i].targetEvent))
+            if (activePool[i].targetEvent == null
+                || dismissedWomanEvents.Contains(activePool[i].targetEvent))
             {
                 weights[i] = 0f;
                 continue;
             }
-            float w = GetBranchWeight(pendingWomanChainBranches[i], rangeIndex);
+
+            float w = GetBranchWeight(activePool[i], rangeIndex);
             if (w < 0f) w = 0f;
             weights[i] = w;
             totalWeight += w;
         }
 
         if (totalWeight <= 0f)
-            return null; //uygun branch yok
+        {
+            int eligibleCount = 0;
+            for (int i = 0; i < activePool.Count; i++)
+            {
+                if (activePool[i].targetEvent != null
+                    && !dismissedWomanEvents.Contains(activePool[i].targetEvent))
+                    eligibleCount++;
+            }
+            if (eligibleCount == 0) return null;
+            Debug.LogWarning("[KADIN SÜRECİ] ZİNCİR DALLANMASI: TÜM AĞIRLIKLAR 0! EŞİT DAĞITIM YAPILIYOR. INSPECTOR'DAN AĞIRLIKLARI KONTROL ET!");
+            float equalWeight = 1f / eligibleCount;
+            totalWeight = 0f;
+            for (int i = 0; i < activePool.Count; i++)
+            {
+                if (activePool[i].targetEvent != null
+                    && !dismissedWomanEvents.Contains(activePool[i].targetEvent))
+                {
+                    weights[i] = equalWeight;
+                    totalWeight += equalWeight;
+                }
+            }
+        }
 
         //ağırlıklı seçim
         float roll = UnityEngine.Random.value * totalWeight;
 
         //önce chain bitme kontrolü
         if (roll < endWeight)
-            return null; //null dönünce TriggerWomanEvent zinciri bitirir
+            return null;
 
         float cumulative = endWeight;
-        for (int i = 0; i < pendingWomanChainBranches.Count; i++)
+        for (int i = 0; i < activePool.Count; i++)
         {
             cumulative += weights[i];
             if (roll <= cumulative)
-                return pendingWomanChainBranches[i].targetEvent;
+            {
+                if (activePool[i].triggersAsImmediateEvent)
+                {
+                    lastChainPickWasImmediate = true;
+                    lastChainPickImmediateDelay = activePool[i].immediateEventDelay;
+                }
+                return activePool[i].targetEvent;
+            }
         }
 
         //fallback
-        return pendingWomanChainBranches[pendingWomanChainBranches.Count - 1].targetEvent;
+        int lastIdx = activePool.Count - 1;
+        if (activePool[lastIdx].triggersAsImmediateEvent)
+        {
+            lastChainPickWasImmediate = true;
+            lastChainPickImmediateDelay = activePool[lastIdx].immediateEventDelay;
+        }
+        return activePool[lastIdx].targetEvent;
     }
 
     private float GetBranchWeight(ChainBranch branch, int rangeIndex)
@@ -645,6 +1042,12 @@ public class WomanProcessManager : MonoBehaviour
     {
         isInWomanChain = false;
         pendingWomanChainBranches = null;
+        pendingWomanConditionalBranches = null;
+        pendingWomanConditionalBranching = false;
+        pendingWomanBranchCounterKey = null;
+        pendingWomanBranchCounterMin = 0;
+        pendingWomanBranchCounterMax = -1;
+        womanChainCounters.Clear();
     }
 
     /// <summary>
@@ -652,7 +1055,7 @@ public class WomanProcessManager : MonoBehaviour
     /// Eventin özel aralığı tier aralığıyla kesiştirilir — daraltabilir ama genişletemez.
     /// Kesişim yoksa eventin özel aralığı geçersiz sayılır, tier aralığı olduğu gibi kullanılır.
     /// </summary>
-    private WarForOilEvent PickEventFromPool(List<WarForOilEvent> pool, float tierMin, float tierMax)
+    private WarForOilEvent PickEventFromPool(List<WarForOilEvent> pool, float tierMin, float tierMax, WarForOilEvent exclude = null)
     {
         List<WarForOilEvent> eligible = new List<WarForOilEvent>();
 
@@ -660,9 +1063,16 @@ public class WomanProcessManager : MonoBehaviour
         {
             WarForOilEvent evt = pool[i];
             if (evt == null) continue;
+            if (evt == exclude) continue;
 
             //yasaklanmış mı
             if (dismissedWomanEvents.Contains(evt)) continue;
+
+            //ikili süreç kontrolü — hem savaş hem kadın süreci aktif olmalı
+            if (evt.requiresBothProcessesActive && !isInWar) continue;
+
+            //hikaye bayrak kontrolü — tüm gerekli bayraklar aktif olmalı
+            if (!IsStoryFlagsSatisfied(evt)) continue;
 
             //öncü event kontrolü — war for oil öncüsü varsa ve savaşta değilsek atla
             if (evt.hasPrecursorEvent && evt.precursorEventType == PrecursorEventType.WarForOil && !isInWar)
@@ -726,7 +1136,23 @@ public class WomanProcessManager : MonoBehaviour
             if (choice.suspicionModifier != 0f)
                 GameStatManager.Instance.AddSuspicion(choice.suspicionModifier);
             if (choice.reputationModifier != 0f)
-                GameStatManager.Instance.AddReputation(choice.reputationModifier);
+            {
+                if (choice.hasReputationFloor && choice.reputationModifier < 0f)
+                {
+                    if (GameStatManager.Instance.Reputation < choice.reputationFloor)
+                        GameStatManager.Instance.AddReputation(-0.1f);
+                    else
+                    {
+                        GameStatManager.Instance.AddReputation(choice.reputationModifier);
+                        if (GameStatManager.Instance.Reputation < choice.reputationFloor)
+                            GameStatManager.Instance.SetStat(StatType.Reputation, choice.reputationFloor);
+                    }
+                }
+                else
+                {
+                    GameStatManager.Instance.AddReputation(choice.reputationModifier);
+                }
+            }
             if (choice.politicalInfluenceModifier != 0f)
                 GameStatManager.Instance.AddPoliticalInfluence(choice.politicalInfluenceModifier);
             if (choice.wealthModifier != 0f)
@@ -736,7 +1162,28 @@ public class WomanProcessManager : MonoBehaviour
         //womanObsession etkisi
         if (choice.womanObsessionModifier != 0f)
         {
-            womanObsession = Mathf.Clamp(womanObsession + choice.womanObsessionModifier, 0f, 100f);
+            float obsessionAmount = choice.womanObsessionModifier;
+            if (obsessionAmount > 0f)
+                obsessionAmount *= obsessionGainMultiplier;
+
+            if (choice.hasObsessionFloor && obsessionAmount < 0f)
+            {
+                if (womanObsession < choice.obsessionFloor)
+                {
+                    //zaten floor'un altında — sadece 0.1 düşür
+                    womanObsession = Mathf.Max(womanObsession - 0.1f, 0f);
+                }
+                else
+                {
+                    womanObsession = Mathf.Clamp(womanObsession + obsessionAmount, 0f, 100f);
+                    if (womanObsession < choice.obsessionFloor)
+                        womanObsession = choice.obsessionFloor;
+                }
+            }
+            else
+            {
+                womanObsession = Mathf.Clamp(womanObsession + obsessionAmount, 0f, 100f);
+            }
             OnObsessionChanged?.Invoke(womanObsession);
         }
 
@@ -818,6 +1265,34 @@ public class WomanProcessManager : MonoBehaviour
             EndWomanChain();
             currentState = WomanProcessState.Inactive;
             OnWomanProcessEnded?.Invoke();
+            return;
+        }
+
+        //obsesyon düşüş limiti — zirve takipli
+        if (hasActiveDropLimit)
+        {
+            WomanProcessDatabase activeDb = redirectedDatabase != null ? redirectedDatabase : database;
+
+            //low→mid geçişi: obsesyon tier1Max'ı aştıysa limit kalıcı olarak kalkar
+            if (womanObsession > activeDb.tier1Max)
+            {
+                hasActiveDropLimit = false;
+                return;
+            }
+
+            //zirveyi güncelle
+            if (womanObsession > dropLimitPeakObsession)
+                dropLimitPeakObsession = womanObsession;
+
+            //eşik = zirve - delta
+            float threshold = dropLimitPeakObsession - dropLimitDelta;
+            if (womanObsession <= threshold)
+            {
+                hasActiveDropLimit = false;
+                EndWomanChain();
+                currentState = WomanProcessState.Inactive;
+                OnWomanProcessEnded?.Invoke();
+            }
         }
     }
 

@@ -27,7 +27,8 @@ public class WarForOilDatabase : ScriptableObject
 
     [Header("Savaş Ayarları")]
     public float warDuration = 300f; //savaş süresi (saniye)
-    public float eventInterval = 15f; //savaş sırasında event kontrol aralığı (saniye)
+    public float eventInterval = 80f; //savaş sırasında normal event aralığı (saniye)
+    public float chainEventInterval = 40f; //zincir aktifken event aralığı (saniye)
     public float initialSupportStat = 50f; //destek stat başlangıç değeri
 
     [Header("Sonuç Ayarları")]

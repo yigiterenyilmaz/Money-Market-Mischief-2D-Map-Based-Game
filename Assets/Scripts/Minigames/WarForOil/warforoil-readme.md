@@ -188,6 +188,7 @@ Savas sirasinda tetiklenen karar olaylari. Ayni event sinifi normal eventler, zi
 | `displayName` | Event basligi |
 | `description` | Event aciklamasi (TextArea) |
 | `devNote` | Sadece Inspector'da gorunen gelistirici notu (oyuna etkisi yok) |
+| `conditionalDescriptions` | Hikaye bayragi aktifse default aciklama yerine alternatif metin gosterilir. Ilk eslesen bayrak gecerli olur. |
 | `minWarTime` | Savas suresinin yuzdesi olarak en erken tetiklenme (0-1, orn. 0.2 = %20, 300sn savasta 60sn) |
 | `maxWarTime` | Savas suresinin yuzdesi olarak en gec tetiklenme (-1 = sinirsiz, 0-1 arasi yuzde) |
 | `decisionTime` | Karar suresi (varsayilan 10 sn) |
@@ -260,6 +261,9 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `eventBlockCycles` | Gecici event engeli — bu kadar event donemi boyunca event gelmez (0-10, 0=etkisiz) |
 | `blocksCeasefire` | Secilirse savas sonuna kadar oyuncunun ateskes butonu engellenir |
 | `blocksEventGroup` | Secilirse bu event'in ait oldugu gruptaki (OFPC/WTETWC) tum eventler bir daha tetiklenmez |
+| `setsStoryFlags` | Bu choice secildiginde aktif edilen hikaye bayraklari (List&lt;StoryFlag&gt;). Kalici — bir kez aktif edildikten sonra oyun boyunca gecerli. |
+| `hasImmediateEvent` | Secildiginde hic beklemeden havuzdan rastgele bir event tetiklenir (WarProcess'e donmeden) |
+| `immediateEventPool` | Agirlikli event havuzu (List&lt;ImmediateEventEntry&gt;). Her giris: targetEvent + weight. Agirliga gore rastgele secilir |
 | `hasProbabilisticWarEnd` | Olasilik bazli savas bitirme (3 sonuc: savas biter / event yok olur / tekrar tetiklenir) |
 | `probWarEndChance` | Savas bitme olasiligi (0-1, support=50 icin base deger) |
 | `probDismissChance` | Event yok olma olasiligi (0-1, support=50 icin base deger). Tekrar tetiklenme = 1 - warEnd - dismiss |
@@ -282,6 +286,13 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `chainInfluenceStat` | Dallanma secimini etkileyen stat (ChainInfluenceStat: JustLuck / Wealth / Suspicion / Reputation / PoliticalInfluence) |
 | `chainThreshold0/1/2` | Stat aralik esikleri (varsayilan 20/50/75, 4 aralik olusturur) |
 | `chainBranches` | Dallanma hedefleri listesi (List\<ChainBranch\>). Bos = chain biter. Dolu = sonraki chain event bu listeden secilir. Her branch'te 4 aralik agirligi (weightRange0-3). |
+| **Zincir Sayac** | |
+| `incrementsChainCounter` | Bu choice secildiginde zincir sayacini artirir |
+| `chainCounterKey` | Sayac adi (serbest string, orn. "acele", "yavasla") |
+| `chainCounterIncrement` | Artis miktari (varsayilan 1) |
+| `hasEarlyChainTrigger` | Sayac esige ulasirsa zinciri atlayip direkt hedef event'e gecer |
+| `earlyTriggerThreshold` | Erken tetikleme esik degeri |
+| `earlyTriggerEvent` | Esik asildikca tetiklenecek event |
 | **Rakip Isgal Flagleri** (foldout) | |
 | `acceptsRivalDeal` | Rakip isgal anlasmasini kabul eder |
 | `rejectsRivalDeal` | Rakip isgal anlasmasini reddeder → kose kapma yarisi baslar |
@@ -299,8 +310,14 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `startsWomanProcess` | Secildiginde kadin surecini baslatir (oyun boyunca tek sefer, sadece savas icinde calisir) |
 | `endsWomanProcess` | Secildiginde kadin surecini aninda bitirir (obsesyon degeri ne olursa olsun) |
 | `womanObsessionModifier` | Kadin sureci stat degisimi (+ = obsesyon artar, - = azalir). Sadece isWomanProcessEvent acikken Inspector'da gorunur. |
+| `redirectsWomanPool` | true ise secildiginde kadin sureci havuzunu kalici olarak baska bir WomanProcessDatabase'e yonlendirir. Sadece isWomanProcessEvent acikken Inspector'da gorunur. |
+| `womanPoolDatabase` | Yonlendirilecek WomanProcessDatabase referansi. redirectsWomanPool aktifken gorunur. |
+| `freezesWomanProcess` | true ise kadin surecini belirli dongu sayisi kadar dondurur. Sadece isWomanProcessEvent acikken gorunur. |
+| `womanProcessFreezeCycles` | Kac dongu boyunca kadin eventi tetiklenmeyecek (min 1). freezesWomanProcess aktifken gorunur. Mevcut dondurma varsa ustune eklenir. |
+| `hasObsessionDropLimit` | true ise bu choice secildikten sonra obsesyon zirve degerinden belirli miktar duserse kadin sureci otomatik sona erer. Zirve takipli: obsesyon yukselirse esik de yukselir. Low→Mid kademe gecisinde limit kalici olarak kalkar. |
+| `obsessionDropLimit` | Zirve obsesyondan bu kadar duserse surec biter. Ornek: 12'de secildi, limit 3 → esik 9. Obsesyon 15'e cikti → esik 12. Birden fazla limit varsa en siki (kucuk delta) gecerli olur. |
 | **Kalici Stat Carpanlari** (foldout) | |
-| `permanentMultipliers` | Liste: birden fazla stat icin kalici carpan tanimlanabilir. Her entry: `stat` (StatType) + `multiplier` (float). Ornek: 1.1 = %10 artis. Carpisimsal birikir. Tum oyun boyunca, tum kaynaklardan gecerlidir. |
+| `permanentMultipliers` | Liste: birden fazla stat icin kalici carpan tanimlanabilir. Her entry: `stat` (PermanentMultiplierStatType) + `multiplier` (float). Ornek: 1.1 = %10 artis. Carpisimsal birikir. Tum oyun boyunca, tum kaynaklardan gecerlidir. Secenekler: Wealth, Suspicion, Reputation, PoliticalInfluence, WarSupport, WomanObsession. WarSupport icin WarForOilManager, WomanObsession icin WomanProcessManager, digerleri icin GameStatManager uygulanir. |
 | **On Kosullar** (foldout) | |
 | `requiredSkills` | Bu secenek icin acilmis olmasi gereken skill'ler |
 | `statConditions` | Bu secenek icin saglanmasi gereken stat kosullari |
@@ -360,13 +377,24 @@ Bir choice secildiginde siradaki chain event'in olasi hedeflerinden birini tanim
 | `weightRange1` | Aralik 1 agirligi |
 | `weightRange2` | Aralik 2 agirligi |
 | `weightRange3` | Aralik 3 agirligi |
+| `triggersAsImmediateEvent` | true ise secilen branch zincir devami yerine aninda event olarak tetiklenir. Zincir biter, event standalone olarak gosterilir. |
+| `immediateEventDelay` | Aninda event gecikmesi (0-10 saniye). triggersAsImmediateEvent aktifken gorunur. 0 = aninda, N = N saniye sonra tetiklenir. |
+
+**Kosullu dallanma (choice seviyesinde):**
+- `hasConditionalBranching`: true ise kosullu dallanma aktif
+- `branchCounterKey`: Sayac adi
+- `branchCounterMin`: Minimum sayac degeri (dahil)
+- `branchCounterMax`: Maksimum sayac degeri (-1 = sinirsiz)
+
+Kosul saglanirsa `conditionalChainBranches` listesinden, saglanmazsa `chainBranches` listesinden secim yapilir. Iki havuzun agirliklari bagimsizdir.
 
 **Secim mantigi:**
 1. Stat'in mevcut yuzdesi (0-100) hesaplanir
 2. Esik degerlerine gore hangi aralikta oldugu belirlenir
 3. O araligin agirligi (weightRangeX) kullanilir
-4. Tum branch'lerin ayni araliktaki agirliklari toplanir, normalize edilir, agirlikli random secim yapilir
-5. JustLuck modunda aralik yok, sadece weightRange0 kullanilir
+4. Kosullu dallanma aktifse: kosul kontrol edilir, gecen havuz secilir
+5. Secilen havuzdaki branch'lerin agirliklarindan normalize edilip agirlikli random secim yapilir
+6. JustLuck modunda aralik yok, sadece weightRange0 kullanilir
 
 **Not:** Her aralik icin tum branch'lerin agirlik toplami ~1 olmalidir (olasilik gibi girilir).
 
@@ -905,7 +933,7 @@ Savas sirasinda event tetiklemeden once `EventCoordinator.CanShowEvent()` kontro
 - **Choice'lar foldout ile**: Her choice icinde 10 foldout grubu:
   1. **Modifiers** — supportModifier, suspicionModifier, reputationModifier, politicalInfluenceModifier, costModifier (birikimli), wealthModifier (anlik), cornerGrabModifier
   2. **Protest Etkisi** — protestModifier, protestTriggerChanceBonus, olasilikli tepki (hasProtestChance + alt alanlari)
-  4. **Diger Sonuclar** — endsWar, reducesReward, endsWarWithDeal, blocksEvents, blocksCeasefire, blocksEventGroup, hasProbabilisticRewardReduction, hasProbabilisticWarEnd
+  4. **Diger Sonuclar** — endsWar, reducesReward, endsWarWithDeal, blocksEvents, blocksCeasefire, blocksEventGroup, hasImmediateEvent, hasProbabilisticRewardReduction, hasProbabilisticWarEnd
   5. **Feed Sonuclari** — freezesFeed, slowsFeed, hasFeedOverride (alt kosullu alanlarla)
   6. **Zincir Dallanmasi** — chainInfluenceStat, esik degerleri, chainBranches listesi (targetEvent, weightRange0-3), chainCanEnd, chainEndWeight
   7. **Rakip Isgal Flagleri** — acceptsRivalDeal, rejectsRivalDeal
@@ -1052,6 +1080,7 @@ Savas sirasinda bir chain choice'u ile tetiklenen, oyuncunun obsesyon stat'ini y
 - **3 kademe**: Obsesyon degerine gore farkli event havuzlari ve sikliklari
 - **Game over**: Obsesyon 100'e ulasirsa suspicion 100'e cikarilarak game over tetiklenir
 - **Surec bitis**: Obsesyon `endThreshold` (10) altina duserse surec biter
+- **Havuz yonlendirme**: Bir choice'taki `redirectsWomanPool` ile kadin sureci kalici olarak baska bir WomanProcessDatabase'e yonlendirilebilir — bundan sonra eventler o database'den cekilir
 
 ### Kademeler
 
@@ -1060,6 +1089,8 @@ Savas sirasinda bir chain choice'u ile tetiklenen, oyuncunun obsesyon stat'ini y
 | 1 | 0 - tier1Max (30) | Her 5 eventte 1 | Dusuk obsesyon, seyrek event |
 | 2 | tier1Max - tier2Max (65) | Her 3 eventte 1 | Orta obsesyon |
 | 3 | tier2Max - 100 | Her 2 eventte 1 | Yuksek obsesyon, sik event |
+
+Her kademe icin "N eventte M kadin eventi" ayarlanabilir. Ornek: tier2Frequency=3, tier2WomanCount=2 → her 3 eventte 2 kadin eventi art arda tetiklenir.
 
 ### Baslatma
 
@@ -1116,6 +1147,7 @@ Kadin eventleri `WarForOilEvent` altyapisini kullanir ama WomanProcessManager ke
 | `wealthModifier` | Evet — anlik para |
 | Feed etkileri | Evet — freeze/slow/override |
 | `permanentMultipliers` | Evet — kalici stat carpanlari |
+| `redirectsWomanPool` | Evet — kalici havuz yonlendirme (baska WomanProcessDatabase'e gecer) |
 | `supportModifier` | Kosullu — savas aktifse WarForOilManager'a iletilir, degilse yok sayilir |
 | `cornerGrabModifier` | Kosullu — savas aktif + kose kapma yarisi varsa uygulanir |
 | Protest etkileri | Kosullu — savas aktif + protest aktifse uygulanir |
@@ -1135,9 +1167,12 @@ Kadin eventleri `WarForOilEvent` altyapisini kullanir ama WomanProcessManager ke
 | `tier1Events` | — | Kademe 1 event havuzu |
 | `tier2Events` | — | Kademe 2 event havuzu |
 | `tier3Events` | — | Kademe 3 event havuzu |
-| `tier1Frequency` | 5 | Kademe 1'de her N eventte 1 kadin eventi |
-| `tier2Frequency` | 3 | Kademe 2'de her N eventte 1 |
-| `tier3Frequency` | 2 | Kademe 3'te her N eventte 1 |
+| `tier1Frequency` | 5 | Kademe 1'de her N eventte |
+| `tier1WomanCount` | 1 | Kademe 1'de dongu basina kac kadin eventi |
+| `tier2Frequency` | 3 | Kademe 2'de her N eventte |
+| `tier2WomanCount` | 1 | Kademe 2'de dongu basina kac kadin eventi |
+| `tier3Frequency` | 2 | Kademe 3'te her N eventte |
+| `tier3WomanCount` | 1 | Kademe 3'te dongu basina kac kadin eventi |
 | `decisionTime` | 10 | Karar suresi (saniye) |
 
 ### Inspector Kullanimi
@@ -1178,3 +1213,25 @@ Assets/Scripts/Minigames/WarForOil/
 │   └── WarForOilEventEditor.cs — Inspector custom editor
 └── warforoil-readme.md         — bu dosya
 ```
+
+---
+
+## Hikaye Bayraklari Sistemi (StoryFlag)
+
+Oyun icinde gerceklesmis onemli olaylari takip eden bayrak sistemi. Bir kez aktif edilen bayrak oyun boyunca kalicidir.
+
+### Dosyalar
+
+- `Assets/Scripts/Core/Enums/StoryFlag.cs` — enum tanimi (tum bayraklar burada)
+- `Assets/Scripts/Core/StoryFlagManager.cs` — singleton manager (HashSet ile takip)
+
+### Kullanim
+
+**Bayrak aktif etme (choice tarafinda):**
+- `WarForOilEventChoice.setsStoryFlags` — bu choice secildiginde listedeki bayraklar aktif olur
+- Inspector'da "Diger Sonuclar" foldout'unda "Hikaye Bayraklari" olarak gozukur
+
+**Aciklama degistirme (event tarafinda):**
+- `WarForOilEvent.conditionalDescriptions` — hikaye bayragi aktifse default aciklama yerine alternatif metin gosterilir
+- `GetDescription()` metodu ile alinir — ilk eslesen bayrak gecerli olur
+- Inspector'da "Kosullu Aciklamalar" olarak gozukur

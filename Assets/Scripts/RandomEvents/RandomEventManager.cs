@@ -11,10 +11,12 @@ public class RandomEventManager : MonoBehaviour
     public int currentGamePhase = 0; //şu anki phase
     public float elapsedTime = 0f; //oyun başladığından beri geçen toplam süre
 
-    public float minEventInterval = 45f; // minimum 45 saniye
-    public float maxEventInterval = 75f; // maximum 75 saniye
+    public float minEventInterval = 120f; // minimum 120 saniye
+    public float maxEventInterval = 140f; // maximum 140 saniye
     private float eventTimer = 0f;
     private float nextEventTime;
+
+    //global event engeli — WarForOilManager üzerinden yönetilir
 
     private HashSet<Event> triggeredEvents = new HashSet<Event>();
     //bu zamana kadar oyuncuya atılmış eventler.
@@ -131,6 +133,10 @@ public class RandomEventManager : MonoBehaviour
 
     public void TriggerRandomEvent() //random event tetikler
     {
+        //global event engeli aktifse random event tetikleme, sayacı düşür
+        if (WarForOilManager.Instance != null && WarForOilManager.Instance.TryConsumeGlobalBlock())
+            return;
+
         //başka bir sistem az önce event gösterdiyse bu cycle'ı atla (en az 2s aralık)
         if (!EventCoordinator.CanShowEvent())
             return;

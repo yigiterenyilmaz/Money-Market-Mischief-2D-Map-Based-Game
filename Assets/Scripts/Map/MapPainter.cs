@@ -75,7 +75,7 @@ public class MapPainter : MonoBehaviour
         ApplyToRenderer(mapTexture);
 
         if (roadGenerator == null)
-            roadGenerator = FindObjectOfType<RoadGenerator>();
+            roadGenerator = FindFirstObjectByType<RoadGenerator>();
 
         if (roadGenerator != null)
         {

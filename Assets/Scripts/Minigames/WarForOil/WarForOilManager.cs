@@ -26,6 +26,8 @@ public class WarForOilManager : MonoBehaviour
     private float eventCheckTimer;
     private float eventDecisionTimer;
     private WarForOilEvent currentEvent;
+    private WarForOilEvent pendingImmediateEvent; //gecikmeli anında event
+    private float immediateEventTimer; //gecikme sayacı
     private Dictionary<WarForOilEvent, int> eventTriggerCounts = new Dictionary<WarForOilEvent, int>();
 
     //operasyon boyunca biriken modifier'lar
@@ -35,23 +37,31 @@ public class WarForOilManager : MonoBehaviour
     private int accumulatedCostModifier;
     private float rewardMultiplier; //baseRewardReduction'lar sonucu biriken ödül çarpanı (1.0'dan başlar)
     private bool eventsBlocked; //bir choice eventleri engelledi mi
-    private int remainingBlockCycles; //geçici event engeli — kalan dönem sayısı
+    private int remainingBlockCycles; //geçici event engeli — kalan dönem sayısı (sadece savaş eventleri)
+    private int remainingGlobalBlockCycles; //global event engeli — kadın eventleri hariç tüm eventler durur
     private bool ceasefireBlocked; //bir choice ateşkesi engelledi mi
     private bool pendingDeal; //anlaşmayla bitirme aktif mi
     private float dealRewardRatio; //anlaşma ödül oranı
+    private bool pendingForceWin; //direkt kazanım aktif mi
+    private bool forceWinCustomReward; //direkt kazanımda özel ödül oranı mı
+    private float forceWinRewardRatio; //direkt kazanım ödül oranı
 
     //zincir sistemi
     private bool isInChain; //şu an bir event zincirinde miyiz
     private WarForOilEvent chainStartEvent; //zincirin baş event'i (Head referansı)
-    private List<ChainBranch> pendingChainBranches; //sıradaki dallanma seçenekleri
+    private List<ChainBranch> pendingChainBranches; //koşulsuz dallanma seçenekleri
+    private List<ChainBranch> pendingConditionalChainBranches; //koşullu dallanma seçenekleri
     private ChainInfluenceStat pendingChainInfluenceStat; //dallanma seçimini etkileyen stat
     private float pendingChainThreshold0; //1. eşik
     private float pendingChainThreshold1; //2. eşik
     private float pendingChainThreshold2; //3. eşik
-    private int chainCycleCounter; //3'lü döngüdeki pozisyon (0,1,2)
-    private int chainSlotsRemaining; //bu döngüde kalan chain event sayısı
     private bool currentEventIsChainEvent; //şu anki event chain slotundan mı geldi (random slot eventleri chain'i bitirmesin)
     private float pendingChainEndWeight; //dallanma seçiminde chain bitme ağırlığı (0 = bitme yok)
+    private bool pendingConditionalBranching; //koşullu dallanma aktif mi
+    private string pendingBranchCounterKey; //koşullu dallanma sayaç adı
+    private int pendingBranchCounterMin; //koşullu dallanma min değer
+    private int pendingBranchCounterMax; //koşullu dallanma max değer (-1 = sınırsız)
+    private Dictionary<string, int> chainCounters = new Dictionary<string, int>(); //zincir sayaçları
     private bool hasActiveChainTickEffect; //chain arası tick etkisi aktif mi
     private ChainTickStatType activeChainTickStat; //tick etkisinin hedef stat'ı
     private float activeChainTickAmount; //tick başına uygulanacak miktar
@@ -276,7 +286,32 @@ public class WarForOilManager : MonoBehaviour
 
         //modifier'ları biriktir
         accumulatedSuspicionModifier += choice.suspicionModifier;
-        accumulatedReputationModifier += choice.reputationModifier;
+
+        //itibar — anlık uygula
+        if (choice.reputationModifier != 0f && GameStatManager.Instance != null)
+        {
+            if (choice.hasReputationFloor && choice.reputationModifier < 0f)
+            {
+                //floor sadece düşürme için geçerli
+                float currentRep = GameStatManager.Instance.Reputation;
+                if (currentRep < choice.reputationFloor)
+                {
+                    //zaten floor'un altında — floor'a yükseltme, sadece 0.1 düşür
+                    GameStatManager.Instance.AddReputation(-0.1f);
+                }
+                else
+                {
+                    GameStatManager.Instance.AddReputation(choice.reputationModifier);
+                    //floor'un altına düştüyse geri çek
+                    if (GameStatManager.Instance.Reputation < choice.reputationFloor)
+                        GameStatManager.Instance.SetStat(StatType.Reputation, choice.reputationFloor);
+                }
+            }
+            else
+            {
+                GameStatManager.Instance.AddReputation(choice.reputationModifier);
+            }
+        }
         accumulatedPoliticalInfluenceModifier += choice.politicalInfluenceModifier;
         accumulatedCostModifier += choice.costModifier;
 
@@ -309,8 +344,39 @@ public class WarForOilManager : MonoBehaviour
                 var entry = choice.permanentMultipliers[i];
                 if (entry.stat == PermanentMultiplierStatType.WarSupport)
                     ApplyPermanentSupportMultiplier(entry.multiplier);
+                else if (entry.stat == PermanentMultiplierStatType.WomanObsession)
+                {
+                    if (WomanProcessManager.Instance != null)
+                        WomanProcessManager.Instance.ApplyPermanentObsessionMultiplier(entry.multiplier);
+                }
                 else if (GameStatManager.Instance != null)
                     GameStatManager.Instance.ApplyPermanentGainMultiplier((StatType)entry.stat, entry.multiplier);
+            }
+        }
+
+        //hikaye bayraklarını aktif et
+        if (choice.setsStoryFlags != null && choice.setsStoryFlags.Count > 0 && StoryFlagManager.Instance != null)
+            StoryFlagManager.Instance.SetFlags(choice.setsStoryFlags);
+
+        //dinamik stat tavanı uygula
+        if (choice.statCeilingEffects != null && choice.statCeilingEffects.Count > 0 && GameStatManager.Instance != null)
+        {
+            for (int i = 0; i < choice.statCeilingEffects.Count; i++)
+            {
+                var entry = choice.statCeilingEffects[i];
+                switch (entry.mode)
+                {
+                    case StatCeilingMode.Set:
+                        GameStatManager.Instance.SetStatCeiling(entry.stat, entry.ceilingValue);
+                        break;
+                    case StatCeilingMode.Multiply:
+                        float currentMax = GameStatManager.Instance.GetEffectiveMax(entry.stat);
+                        GameStatManager.Instance.SetStatCeiling(entry.stat, currentMax * entry.ceilingMultiplier);
+                        break;
+                    case StatCeilingMode.Remove:
+                        GameStatManager.Instance.RemoveStatCeiling(entry.stat);
+                        break;
+                }
             }
         }
 
@@ -389,19 +455,49 @@ public class WarForOilManager : MonoBehaviour
         if (!isInChain && resolvedEvent.chainRole == ChainRole.Head)
             StartChain(resolvedEvent);
 
+        //zincir sayaç artırma
+        if (isInChain && choice.incrementsChainCounter && !string.IsNullOrEmpty(choice.chainCounterKey))
+        {
+            if (!chainCounters.ContainsKey(choice.chainCounterKey))
+                chainCounters[choice.chainCounterKey] = 0;
+            chainCounters[choice.chainCounterKey] += choice.chainCounterIncrement;
+        }
+
+        //zincir erken tetikleme — sayaç eşiğe ulaştıysa zinciri atlayıp direkt event'e geç
+        if (isInChain && choice.hasEarlyChainTrigger && choice.earlyTriggerEvent != null
+            && !string.IsNullOrEmpty(choice.chainCounterKey))
+        {
+            int currentCount = 0;
+            chainCounters.TryGetValue(choice.chainCounterKey, out currentCount);
+            if (currentCount >= choice.earlyTriggerThreshold)
+            {
+                WarForOilEvent earlyEvent = choice.earlyTriggerEvent;
+                EndChain();
+                TriggerEvent(earlyEvent);
+                return;
+            }
+        }
+
         //zincir dallanması — sadece chain'e ait eventlerde kontrol et (Head veya chain slotundan gelen)
         //random slotta gelen normal eventler chain'i etkilemez
         if (isInChain && (resolvedEvent.chainRole == ChainRole.Head || currentEventIsChainEvent))
         {
             currentEventIsChainEvent = false;
-            if (choice.chainBranches != null && choice.chainBranches.Count > 0)
+            bool hasAnyBranches = (choice.chainBranches != null && choice.chainBranches.Count > 0)
+                || (choice.conditionalChainBranches != null && choice.conditionalChainBranches.Count > 0);
+            if (hasAnyBranches)
             {
-                pendingChainBranches = new List<ChainBranch>(choice.chainBranches);
+                pendingChainBranches = choice.chainBranches != null ? new List<ChainBranch>(choice.chainBranches) : new List<ChainBranch>();
+                pendingConditionalChainBranches = choice.conditionalChainBranches != null ? new List<ChainBranch>(choice.conditionalChainBranches) : new List<ChainBranch>();
                 pendingChainInfluenceStat = choice.chainInfluenceStat;
                 pendingChainThreshold0 = choice.chainThreshold0;
                 pendingChainThreshold1 = choice.chainThreshold1;
                 pendingChainThreshold2 = choice.chainThreshold2;
                 pendingChainEndWeight = choice.chainCanEnd ? choice.chainEndWeight : 0f;
+                pendingConditionalBranching = choice.hasConditionalBranching;
+                pendingBranchCounterKey = choice.branchCounterKey;
+                pendingBranchCounterMin = choice.branchCounterMin;
+                pendingBranchCounterMax = choice.branchCounterMax;
 
                 //zincir arası tick etkisi
                 if (choice.hasChainTickEffect)
@@ -459,13 +555,17 @@ public class WarForOilManager : MonoBehaviour
             return;
         }
 
-        //event engelleme (blocksEvents, endsWar veya anlaşma seçildiyse artık event gelmez)
-        if (choice.blocksEvents || choice.endsWar || choice.endsWarWithDeal)
+        //event engelleme (blocksEvents, endsWar, winsWar veya anlaşma seçildiyse artık event gelmez)
+        if (choice.blocksEvents || choice.endsWar || choice.winsWar || choice.endsWarWithDeal)
             eventsBlocked = true;
 
-        //geçici event engeli — belirli dönem boyunca event gelmez
+        //geçici event engeli — belirli dönem boyunca savaş eventi gelmez
         if (choice.eventBlockCycles > 0)
             remainingBlockCycles = choice.eventBlockCycles;
+
+        //global event engeli — kadın eventleri hariç tüm eventler durur
+        if (choice.globalEventBlockCycles > 0)
+            remainingGlobalBlockCycles = choice.globalEventBlockCycles;
 
         //ateşkes engelleme
         if (choice.blocksCeasefire)
@@ -482,6 +582,16 @@ public class WarForOilManager : MonoBehaviour
             warTimer = Mathf.Max(warTimer, targetTimer); //süreyi geri almaz, sadece ileri sarar
         }
 
+        //direkt kazanım — savaşı garanti zaferle bitirir
+        if (choice.winsWar)
+        {
+            float targetTimer = database.warDuration - choice.winWarDelay;
+            warTimer = Mathf.Max(warTimer, targetTimer);
+            pendingForceWin = true;
+            forceWinCustomReward = choice.winWarCustomReward;
+            forceWinRewardRatio = choice.winWarRewardRatio;
+        }
+
         //anlaşmayla bitirme — süreyi ilerlet ve garanti ödül işaretle
         if (choice.endsWarWithDeal)
         {
@@ -489,6 +599,50 @@ public class WarForOilManager : MonoBehaviour
             warTimer = Mathf.Max(warTimer, targetTimer);
             pendingDeal = true;
             dealRewardRatio = choice.dealRewardRatio;
+        }
+
+        //anında event tetikleme — choice'a bağlı havuzdan rastgele biri gösterilir
+        if (choice.hasImmediateEvent)
+        {
+            WarForOilEvent picked = null;
+
+            //tier bazlı — kadın obsesyon seviyesine göre tek event
+            if (choice.immediateEventIsTiered && WomanProcessManager.Instance != null && WomanProcessManager.Instance.IsActive())
+            {
+                WomanProcessDatabase activeDb = WomanProcessManager.Instance.GetActiveDatabase();
+                if (activeDb != null)
+                {
+                    int tier = activeDb.GetTier(WomanProcessManager.Instance.GetObsession());
+                    switch (tier)
+                    {
+                        case 1: picked = choice.immediateEventTier1; break;
+                        case 2: picked = choice.immediateEventTier2; break;
+                        case 3: picked = choice.immediateEventTier3; break;
+                    }
+                }
+            }
+            else
+            {
+                //normal havuzdan seç
+                picked = (choice.immediateEventPool != null && choice.immediateEventPool.Count > 0)
+                    ? PickImmediateEvent(choice.immediateEventPool)
+                    : null;
+            }
+            if (picked != null)
+            {
+                if (choice.immediateEventDelay <= 0f)
+                {
+                    //anında tetikle
+                    TriggerEvent(picked);
+                    return;
+                }
+                else
+                {
+                    //gecikmeli tetikle — WarProcess'e dön, timer say
+                    pendingImmediateEvent = picked;
+                    immediateEventTimer = choice.immediateEventDelay;
+                }
+            }
         }
 
         //savaş sürecine geri dön
@@ -561,8 +715,7 @@ public class WarForOilManager : MonoBehaviour
                 GameStatManager.Instance.AddWealth(result.wealthChange);
             if (result.suspicionChange != 0)
                 GameStatManager.Instance.AddSuspicion(result.suspicionChange);
-            if (result.reputationChange != 0)
-                GameStatManager.Instance.AddReputation(result.reputationChange);
+            //reputation artık anlık uygulanıyor (ResolveEvent'te), burada tekrar uygulanmaz
             if (result.politicalInfluenceChange != 0)
                 GameStatManager.Instance.AddPoliticalInfluence(result.politicalInfluenceChange);
         }
@@ -709,6 +862,19 @@ public class WarForOilManager : MonoBehaviour
     {
         warTimer += Time.deltaTime;
 
+        //gecikmeli anında event kontrolü
+        if (pendingImmediateEvent != null)
+        {
+            immediateEventTimer -= Time.deltaTime;
+            if (immediateEventTimer <= 0f)
+            {
+                WarForOilEvent evt = pendingImmediateEvent;
+                pendingImmediateEvent = null;
+                TriggerEvent(evt);
+                return;
+            }
+        }
+
         //UI'a ilerleme bildir
         float progress = Mathf.Clamp01(warTimer / database.warDuration);
         OnWarProgress?.Invoke(progress);
@@ -772,9 +938,10 @@ public class WarForOilManager : MonoBehaviour
             }
         }
 
-        //event kontrol
+        //event kontrol — zincirdeyken ayrı interval kullanılır
+        float activeInterval = isInChain ? database.chainEventInterval : database.eventInterval;
         eventCheckTimer += Time.deltaTime;
-        if (eventCheckTimer >= database.eventInterval)
+        if (eventCheckTimer >= activeInterval)
         {
             eventCheckTimer = 0f;
 
@@ -784,41 +951,20 @@ public class WarForOilManager : MonoBehaviour
 
             if (isInChain)
             {
-                //3'lü döngü: chain slotları + random slotları
-                if (chainCycleCounter == 0)
-                {
-                    //yeni döngü başlat — 1 veya 2 chain slotu
-                    chainSlotsRemaining = UnityEngine.Random.value < database.chainDoubleChance ? 2 : 1;
-                }
-
-                //sampling without replacement
-                int slotsLeft = 3 - chainCycleCounter;
-                float chainChance = (float)chainSlotsRemaining / slotsLeft;
-
-                if (UnityEngine.Random.value < chainChance
-                    && pendingChainBranches != null && pendingChainBranches.Count > 0)
-                {
-                    //chain slotu
-                    chainSlotsRemaining--;
+                //zincir aktif — sadece chain eventleri gelir
+                if (pendingChainBranches != null && pendingChainBranches.Count > 0)
                     TryTriggerChainSlotEvent();
-                }
                 else
-                {
-                    //random slotu — eventBlockCycles sadece random slotları etkiler
-                    if (remainingBlockCycles > 0)
-                        remainingBlockCycles--;
-                    else
-                        TryTriggerWarEvent();
-                }
-
-                chainCycleCounter++;
-                if (chainCycleCounter >= 3)
-                    chainCycleCounter = 0;
+                    EndChain();
             }
             else
             {
                 //zincir dışı normal akış
-                if (remainingBlockCycles > 0)
+                if (remainingGlobalBlockCycles > 0)
+                {
+                    remainingGlobalBlockCycles--;
+                }
+                else if (remainingBlockCycles > 0)
                 {
                     remainingBlockCycles--;
                 }
@@ -846,6 +992,9 @@ public class WarForOilManager : MonoBehaviour
     /// </summary>
     private void UpdateEventPhase()
     {
+        //süresiz event (decisionTime <= 0) — sayaç işlemez, oyuncu seçene kadar bekler
+        if (eventDecisionTimer < 0f) return;
+
         eventDecisionTimer -= Time.unscaledDeltaTime;
         OnEventDecisionTimerUpdate?.Invoke(eventDecisionTimer);
 
@@ -903,8 +1052,8 @@ public class WarForOilManager : MonoBehaviour
         pendingChainThreshold0 = 0f;
         pendingChainThreshold1 = 0f;
         pendingChainThreshold2 = 0f;
-        chainCycleCounter = 0;
-        chainSlotsRemaining = 0;
+        chainCounters.Clear();
+        eventCheckTimer = 0f; //zincir interval'ı hemen başlasın
 
         OnChainStarted?.Invoke();
     }
@@ -918,15 +1067,20 @@ public class WarForOilManager : MonoBehaviour
         isInChain = false;
         chainStartEvent = null;
         pendingChainBranches = null;
+        pendingConditionalChainBranches = null;
         pendingChainInfluenceStat = ChainInfluenceStat.JustLuck;
         pendingChainThreshold0 = 0f;
         pendingChainThreshold1 = 0f;
         pendingChainThreshold2 = 0f;
-        chainCycleCounter = 0;
-        chainSlotsRemaining = 0;
         currentEventIsChainEvent = false;
         pendingChainEndWeight = 0f;
+        pendingConditionalBranching = false;
+        pendingBranchCounterKey = null;
+        pendingBranchCounterMin = 0;
+        pendingBranchCounterMax = -1;
         hasActiveChainTickEffect = false;
+        chainCounters.Clear();
+        eventCheckTimer = 0f; //normal interval'a geri dön
 
         OnChainEnded?.Invoke();
     }
@@ -951,7 +1105,9 @@ public class WarForOilManager : MonoBehaviour
     /// </summary>
     private void TryTriggerChainSlotEvent()
     {
-        if (pendingChainBranches == null || pendingChainBranches.Count == 0) return;
+        bool hasUnconditioned = pendingChainBranches != null && pendingChainBranches.Count > 0;
+        bool hasConditioned = pendingConditionalChainBranches != null && pendingConditionalChainBranches.Count > 0;
+        if (!hasUnconditioned && !hasConditioned) return;
 
         //hangi aralıkta olduğumuzu belirle
         int rangeIndex = 0;
@@ -964,65 +1120,104 @@ public class WarForOilManager : MonoBehaviour
             else rangeIndex = 0;
         }
 
-        //ağırlıkları topla (chain bitme ağırlığı dahil)
-        //alt zincir dallanma engeli olan event'lerin ağırlığını sıfırla
+        //koşullu dallanma aktifse sayaç kontrolü yap — geçerse koşullu listeyi, geçmezse koşulsuz listeyi kullan
+        bool conditionMet = false;
+        if (pendingConditionalBranching && !string.IsNullOrEmpty(pendingBranchCounterKey)
+            && pendingConditionalChainBranches != null && pendingConditionalChainBranches.Count > 0)
+        {
+            int counterVal = 0;
+            chainCounters.TryGetValue(pendingBranchCounterKey, out counterVal);
+            bool meetsMin = counterVal >= pendingBranchCounterMin;
+            bool meetsMax = pendingBranchCounterMax < 0 || counterVal <= pendingBranchCounterMax;
+            conditionMet = meetsMin && meetsMax;
+        }
+
+        List<ChainBranch> activePool = conditionMet ? pendingConditionalChainBranches : pendingChainBranches;
+        if (activePool == null || activePool.Count == 0)
+        {
+            EndChain();
+            return;
+        }
+
+        float[] weights = new float[activePool.Count];
         float endWeight = pendingChainEndWeight > 0f ? pendingChainEndWeight : 0f;
         float totalWeight = endWeight;
-        float[] weights = new float[pendingChainBranches.Count];
-        for (int i = 0; i < pendingChainBranches.Count; i++)
+
+        for (int i = 0; i < activePool.Count; i++)
         {
-            //engellenen event ise ağırlık 0 — dallanma hedefi olamaz
-            if (pendingChainBranches[i].targetEvent != null
-                && blockedBranchEventIds.Contains(pendingChainBranches[i].targetEvent.id))
+            //engellenen event
+            if (activePool[i].targetEvent != null
+                && blockedBranchEventIds.Contains(activePool[i].targetEvent.id))
             {
                 weights[i] = 0f;
                 continue;
             }
 
-            //kadın süreci zaten yaşandıysa, kadın süreci başlatan eventleri dallanmadan çıkar
-            if (pendingChainBranches[i].targetEvent != null
+            //kadın süreci zaten yaşandıysa
+            if (activePool[i].targetEvent != null
                 && WomanProcessManager.Instance != null
                 && WomanProcessManager.Instance.WasTriggeredThisGame
-                && HasAnyWomanProcessChoice(pendingChainBranches[i].targetEvent))
+                && HasAnyWomanProcessChoice(activePool[i].targetEvent))
             {
                 weights[i] = 0f;
                 continue;
             }
-            float w = GetBranchWeight(pendingChainBranches[i], rangeIndex);
+
+            float w = GetBranchWeight(activePool[i], rangeIndex);
             if (w < 0f) w = 0f;
             weights[i] = w;
             totalWeight += w;
         }
 
-        WarForOilEvent selected;
+        WarForOilEvent selected = null;
 
         if (totalWeight <= 0f)
         {
-            //tüm ağırlıklar 0 — uygun branch kalmadı, zincir biter
-            EndChain();
-            return;
+            //tüm ağırlıklar 0 — uygun event varsa eşit dağıt
+            int eligibleCount = 0;
+            for (int i = 0; i < activePool.Count; i++)
+            {
+                if (activePool[i].targetEvent != null && weights[i] >= 0f
+                    && (activePool[i].targetEvent == null || !blockedBranchEventIds.Contains(activePool[i].targetEvent.id)))
+                    eligibleCount++;
+            }
+            if (eligibleCount == 0)
+            {
+                EndChain();
+                return;
+            }
+            Debug.LogWarning("[WAR FOR OIL] ZİNCİR DALLANMASI: TÜM AĞIRLIKLAR 0! EŞİT DAĞITIM YAPILIYOR. INSPECTOR'DAN AĞIRLIKLARI KONTROL ET!");
+            float equalWeight = 1f / eligibleCount;
+            totalWeight = 0f;
+            for (int i = 0; i < activePool.Count; i++)
+            {
+                if (activePool[i].targetEvent != null
+                    && !blockedBranchEventIds.Contains(activePool[i].targetEvent.id))
+                {
+                    weights[i] = equalWeight;
+                    totalWeight += equalWeight;
+                }
+            }
         }
-        else
+
+        //ağırlıklı rastgele seçim — önce chain bitme kontrolü
         {
-            //ağırlıklı rastgele seçim — önce chain bitme kontrolü
             float roll = UnityEngine.Random.value * totalWeight;
 
             if (roll < endWeight)
             {
-                //chain biter
                 EndChain();
                 return;
             }
 
-            //branch seçimi
             float cumulative = endWeight;
-            selected = pendingChainBranches[pendingChainBranches.Count - 1].targetEvent; //fallback
-            for (int i = 0; i < pendingChainBranches.Count; i++)
+            selected = activePool[activePool.Count - 1].targetEvent; //fallback
+            for (int i = 0; i < activePool.Count; i++)
             {
                 cumulative += weights[i];
                 if (roll <= cumulative)
                 {
-                    selected = pendingChainBranches[i].targetEvent;
+                    selected = activePool[i].targetEvent;
                     break;
                 }
             }
@@ -1038,8 +1233,39 @@ public class WarForOilManager : MonoBehaviour
         //chain event tetiklenince önceki tick etkisi durur (yeni choice kendi etkisini başlatabilir)
         hasActiveChainTickEffect = false;
 
-        //event'i tetikle — chain slotundan geldiğini işaretle
-        currentEventIsChainEvent = true;
+        //seçilen branch anında event mi kontrol et
+        bool isImmediate = false;
+        float immDelay = 0f;
+        for (int i = 0; i < activePool.Count; i++)
+        {
+            if (activePool[i].targetEvent == selected && activePool[i].triggersAsImmediateEvent)
+            {
+                isImmediate = true;
+                immDelay = activePool[i].immediateEventDelay;
+                break;
+            }
+        }
+
+        if (isImmediate)
+        {
+            //anında event olarak tetikle — zincir devam ediyor, sadece hemen gösterilecek
+            currentEventIsChainEvent = true; //zincirin parçası olmaya devam ediyor
+
+            if (immDelay > 0f)
+            {
+                //gecikmeli tetikle — WarProcess'e dön, timer say
+                pendingImmediateEvent = selected;
+                immediateEventTimer = immDelay;
+                currentState = WarForOilState.WarProcess;
+                return;
+            }
+        }
+        else
+        {
+            //normal chain event — zincir devam eder
+            currentEventIsChainEvent = true;
+        }
+
         TriggerEvent(selected);
     }
 
@@ -1402,6 +1628,52 @@ public class WarForOilManager : MonoBehaviour
     }
 
     // ==================== VANDALİZM SİSTEMİ ====================
+
+    /// <summary>
+    /// Ağırlıklı havuzdan rastgele bir anında event seçer.
+    /// </summary>
+    private WarForOilEvent PickImmediateEvent(List<ImmediateEventEntry> pool)
+    {
+        float totalWeight = 0f;
+        int eligibleCount = 0;
+        for (int i = 0; i < pool.Count; i++)
+        {
+            if (pool[i].targetEvent != null)
+            {
+                if (pool[i].weight > 0f)
+                    totalWeight += pool[i].weight;
+                eligibleCount++;
+            }
+        }
+        //tüm ağırlıklar 0 ama event varsa eşit dağıt
+        if (totalWeight <= 0f)
+        {
+            if (eligibleCount == 0) return null;
+            Debug.LogWarning("[WAR FOR OIL] ANLIK EVENT HAVUZU: TÜM AĞIRLIKLAR 0! EŞİT DAĞITIM YAPILIYOR. INSPECTOR'DAN AĞIRLIKLARI KONTROL ET!");
+            int pick = UnityEngine.Random.Range(0, eligibleCount);
+            int idx = 0;
+            for (int i = 0; i < pool.Count; i++)
+            {
+                if (pool[i].targetEvent != null)
+                {
+                    if (idx == pick) return pool[i].targetEvent;
+                    idx++;
+                }
+            }
+            return null;
+        }
+
+        float roll = UnityEngine.Random.Range(0f, totalWeight);
+        float cumulative = 0f;
+        for (int i = 0; i < pool.Count; i++)
+        {
+            if (pool[i].targetEvent == null || pool[i].weight <= 0f) continue;
+            cumulative += pool[i].weight;
+            if (roll <= cumulative)
+                return pool[i].targetEvent;
+        }
+        return pool[pool.Count - 1].targetEvent;
+    }
 
     /// <summary>
     /// Choice'un vandalizm etkisini uygular.
@@ -1820,6 +2092,17 @@ public class WarForOilManager : MonoBehaviour
     /// <summary>
     /// Grup kontrolü: maxTriggerCount aşıldıysa bu event bloklanır.
     /// </summary>
+    private bool IsStoryFlagsSatisfied(WarForOilEvent evt)
+    {
+        if (evt.requiredStoryFlags == null || evt.requiredStoryFlags.Count == 0) return true;
+        if (StoryFlagManager.Instance == null) return false;
+        for (int i = 0; i < evt.requiredStoryFlags.Count; i++)
+        {
+            if (!StoryFlagManager.Instance.HasFlag(evt.requiredStoryFlags[i])) return false;
+        }
+        return true;
+    }
+
     private bool IsBlockedByGroup(WarForOilEvent evt)
     {
         if (database.eventGroups == null) return false;
@@ -1904,27 +2187,33 @@ public class WarForOilManager : MonoBehaviour
         accumulatedSuspicionModifier = 0f;
         accumulatedReputationModifier = 0f;
         accumulatedPoliticalInfluenceModifier = 0f;
+        pendingImmediateEvent = null;
+        immediateEventTimer = 0f;
         accumulatedCostModifier = 0;
         rewardMultiplier = 1f;
         eventsBlocked = false;
         remainingBlockCycles = 0;
+        remainingGlobalBlockCycles = 0;
         ceasefireBlocked = false;
         pendingDeal = false;
+        pendingForceWin = false;
+        forceWinCustomReward = false;
+        forceWinRewardRatio = 1f;
         dealRewardRatio = 0f;
         eventTriggerCounts.Clear();
         currentEvent = null;
         isInChain = false;
         chainStartEvent = null;
         pendingChainBranches = null;
+        pendingConditionalChainBranches = null;
         pendingChainInfluenceStat = ChainInfluenceStat.JustLuck;
         pendingChainThreshold0 = 0f;
         pendingChainThreshold1 = 0f;
         pendingChainThreshold2 = 0f;
-        chainCycleCounter = 0;
-        chainSlotsRemaining = 0;
         currentEventIsChainEvent = false;
         pendingChainEndWeight = 0f;
         hasActiveChainTickEffect = false;
+        chainCounters.Clear();
         isCornerGrabRace = false;
         rivalInvasionTriggered = false;
         rivalCountry = null;
@@ -2081,6 +2370,8 @@ public class WarForOilManager : MonoBehaviour
             {
                 WarForOilEvent evt = eventPool[i];
                 if (isInChain && evt.chainRole == ChainRole.Head) continue; //chain aktifken Head eventler random slotta gelmesin
+                if (evt.requiresBothProcessesActive && (WomanProcessManager.Instance == null || !WomanProcessManager.Instance.IsActive())) continue;
+                if (!IsStoryFlagsSatisfied(evt)) continue;
                 if (warTimer < evt.minWarTime * database.warDuration) continue;
                 if (evt.maxWarTime >= 0f && warTimer > evt.maxWarTime * database.warDuration) continue;
                 if (dismissedEventIds.Contains(evt.id)) continue;
@@ -2102,6 +2393,8 @@ public class WarForOilManager : MonoBehaviour
             for (int i = 0; i < database.protestEvents.Count; i++)
             {
                 WarForOilEvent evt = database.protestEvents[i];
+                if (evt.requiresBothProcessesActive && (WomanProcessManager.Instance == null || !WomanProcessManager.Instance.IsActive())) continue;
+                if (!IsStoryFlagsSatisfied(evt)) continue;
                 if (warTimer < evt.minWarTime * database.warDuration) continue;
                 if (evt.maxWarTime >= 0f && warTimer > evt.maxWarTime * database.warDuration) continue;
                 if (dismissedEventIds.Contains(evt.id)) continue;
@@ -2223,8 +2516,33 @@ public class WarForOilManager : MonoBehaviour
     {
         float effectiveBaseReward = GetEffectiveBaseReward(selectedCountry);
 
+        //direkt kazanım aktifse — zar yok, tam zafer
+        if (pendingForceWin)
+        {
+            float rewardRatio;
+            if (forceWinCustomReward)
+                rewardRatio = forceWinRewardRatio;
+            else
+            {
+                float supportRatio = supportStat / 100f;
+                rewardRatio = Mathf.Max(database.supportRewardRatio * supportRatio, 0.5f);
+            }
+            float reward = effectiveBaseReward * rewardMultiplier * rewardRatio;
+
+            pendingResult = new WarForOilResult();
+            pendingResult.country = selectedCountry;
+            pendingResult.warWon = true;
+            pendingResult.finalSupportStat = supportStat;
+            pendingResult.finalVandalismLevel = currentVandalismLevel;
+            pendingResult.finalMediaPursuitLevel = currentMediaPursuitLevel;
+            pendingResult.winChance = 1f;
+            pendingResult.wealthChange = reward - accumulatedCostModifier;
+            pendingResult.suspicionChange = accumulatedSuspicionModifier;
+            pendingResult.reputationChange = accumulatedReputationModifier;
+            pendingResult.politicalInfluenceChange = accumulatedPoliticalInfluenceModifier;
+        }
         //anlaşmayla bitirme aktifse — zar yok, garanti ödül
-        if (pendingDeal)
+        else if (pendingDeal)
         {
             float dealReward = effectiveBaseReward * rewardMultiplier * dealRewardRatio;
 
@@ -2469,6 +2787,17 @@ public class WarForOilManager : MonoBehaviour
         if (currentState != WarForOilState.WarProcess && currentState != WarForOilState.EventPhase)
             return 0f;
         return Mathf.Clamp01(warTimer / database.warDuration);
+    }
+
+    /// <summary>
+    /// Global event engeli aktifse sayacı 1 düşürür ve true döner. Değilse false.
+    /// RandomEventManager gibi dış sistemler bunu çağırarak kendi event'lerini de engeller.
+    /// </summary>
+    public bool TryConsumeGlobalBlock()
+    {
+        if (remainingGlobalBlockCycles <= 0) return false;
+        remainingGlobalBlockCycles--;
+        return true;
     }
 }
 
