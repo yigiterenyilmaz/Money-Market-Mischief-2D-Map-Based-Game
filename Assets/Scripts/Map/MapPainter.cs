@@ -85,6 +85,11 @@ public class MapPainter : MonoBehaviour
         else Debug.LogWarning("MapPainter: No RoadGenerator found. Roads will not be generated.");
 
         decorPlacer.Repaint(mapGenerator, settings, mapTexture);
+
+        //dalga overlay'i haritayla aynı anda başlat
+        var waveOverlay = GetComponent<OceanWaveOverlay>();
+        if (waveOverlay != null)
+            waveOverlay.SetupNow();
     }
 
     // =========================================================================

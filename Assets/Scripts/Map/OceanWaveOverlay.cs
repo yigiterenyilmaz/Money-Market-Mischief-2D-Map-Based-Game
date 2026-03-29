@@ -1,8 +1,10 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Haritanın üstüne yarı saydam dalga efekti koyar.
 /// Sadece su alanında görünür, kara üzerinde şeffaf.
+/// G kanalında kıyı mesafe bilgisi — kıyıya vuran dalga animasyonu için.
 /// </summary>
 public class OceanWaveOverlay : MonoBehaviour
 {
@@ -13,7 +15,7 @@ public class OceanWaveOverlay : MonoBehaviour
     [Header("Shader")]
     public Shader oceanShader;
 
-    [Header("Wave Settings")]
+    [Header("Open Ocean Wave Settings")]
     [Range(0f, 1f)] public float intensity = 0.25f;
     public Color waveColorLight = new Color(0.3f, 0.5f, 0.7f, 0.2f);
     public Color waveColorDark = new Color(0.05f, 0.12f, 0.25f, 0.15f);
@@ -28,20 +30,25 @@ public class OceanWaveOverlay : MonoBehaviour
     public Vector2 foamSpeed = new Vector2(0.01f, -0.015f);
     [Range(0.5f, 0.95f)] public float foamThreshold = 0.72f;
 
+    [Header("Shore Wave Settings")]
+    [Range(5, 40)] public int shoreWaveMaxDist = 20;
+    [Range(0f, 1f)] public float shoreWaveIntensity = 0.55f;
+    public Color shoreWaveColor = new Color(0.85f, 0.92f, 1f, 0.5f);
+    [Range(0.5f, 5f)] public float shoreWaveSpeed = 1.5f;
+    [Range(1f, 8f)] public float shoreWaveFrequency = 3f;
+    [Range(0f, 1f)] public float shoreFoamIntensity = 0.7f;
+
     private GameObject overlayGO;
     private SpriteRenderer overlaySR;
     private Material overlayMat;
     private bool initialized;
 
-    void Start()
+    /// <summary>
+    /// MapPainter tarafından harita boyanır boyanmaz çağrılır — gecikme yok.
+    /// </summary>
+    public void SetupNow()
     {
-        StartCoroutine(WaitAndSetup());
-    }
-
-    System.Collections.IEnumerator WaitAndSetup()
-    {
-        while (mapPainter == null || mapPainter.GetMapTexture() == null)
-            yield return null;
+        if (initialized) return;
         Setup();
     }
 
@@ -57,20 +64,26 @@ public class OceanWaveOverlay : MonoBehaviour
 
         int w = mapGenerator.width, h = mapGenerator.height;
 
-        //mask texture — R kanalı: kara=1, su=0
+        // su tarafında kıyı mesafe alanı (BFS)
+        int[,] waterShoreDist = BuildWaterShoreDistField(w, h);
+
+        // mask texture — R: kara=1/su=0, G: kıyı mesafesi (normalize 0-1)
         Texture2D mask = new Texture2D(w, h, TextureFormat.RGBA32, false);
-        mask.filterMode = FilterMode.Bilinear;
+        mask.filterMode = FilterMode.Point;
         Color[] maskPx = new Color[w * h];
         for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
             {
                 float land = mapGenerator.IsLand(x, y) ? 1f : 0f;
-                maskPx[x + y * w] = new Color(land, land, land, 1f);
+                float shoreDist = 1f;
+                if (!mapGenerator.IsLand(x, y) && waterShoreDist[x, y] < int.MaxValue)
+                    shoreDist = Mathf.Clamp01((float)waterShoreDist[x, y] / shoreWaveMaxDist);
+                maskPx[x + y * w] = new Color(land, shoreDist, 0f, 1f);
             }
         mask.SetPixels(maskPx);
         mask.Apply();
 
-        //beyaz sprite — shader tüm işi yapacak
+        // beyaz sprite — shader tüm işi yapacak
         Texture2D spriteTex = new Texture2D(w, h, TextureFormat.RGBA32, false);
         spriteTex.filterMode = FilterMode.Point;
         Color[] spritePx = new Color[w * h];
@@ -79,12 +92,12 @@ public class OceanWaveOverlay : MonoBehaviour
         spriteTex.SetPixels(spritePx);
         spriteTex.Apply();
 
-        //materyal
+        // materyal
         overlayMat = new Material(oceanShader);
         overlayMat.SetTexture("_MaskTex", mask);
         UpdateMaterialProperties();
 
-        //overlay GO
+        // overlay GO
         if (overlayGO != null) Destroy(overlayGO);
         overlayGO = new GameObject("OceanWaveOverlay");
         overlayGO.transform.SetParent(transform);
@@ -96,7 +109,101 @@ public class OceanWaveOverlay : MonoBehaviour
         overlaySR.sortingOrder = 1;
 
         initialized = true;
-        Debug.Log("OceanWaveOverlay: Aktif.");
+        Debug.Log("OceanWaveOverlay: Aktif (kıyı dalgası dahil).");
+    }
+
+    /// <summary>
+    /// Harita kenarından flood fill ile okyanusa bağlı su piksellerini tespit eder.
+    /// Göller (karayla çevrili su) false kalır.
+    /// </summary>
+    bool[,] BuildOceanMask(int w, int h)
+    {
+        bool[,] isOcean = new bool[w, h];
+        int[] dx4 = { 1, -1, 0, 0 };
+        int[] dy4 = { 0, 0, 1, -1 };
+        var queue = new Queue<Vector2Int>();
+
+        // harita kenarındaki su piksellerinden başla
+        for (int x = 0; x < w; x++)
+        {
+            if (!mapGenerator.IsLand(x, 0))     { isOcean[x, 0] = true; queue.Enqueue(new Vector2Int(x, 0)); }
+            if (!mapGenerator.IsLand(x, h - 1)) { isOcean[x, h - 1] = true; queue.Enqueue(new Vector2Int(x, h - 1)); }
+        }
+        for (int y = 1; y < h - 1; y++)
+        {
+            if (!mapGenerator.IsLand(0, y))     { isOcean[0, y] = true; queue.Enqueue(new Vector2Int(0, y)); }
+            if (!mapGenerator.IsLand(w - 1, y)) { isOcean[w - 1, y] = true; queue.Enqueue(new Vector2Int(w - 1, y)); }
+        }
+
+        while (queue.Count > 0)
+        {
+            var pos = queue.Dequeue();
+            for (int i = 0; i < 4; i++)
+            {
+                int nx = pos.x + dx4[i], ny = pos.y + dy4[i];
+                if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                if (isOcean[nx, ny] || mapGenerator.IsLand(nx, ny)) continue;
+                isOcean[nx, ny] = true;
+                queue.Enqueue(new Vector2Int(nx, ny));
+            }
+        }
+
+        return isOcean;
+    }
+
+    /// <summary>
+    /// Sadece okyanus su piksellerinden kıyıya olan mesafeyi hesaplar (BFS).
+    /// Göl kıyıları int.MaxValue kalır — dalga efekti uygulanmaz.
+    /// </summary>
+    int[,] BuildWaterShoreDistField(int w, int h)
+    {
+        bool[,] isOcean = BuildOceanMask(w, h);
+
+        int[,] dist = new int[w, h];
+        for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+                dist[x, y] = int.MaxValue;
+
+        int[] dx4 = { 1, -1, 0, 0 };
+        int[] dy4 = { 0, 0, 1, -1 };
+        var queue = new Queue<Vector2Int>();
+
+        // sadece okyanus-kara sınırındaki su pikselleri — mesafe 0
+        for (int x = 0; x < w; x++)
+        for (int y = 0; y < h; y++)
+        {
+            if (!isOcean[x, y]) continue;
+            for (int i = 0; i < 4; i++)
+            {
+                int nx = x + dx4[i], ny = y + dy4[i];
+                if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                if (mapGenerator.IsLand(nx, ny))
+                {
+                    dist[x, y] = 0;
+                    queue.Enqueue(new Vector2Int(x, y));
+                    break;
+                }
+            }
+        }
+
+        // BFS — sadece shoreWaveMaxDist kadar yay
+        while (queue.Count > 0)
+        {
+            var pos = queue.Dequeue();
+            int d = dist[pos.x, pos.y];
+            if (d >= shoreWaveMaxDist) continue;
+            for (int i = 0; i < 4; i++)
+            {
+                int nx = pos.x + dx4[i], ny = pos.y + dy4[i];
+                if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                if (!isOcean[nx, ny]) continue;
+                if (dist[nx, ny] <= d + 1) continue;
+                dist[nx, ny] = d + 1;
+                queue.Enqueue(new Vector2Int(nx, ny));
+            }
+        }
+
+        return dist;
     }
 
     void Update()
@@ -118,5 +225,12 @@ public class OceanWaveOverlay : MonoBehaviour
         overlayMat.SetVector("_FoamSpeed", foamSpeed);
         overlayMat.SetFloat("_FoamThreshold", foamThreshold);
         overlayMat.SetFloat("_Intensity", intensity);
+
+        // kıyı dalgası parametreleri
+        overlayMat.SetFloat("_ShoreWaveIntensity", shoreWaveIntensity);
+        overlayMat.SetColor("_ShoreWaveColor", shoreWaveColor);
+        overlayMat.SetFloat("_ShoreWaveSpeed", shoreWaveSpeed);
+        overlayMat.SetFloat("_ShoreWaveFrequency", shoreWaveFrequency);
+        overlayMat.SetFloat("_ShoreFoamIntensity", shoreFoamIntensity);
     }
 }
