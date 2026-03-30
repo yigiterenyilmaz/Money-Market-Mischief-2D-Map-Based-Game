@@ -34,6 +34,9 @@ public class CandlestickChart : MonoBehaviour
     [Tooltip("Minimum mum yuksekligi (piksel)")]
     public float minCandleHeight = 4f;
 
+    [Tooltip("Fitil genisligi (piksel)")]
+    public float wickWidth = 2f;
+
     [Tooltip("1 birim fiyat degisimi kac piksel olsun")]
     public float priceToPixel = 30f;
 
@@ -61,9 +64,11 @@ public class CandlestickChart : MonoBehaviour
     // Mum verileri
     struct CandleData
     {
-        public float open, close;
+        public float open, close, high, low;
         public RectTransform rect;
         public Image image;
+        public RectTransform wickRect;
+        public Image wickImage;
         public bool isClosed;
     }
 
@@ -186,30 +191,45 @@ public class CandlestickChart : MonoBehaviour
         candleHighPrice = currentPrice;
         candleLowPrice = currentPrice;
 
+        // X pozisyonu
+        float xPos = candles.Count * (candleWidth + candleSpacing);
+
+        // Mum govdesi olustur
         GameObject candleObj = Instantiate(candlePrefab, contentParent);
         candleObj.SetActive(true);
 
         RectTransform rect = candleObj.GetComponent<RectTransform>();
         Image img = candleObj.GetComponent<Image>();
 
-        // Anchor sol-alt
         rect.anchorMin = new Vector2(0f, 0f);
         rect.anchorMax = new Vector2(0f, 0f);
-
-        // X pozisyonu
-        float xPos = candles.Count * (candleWidth + candleSpacing);
-
-        // Pivot ve pozisyon: open fiyatinda, yukari dogru buyuyecek
         rect.pivot = new Vector2(0.5f, 0f);
         rect.sizeDelta = new Vector2(candleWidth, minCandleHeight);
         rect.anchoredPosition = new Vector2(xPos, PriceToY(currentPrice));
+
+        // Fitil olustur (mumun child'i, arkasinda kalacak)
+        GameObject wickObj = new GameObject("Wick");
+        wickObj.transform.SetParent(rect, false);
+        wickObj.transform.SetAsFirstSibling(); // mumun arkasinda kalsin
+        Image wickImg = wickObj.AddComponent<Image>();
+        wickImg.color = Color.white;
+        RectTransform wickRect = wickObj.GetComponent<RectTransform>();
+        wickRect.anchorMin = new Vector2(0.5f, 0f);
+        wickRect.anchorMax = new Vector2(0.5f, 0f);
+        wickRect.pivot = new Vector2(0.5f, 0f);
+        wickRect.sizeDelta = new Vector2(wickWidth, minCandleHeight);
+        wickRect.anchoredPosition = Vector2.zero;
 
         CandleData data = new CandleData
         {
             open = currentPrice,
             close = currentPrice,
+            high = currentPrice,
+            low = currentPrice,
             rect = rect,
             image = img,
+            wickRect = wickRect,
+            wickImage = wickImg,
             isClosed = false
         };
 
@@ -230,6 +250,8 @@ public class CandlestickChart : MonoBehaviour
 
         CandleData data = candles[activeCandleIndex];
         data.close = currentPrice;
+        data.high = candleHighPrice;
+        data.low = candleLowPrice;
         candles[activeCandleIndex] = data;
 
         // Content boyutunu guncelle (fiyat araligi degismis olabilir)
@@ -237,6 +259,9 @@ public class CandlestickChart : MonoBehaviour
 
         // Tum mumlari yeniden ciz (lowestPrice degismis olabilir)
         RedrawAllCandles();
+
+        // Kamerayi mevcut fiyata odakla
+        ScrollToCurrentPrice();
     }
 
     void CloseCurrentCandle()
@@ -258,27 +283,50 @@ public class CandlestickChart : MonoBehaviour
 
             float open = c.open;
             float close = c.close;
+            float high = c.high;
+            float low = c.low;
+            float xPos = c.rect.anchoredPosition.x;
 
             bool isGreen = close >= open;
             float bodySize = Mathf.Abs(close - open);
             float bodyHeight = bodySize * priceToPixel;
             bodyHeight = Mathf.Max(bodyHeight, minCandleHeight);
 
+            // Mum govdesi
             if (isGreen)
             {
-                // Yesil: open'dan yukari uzar, pivot alt
                 c.rect.pivot = new Vector2(0.5f, 0f);
-                c.rect.anchoredPosition = new Vector2(c.rect.anchoredPosition.x, PriceToY(open));
+                c.rect.anchoredPosition = new Vector2(xPos, PriceToY(open));
             }
             else
             {
-                // Kirmizi: open'dan asagi uzar, pivot ust
                 c.rect.pivot = new Vector2(0.5f, 1f);
-                c.rect.anchoredPosition = new Vector2(c.rect.anchoredPosition.x, PriceToY(open));
+                c.rect.anchoredPosition = new Vector2(xPos, PriceToY(open));
             }
 
             c.rect.sizeDelta = new Vector2(candleWidth, bodyHeight);
             c.image.color = isGreen ? greenColor : redColor;
+
+            // Fitil: low'dan high'a uzanir (mumun local koordinatinda)
+            if (c.wickRect != null)
+            {
+                float wickHeight = (high - low) * priceToPixel;
+                wickHeight = Mathf.Max(wickHeight, 1f);
+
+                // Mumun pivot noktasina gore fitil offseti
+                // Yesil: pivot alt = open fiyati, fitil low'dan baslar → offset = (low - open) * priceToPixel
+                // Kirmizi: pivot ust = open fiyati, fitil low'dan baslar → offset = (low - open) * priceToPixel + bodyHeight
+                float localY;
+                if (isGreen)
+                    localY = (low - open) * priceToPixel;
+                else
+                    localY = (low - open) * priceToPixel + bodyHeight;
+
+                c.wickRect.pivot = new Vector2(0.5f, 0f);
+                c.wickRect.anchoredPosition = new Vector2(0f, localY);
+                c.wickRect.sizeDelta = new Vector2(wickWidth, wickHeight);
+                c.wickImage.color = isGreen ? greenColor : redColor;
+            }
         }
     }
 
@@ -297,6 +345,7 @@ public class CandlestickChart : MonoBehaviour
             float xPos = i * (candleWidth + candleSpacing);
             Vector2 pos = candles[i].rect.anchoredPosition;
             candles[i].rect.anchoredPosition = new Vector2(xPos, pos.y);
+            // Fitil mumun child'i, X otomatik takip eder
         }
 
         UpdateContentSize();
@@ -308,6 +357,46 @@ public class CandlestickChart : MonoBehaviour
 
         if (scrollRect != null)
             scrollRect.horizontalNormalizedPosition = 1f;
+    }
+
+    void ScrollToCurrentPrice()
+    {
+        if (scrollRect == null) return;
+
+        // Yatay: en saga
+        scrollRect.horizontalNormalizedPosition = 1f;
+
+        // Dikey: sadece mum viewport disina cikinca scroll yap
+        float contentHeight = contentParent.sizeDelta.y;
+        float viewportHeight = chartAreaHeight;
+        if (contentHeight <= viewportHeight) return;
+
+        float maxScroll = contentHeight - viewportHeight;
+        float priceY = PriceToY(currentPrice);
+
+        // Viewport'un su an gosterdigi alt ve ust sinirlar
+        float currentScrollY = scrollRect.verticalNormalizedPosition * maxScroll;
+        float viewBottom = currentScrollY;
+        float viewTop = currentScrollY + viewportHeight;
+
+        // Ust kenara yaklasinca padding kadar bosluk birak
+        float padding = viewportHeight * 0.1f;
+
+        float targetScrollY = currentScrollY;
+
+        if (priceY > viewTop - padding)
+        {
+            // Fiyat ustten tasiyor, yukari kaydir
+            targetScrollY = priceY - viewportHeight + padding;
+        }
+        else if (priceY < viewBottom + padding)
+        {
+            // Fiyat alttan tasiyor, asagi kaydir
+            targetScrollY = priceY - padding;
+        }
+
+        targetScrollY = Mathf.Clamp(targetScrollY, 0f, maxScroll);
+        scrollRect.verticalNormalizedPosition = targetScrollY / maxScroll;
     }
 
     // === Debug Buton ===
