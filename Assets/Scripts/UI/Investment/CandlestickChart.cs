@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
 using System.Collections.Generic;
 
 /// <summary>
@@ -42,6 +43,16 @@ public class CandlestickChart : MonoBehaviour
 
     [Tooltip("1 birim fiyat degisimi kac piksel olsun")]
     public float priceToPixel = 30f;
+
+    [Header("Zoom Ayarlari")]
+    [Tooltip("Zoom hizi")]
+    public float zoomSpeed = 0.1f;
+
+    [Tooltip("Minimum zoom (uzaklastirma siniri)")]
+    public float minZoom = 0.3f;
+
+    [Tooltip("Maksimum zoom (yakinlastirma siniri)")]
+    public float maxZoom = 3f;
 
     [Header("Mock Fiyat Ayarlari")]
     [Tooltip("Baslangic fiyati")]
@@ -87,6 +98,12 @@ public class CandlestickChart : MonoBehaviour
     float highestPrice;
     float chartAreaHeight;
 
+    // Zoom
+    float currentZoom = 1f;
+    float basePriceToPixel;
+    float baseCandleWidth;
+    float baseCandleSpacing;
+
     // Renkler
     Color greenColor = new Color(0.18f, 0.8f, 0.34f);
     Color redColor = new Color(0.9f, 0.22f, 0.21f);
@@ -110,8 +127,17 @@ public class CandlestickChart : MonoBehaviour
         else
             chartAreaHeight = 300f;
 
+        // Zoom icin base degerleri kaydet
+        basePriceToPixel = priceToPixel;
+        baseCandleWidth = candleWidth;
+        baseCandleSpacing = candleSpacing;
+
         // ScrollRect referansini al
         scrollRect = contentParent.parent.GetComponent<ScrollRect>();
+
+        // Mouse tekerlegini scroll icin degil zoom icin kullanacagiz
+        if (scrollRect != null)
+            scrollRect.scrollSensitivity = 0f;
 
         // Panel kapaliysa kapali kalsin
         if (investmentPanel != null)
@@ -127,6 +153,10 @@ public class CandlestickChart : MonoBehaviour
     void Update()
     {
         timer += Time.deltaTime;
+
+        // Zoom: panel acikken mouse tekerlegiyle
+        if (investmentPanel != null && investmentPanel.activeSelf)
+            HandleZoom();
 
         priceFrameCounter++;
         if (priceFrameCounter >= 2)
@@ -148,6 +178,34 @@ public class CandlestickChart : MonoBehaviour
             StartNewCandle();
             timer = 0f;
         }
+    }
+
+    void HandleZoom()
+    {
+        float scroll = Mouse.current.scroll.ReadValue().y;
+        if (scroll == 0f) return;
+
+        float prevZoom = currentZoom;
+        currentZoom += scroll * zoomSpeed;
+        currentZoom = Mathf.Clamp(currentZoom, minZoom, maxZoom);
+
+        if (Mathf.Approximately(prevZoom, currentZoom)) return;
+
+        // Zoom'a gore degerler guncelle
+        priceToPixel = basePriceToPixel * currentZoom;
+        candleWidth = baseCandleWidth * currentZoom;
+        candleSpacing = baseCandleSpacing * currentZoom;
+
+        // Tum mumlarin X pozisyonlarini yeniden hesapla
+        for (int i = 0; i < candles.Count; i++)
+        {
+            if (candles[i].rect == null) continue;
+            float xPos = i * (candleWidth + candleSpacing);
+            candles[i].rect.anchoredPosition = new Vector2(xPos, candles[i].rect.anchoredPosition.y);
+        }
+
+        UpdateContentSize();
+        RedrawAllCandles();
     }
 
     void UpdateMockPrice()
