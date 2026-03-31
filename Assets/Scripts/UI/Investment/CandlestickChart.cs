@@ -18,6 +18,9 @@ public class CandlestickChart : MonoBehaviour
     [Tooltip("InvestmentPanel objesi (acma/kapama icin)")]
     public GameObject investmentPanel;
 
+    [Tooltip("Harita kamera kontrolcusu (panel acikken devre disi)")]
+    public MapController mapController;
+
     [Header("Grafik Ayarlari")]
     [Tooltip("Mum olusturma araligi (saniye)")]
     public float candleInterval = 6f;
@@ -60,6 +63,10 @@ public class CandlestickChart : MonoBehaviour
     // Trend durumu
     float currentTrend;
     float trendTimer;
+
+    // Frame sayaclari
+    int priceFrameCounter;
+    int candleFrameCounter;
 
     // Mum verileri
     struct CandleData
@@ -121,8 +128,19 @@ public class CandlestickChart : MonoBehaviour
     {
         timer += Time.deltaTime;
 
-        UpdateMockPrice();
-        UpdateActiveCandle();
+        priceFrameCounter++;
+        if (priceFrameCounter >= 2)
+        {
+            priceFrameCounter = 0;
+            UpdateMockPrice();
+        }
+
+        candleFrameCounter++;
+        if (candleFrameCounter >= 10)
+        {
+            candleFrameCounter = 0;
+            UpdateActiveCandle();
+        }
 
         if (timer >= candleInterval)
         {
@@ -445,6 +463,10 @@ public class CandlestickChart : MonoBehaviour
 
         bool isActive = investmentPanel.activeSelf;
         investmentPanel.SetActive(!isActive);
+
+        // Panel acilinca harita kontrolunu kapat, kapaninca ac
+        if (mapController != null)
+            mapController.enable = isActive;
 
         if (!isActive)
             timer = 0f;
