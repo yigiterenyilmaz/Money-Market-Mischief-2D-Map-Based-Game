@@ -17,8 +17,11 @@ public class SocialMediaBubbleUI : MonoBehaviour
 
     [Header("Balon Ayarlari")]
     public float spacingBetweenBubbles = 8f;
+    public float slideSpeed = 5f; // smooth kayma hizi
 
+    // her balonun hedef y pozisyonunu tutar
     List<RectTransform> activeBubbles = new List<RectTransform>();
+    List<float> targetYPositions = new List<float>();
 
     void OnEnable()
     {
@@ -28,6 +31,24 @@ public class SocialMediaBubbleUI : MonoBehaviour
     void OnDisable()
     {
         MockSocialMediaFeedManager.OnNewMockPost -= HandleNewPost;
+    }
+
+    void Update()
+    {
+        // balonlari hedef pozisyonlarina dogru smooth kaydir
+        for (int i = activeBubbles.Count - 1; i >= 0; i--)
+        {
+            if (activeBubbles[i] == null)
+            {
+                activeBubbles.RemoveAt(i);
+                targetYPositions.RemoveAt(i);
+                continue;
+            }
+
+            Vector2 pos = activeBubbles[i].anchoredPosition;
+            pos.y = Mathf.Lerp(pos.y, targetYPositions[i], Time.deltaTime * slideSpeed);
+            activeBubbles[i].anchoredPosition = pos;
+        }
     }
 
     void HandleNewPost(MockSocialMediaPost post)
@@ -49,10 +70,10 @@ public class SocialMediaBubbleUI : MonoBehaviour
         bubbleRect.anchorMin = new Vector2(0.5f, 0f);
         bubbleRect.anchorMax = new Vector2(0.5f, 0f);
 
-        // localScale ile butunuyle buyut — sizeDelta, pivot, child'lara dokunma
+        // localScale ile butunuyle buyut
         bubbleRect.localScale = new Vector3(scaleFactor, scaleFactor, 1f);
 
-        // scaled yukseklik (stacking ve overflow icin)
+        // scaled yukseklik
         float scaledHeight = bubbleRect.sizeDelta.y * scaleFactor;
 
         // text iceriklerini yaz
@@ -64,23 +85,20 @@ public class SocialMediaBubbleUI : MonoBehaviour
         if (authorText != null)
             authorText.text = post.authorName;
 
-        // mevcut balonlari yukari kaydir
+        // mevcut balonlarin hedef pozisyonlarini yukari kaydir
         float shiftAmount = scaledHeight + spacingBetweenBubbles;
-        for (int i = activeBubbles.Count - 1; i >= 0; i--)
+        for (int i = 0; i < targetYPositions.Count; i++)
         {
-            if (activeBubbles[i] == null)
-            {
-                activeBubbles.RemoveAt(i);
-                continue;
-            }
-            activeBubbles[i].anchoredPosition += new Vector2(0, shiftAmount);
+            targetYPositions[i] += shiftAmount;
         }
 
-        // yeni balonu panelin altina yerlestir
-        // pivot center (0.5, 0.5) — margin farkindan x offset hesapla
+        // yeni balonu panelin altina yerlestir (bu anlik, smooth degil)
         float xOffset = (panelLeftMargin - panelRightMargin) / 2f;
-        bubbleRect.anchoredPosition = new Vector2(xOffset, panelBottomMargin + scaledHeight * 0.5f);
+        float startY = panelBottomMargin + scaledHeight * 0.5f;
+        bubbleRect.anchoredPosition = new Vector2(xOffset, startY);
+
         activeBubbles.Add(bubbleRect);
+        targetYPositions.Add(startY);
 
         RemoveOverflowBubbles();
     }
@@ -94,15 +112,18 @@ public class SocialMediaBubbleUI : MonoBehaviour
             if (activeBubbles[i] == null)
             {
                 activeBubbles.RemoveAt(i);
+                targetYPositions.RemoveAt(i);
                 continue;
             }
 
+            // hedef pozisyona gore kontrol et (gercek pozisyon henuz oraya ulasmamis olabilir)
             float scaledHeight = activeBubbles[i].sizeDelta.y * activeBubbles[i].localScale.y;
-            float bubbleTop = activeBubbles[i].anchoredPosition.y + scaledHeight * 0.5f;
+            float bubbleTop = targetYPositions[i] + scaledHeight * 0.5f;
             if (bubbleTop > maxTop)
             {
                 Destroy(activeBubbles[i].gameObject);
                 activeBubbles.RemoveAt(i);
+                targetYPositions.RemoveAt(i);
             }
         }
     }
