@@ -10,7 +10,6 @@ public class MapDecorPlacer : MonoBehaviour
     public float spriteZ                        = -0.5f;
 
     [Header("Spawn Rates — Per Region")]
-    [Range(0, 16)] public int citiesSpawnRate       = 2;
     [Range(0, 16)] public int agriculturalSpawnRate = 2;
     [Range(0, 16)] public int urbanSpawnRate        = 2;
     [Range(0, 16)] public int industrialSpawnRate   = 2;
@@ -23,8 +22,30 @@ public class MapDecorPlacer : MonoBehaviour
     [Range(0, 20)]     public int   cityRegionBorderBuffer      = 5;
     public bool                     citySnapRotation            = false;
     [Range(0.05f, 2f)] public float overlapRadius               = 0.3f;
-    [Range(0, 30)]     public int   cityBuildingMaxRoadDistance = 8;
-    [Range(0f, 1f)]    public float cityRoadAffinityStrength    = 0.7f;
+    [Range(0, 30)]     public int   cityBuildingMaxRoadDistance = 15;
+    [Tooltip("Yoldan minimum uzaklık — sprite'ların yol üstüne taşmasını önler.")]
+    [Range(1, 10)]     public int   cityMinRoadDistance         = 2;
+    [Tooltip("Şehir sprite'ları için ayrı scale aralığı.")]
+    public Vector2 citySpriteScaleRange = new Vector2(0.3f, 0.5f);
+
+    [Header("City Building Shadow")]
+    [Tooltip("Gölge offset (world unit). X=sağ, Y=aşağı.")]
+    public Vector2 shadowOffset = new Vector2(0.02f, -0.02f);
+    [Tooltip("Gölge rengi ve saydamlığı.")]
+    public Color shadowColor = new Color(0f, 0f, 0f, 0.4f);
+
+    [Tooltip("Yoğun bölgede sprite'lar arası minimum mesafe. Küçük = daha sıkı.")]
+    [Range(0.01f, 0.5f)] public float denseOverlapRadius        = 0.04f;
+
+    [Header("City Sub-Zones — Yoğunluk")]
+    [Tooltip("Yoğun bölge oranı alt sınırı (şehir tile'larının yüzdesi).")]
+    [Range(0.1f, 0.5f)] public float cityDenseRatioMin          = 0.2f;
+    [Tooltip("Yoğun bölge oranı üst sınırı.")]
+    [Range(0.2f, 0.7f)] public float cityDenseRatioMax          = 0.5f;
+    [Tooltip("Seyrek bölge spawn oranı.")]
+    [Range(0, 16)]      public int   citySparseSpawnRate        = 1;
+    [Tooltip("Noise ölçeği — küçük değer = büyük kümeler.")]
+    [Range(0.01f, 0.1f)] public float cityDenseNoiseScale       = 0.03f;
 
     [Header("Broken Building Sprites")]
     [Tooltip("Sprites randomly picked when a city building is cracked by an earthquake.")]
@@ -33,8 +54,6 @@ public class MapDecorPlacer : MonoBehaviour
     public Color brokenBuildingTint = new Color(0.55f, 0.45f, 0.40f, 1f);
 
     [Header("Day / Night Building Sprites")]
-    [Tooltip("Night variants of citiesDecor (lights on). Index-matched to citiesDecor.")]
-    public List<Sprite> citiesDecorNight = new List<Sprite>();
     [Tooltip("Night variants of broken building sprites. Index-matched to brokenBuildingSprites.")]
     public List<Sprite> brokenBuildingSpritesNight = new List<Sprite>();
 
@@ -96,6 +115,7 @@ public class MapDecorPlacer : MonoBehaviour
         public SpriteRenderer  nightRenderer;
         public int             tileX, tileY;
         public bool            isBroken;
+        public bool            isSpecial;
         public int             spriteIndex;
         public int             brokenIndex;
         public float           baseAlpha;
@@ -136,6 +156,7 @@ public class MapDecorPlacer : MonoBehaviour
 
     private List<GameObject>   decorObjects    = new List<GameObject>();
     private List<Vector2>      occupiedCenters = new List<Vector2>();
+    private List<Vector3>      denseOccupied   = new List<Vector3>(); // x, y, radius
     private List<BuildingData> cityBuildings   = new List<BuildingData>();
     private List<PortData>     ports           = new List<PortData>();
     private List<ShipInstance> activeShips     = new List<ShipInstance>();
@@ -186,8 +207,10 @@ public class MapDecorPlacer : MonoBehaviour
         cachedHalfW = halfW;
         cachedHalfH = halfH;
 
-        var cityTilePool   = new List<Vector2Int>();
+        var allCityTiles   = new List<Vector2Int>();
         var biomeTilePools = new Dictionary<int, List<Vector2Int>>();
+
+        bool hasRoads = RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated;
 
         for (int x = 0; x < map.width; x++)
         for (int y = 0; y < map.height; y++)
@@ -197,8 +220,12 @@ public class MapDecorPlacer : MonoBehaviour
             int b = map.GetBiome(x, y);
             if (b == 2)
             {
-                if (cityRegionBorderBuffer == 0 || IsInsideRegion(map, x, y, cityRegionBorderBuffer))
-                    cityTilePool.Add(new Vector2Int(x, y));
+                if (cityRegionBorderBuffer > 0 && !IsInsideRegion(map, x, y, cityRegionBorderBuffer))
+                    continue;
+                // Yola çok yakın veya üstündeki tile'ları dışla
+                if (hasRoads && RoadGenerator.Instance.GetDistanceToRoadEdge(x, y) < cityMinRoadDistance)
+                    continue;
+                allCityTiles.Add(new Vector2Int(x, y));
             }
             else
             {
@@ -208,11 +235,23 @@ public class MapDecorPlacer : MonoBehaviour
             }
         }
 
-        int cityAttempts = (cityTilePool.Count / Mathf.Max(1, cellArea)) * citiesSpawnRate;
-        for (int attempt = 0; attempt < cityAttempts; attempt++)
+        // Yoğun / seyrek alt bölge ayrımı
+        var cityDensePool  = new List<Vector2Int>();
+        var citySparsePool = new List<Vector2Int>();
+        ClassifyCityDensity(allCityTiles, cityDensePool, citySparsePool);
+
+        // 1) Özel binaları önce yerleştir
+        PlaceSpecialCityBuildings(map, settings, cityDensePool, citySparsePool, halfW, halfH);
+
+        // 2) Yoğun bölge — tüm boşlukları doldur
+        FillDenseCityArea(map, settings, cityDensePool, halfW, halfH);
+
+        // 3) Seyrek bölge — genel binalar
+        int sparseAttempts = (citySparsePool.Count / Mathf.Max(1, cellArea)) * citySparseSpawnRate;
+        for (int attempt = 0; attempt < sparseAttempts; attempt++)
         {
-            if (cityTilePool.Count == 0) break;
-            Vector2Int tile = cityTilePool[Random.Range(0, cityTilePool.Count)];
+            if (citySparsePool.Count == 0) break;
+            Vector2Int tile = citySparsePool[Random.Range(0, citySparsePool.Count)];
             TryPlaceCityBuilding(map, settings, tile.x, tile.y, halfW, halfH);
         }
 
@@ -493,20 +532,14 @@ public class MapDecorPlacer : MonoBehaviour
         if (settings.citiesDecor == null || settings.citiesDecor.Count == 0) return;
         if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) return;
 
-        if (cityBuildingMaxRoadDistance > 0 && RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated)
-        {
-            int roadDist = RoadGenerator.Instance.GetDistanceToRoad(tx, ty);
-            if (roadDist > cityBuildingMaxRoadDistance) return;
-            if (cityRoadAffinityStrength > 0f && roadDist > 0)
-            {
-                float normalizedDist = (float)roadDist / cityBuildingMaxRoadDistance;
-                float spawnChance    = 1f - (normalizedDist * cityRoadAffinityStrength);
-                if (Random.value > spawnChance) return;
-            }
-        }
+        // Güvenlik: yola çok yakın tile'a sprite koyma
+        if (RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated
+            && RoadGenerator.Instance.GetDistanceToRoadEdge(tx, ty) < cityMinRoadDistance)
+            return;
 
         int spriteIdx = Random.Range(0, settings.citiesDecor.Count);
-        Sprite daySprite = settings.citiesDecor[spriteIdx];
+        var entry = settings.citiesDecor[spriteIdx];
+        Sprite daySprite = entry.daySprite;
         if (daySprite == null) return;
 
         float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
@@ -514,39 +547,12 @@ public class MapDecorPlacer : MonoBehaviour
         if (IsOverlapping(wx, wy)) return;
         occupiedCenters.Add(new Vector2(wx, wy));
 
-        float scale    = Random.Range(spriteScaleRange.x, spriteScaleRange.y);
+        float scale    = Random.Range(citySpriteScaleRange.x, citySpriteScaleRange.y);
         float baseA    = Random.Range(0.85f, 1f);
         int sortOrder  = 10 + (int)(wy * -100f);
 
-        GameObject go = new GameObject("CityBuilding");
-        go.transform.SetParent(transform);
-        go.transform.position   = new Vector3(wx, wy, spriteZ);
-        go.transform.localScale = new Vector3(scale, scale, 1f);
-        if (citySnapRotation)
-            go.transform.rotation = Quaternion.Euler(0f, 0f, Random.Range(0, 4) * 90f);
-
-        SpriteRenderer daySR = go.AddComponent<SpriteRenderer>();
-        daySR.sprite       = daySprite;
-        daySR.sortingOrder = sortOrder;
-        daySR.flipX        = false;
-        daySR.color        = new Color(1f, 1f, 1f, baseA);
-
-        SpriteRenderer nightSR = null;
-        Sprite nightSprite = GetNightCitySprite(spriteIdx);
-        if (nightSprite != null)
-        {
-            GameObject nightGo = new GameObject("NightOverlay");
-            nightGo.transform.SetParent(go.transform, false);
-            nightGo.transform.localPosition = Vector3.zero;
-            nightGo.transform.localScale    = Vector3.one;
-            nightGo.transform.localRotation = Quaternion.identity;
-
-            nightSR              = nightGo.AddComponent<SpriteRenderer>();
-            nightSR.sprite       = nightSprite;
-            nightSR.sortingOrder = sortOrder + 1;
-            nightSR.flipX        = false;
-            nightSR.color        = new Color(1f, 1f, 1f, 0f);
-        }
+        var (go, daySR, nightSR) = CreateCityBuildingObject(
+            daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder);
 
         decorObjects.Add(go);
         cityBuildings.Add(new BuildingData
@@ -557,17 +563,282 @@ public class MapDecorPlacer : MonoBehaviour
             tileX         = tx,
             tileY         = ty,
             isBroken      = false,
+            isSpecial     = false,
             spriteIndex   = spriteIdx,
             brokenIndex   = -1,
             baseAlpha     = baseA
         });
     }
 
-    Sprite GetNightCitySprite(int index)
+    // -------------------------------------------------------------------------
+    // CITY DENSITY CLASSIFICATION — Yoğun / Seyrek bölge ayrımı
+    // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // DENSE CITY — Grid taramayla tüm boşlukları doldurma
+    // -------------------------------------------------------------------------
+
+    void FillDenseCityArea(MapGenerator map, BiomePaintSettings settings,
+                           List<Vector2Int> densePool, float halfW, float halfH)
     {
-        if (citiesDecorNight == null || index < 0 || index >= citiesDecorNight.Count)
-            return null;
-        return citiesDecorNight[index];
+        if (settings.citiesDecor == null || settings.citiesDecor.Count == 0) return;
+        if (densePool.Count == 0) return;
+
+        // Dense tile'ları hızlı lookup için set'e al
+        var denseSet = new HashSet<Vector2Int>(densePool);
+
+        // Grid adımı: sprite boyutuna göre (piksel cinsinden)
+        // citySpriteScaleRange ortalaması * sprite genişliği tahmini
+        float avgScale = (citySpriteScaleRange.x + citySpriteScaleRange.y) * 0.5f;
+        // Step küçük = daha fazla aday nokta = boşluk kalmaz
+        int step = Mathf.Max(1, Mathf.RoundToInt(avgScale * pixelsPerUnit * 0.08f));
+
+        // Dense bölgenin sınırlarını bul
+        int minX = int.MaxValue, minY = int.MaxValue;
+        int maxX = int.MinValue, maxY = int.MinValue;
+        for (int i = 0; i < densePool.Count; i++)
+        {
+            var t = densePool[i];
+            if (t.x < minX) minX = t.x;
+            if (t.x > maxX) maxX = t.x;
+            if (t.y < minY) minY = t.y;
+            if (t.y > maxY) maxY = t.y;
+        }
+
+        int placed = 0;
+
+        // Grid şeklinde tara, rastgele offset ile kaotik yerleştir
+        int jitter = Mathf.Max(1, step / 2);
+        for (int x = minX; x <= maxX; x += step)
+        for (int y = minY; y <= maxY; y += step)
+        {
+            // Rastgele kaydırma — düz grid hissini kırar
+            int jx = x + Random.Range(-jitter, jitter + 1);
+            int jy = y + Random.Range(-jitter, jitter + 1);
+
+            // Kaydırılmış nokta veya yakın komşusu dense bölgede mi kontrol et
+            bool inDense = false;
+            int half = step / 2;
+            for (int dx = -half; dx <= half && !inDense; dx += half)
+            for (int dy = -half; dy <= half && !inDense; dy += half)
+            {
+                if (denseSet.Contains(new Vector2Int(jx + dx, jy + dy)))
+                    inDense = true;
+            }
+            if (!inDense) continue;
+
+            if (TryPlaceCityBuildingDense(map, settings, jx, jy, halfW, halfH))
+                placed++;
+        }
+
+        Debug.Log($"MapDecorPlacer: dense fill complete, step={step}, placed={placed}");
+    }
+
+    /// <summary>
+    /// Dense bölge için sıkı overlap kontrolüyle yerleştirme — üst üste binmez ama bitişik durur.
+    /// </summary>
+    bool TryPlaceCityBuildingDense(MapGenerator map, BiomePaintSettings settings,
+                                   int tx, int ty, float halfW, float halfH)
+    {
+        if (settings.citiesDecor.Count == 0) return false;
+        if (!map.IsLand(tx, ty)) return false;
+        if (map.GetBiome(tx, ty) != 2) return false;
+        if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) return false;
+
+        // Yol kenarı kontrolü
+        if (RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated
+            && RoadGenerator.Instance.GetDistanceToRoadEdge(tx, ty) < cityMinRoadDistance)
+            return false;
+
+        int spriteIdx = Random.Range(0, settings.citiesDecor.Count);
+        var entry = settings.citiesDecor[spriteIdx];
+        Sprite daySprite = entry.daySprite;
+        if (daySprite == null) return false;
+
+        float scale = Random.Range(citySpriteScaleRange.x, citySpriteScaleRange.y);
+
+        // Sprite'ın world boyutunu hesapla
+        float spriteWorldW = (daySprite.rect.width / daySprite.pixelsPerUnit) * scale;
+        float spriteWorldH = (daySprite.rect.height / daySprite.pixelsPerUnit) * scale;
+        float spriteRadius = Mathf.Min(spriteWorldW, spriteWorldH) * 0.45f;
+
+        float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
+        float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
+
+        // Sprite'ın gerçek boyutuna göre overlap kontrolü
+        if (IsDenseOverlapping(wx, wy, spriteRadius)) return false;
+        denseOccupied.Add(new Vector3(wx, wy, spriteRadius));
+
+        float baseA    = 1f;
+        int sortOrder  = 10 + (int)(wy * -100f);
+
+        // Ortak yerleştirme
+        var (go, daySR, nightSR) = CreateCityBuildingObject(
+            daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder);
+
+        decorObjects.Add(go);
+        cityBuildings.Add(new BuildingData
+        {
+            go            = go,
+            dayRenderer   = daySR,
+            nightRenderer = nightSR,
+            tileX         = tx,
+            tileY         = ty,
+            isBroken      = false,
+            isSpecial     = false,
+            spriteIndex   = spriteIdx,
+            brokenIndex   = -1,
+            baseAlpha     = baseA
+        });
+
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // CITY DENSITY CLASSIFICATION — Yoğun / Seyrek bölge ayrımı
+    // -------------------------------------------------------------------------
+
+    void ClassifyCityDensity(List<Vector2Int> allTiles,
+                             List<Vector2Int> denseOut, List<Vector2Int> sparseOut)
+    {
+        if (allTiles.Count == 0) return;
+
+        // Merkez noktayı hesapla
+        float cx = 0f, cy = 0f;
+        for (int i = 0; i < allTiles.Count; i++)
+        {
+            cx += allTiles[i].x;
+            cy += allTiles[i].y;
+        }
+        cx /= allTiles.Count;
+        cy /= allTiles.Count;
+
+        // Tek küme — merkez nokta seed olarak kullanılır
+        Vector2 seed = new Vector2(cx, cy);
+        float noiseOffsetX = Random.Range(0f, 1000f);
+        float noiseOffsetY = Random.Range(0f, 1000f);
+
+        // Her tile için skor hesapla: noise + merkeze yakınlık
+        float maxDist = Mathf.Sqrt(allTiles.Count) * 0.5f + 1f;
+        var scored = new List<(Vector2Int tile, float score)>(allTiles.Count);
+
+        for (int i = 0; i < allTiles.Count; i++)
+        {
+            Vector2Int t = allTiles[i];
+            float noise = Mathf.PerlinNoise(
+                t.x * cityDenseNoiseScale + noiseOffsetX,
+                t.y * cityDenseNoiseScale + noiseOffsetY);
+
+            float dist = Vector2.Distance(new Vector2(t.x, t.y), seed);
+            float proximity = 1f - Mathf.Clamp01(dist / maxDist);
+
+            // Skor: proximity ağırlıklı — tek bütün küme oluşturur
+            float score = noise * 0.3f + proximity * 0.7f;
+            scored.Add((t, score));
+        }
+
+        // Skora göre sırala (yüksekten düşüğe)
+        scored.Sort((a, b) => b.score.CompareTo(a.score));
+
+        // Yoğun bölge oranı (rastgele min-max arası)
+        float denseRatio = Random.Range(cityDenseRatioMin, cityDenseRatioMax);
+        int denseCount = Mathf.Max(1, Mathf.RoundToInt(allTiles.Count * denseRatio));
+
+        for (int i = 0; i < scored.Count; i++)
+        {
+            if (i < denseCount)
+                denseOut.Add(scored[i].tile);
+            else
+                sparseOut.Add(scored[i].tile);
+        }
+
+        Debug.Log($"MapDecorPlacer: city tiles={allTiles.Count}, dense={denseOut.Count}, sparse={sparseOut.Count}");
+    }
+
+    // -------------------------------------------------------------------------
+    // SPECIAL CITY BUILDINGS — Sabit sayılı özel binalar
+    // -------------------------------------------------------------------------
+
+    void PlaceSpecialCityBuildings(MapGenerator map, BiomePaintSettings settings,
+                                   List<Vector2Int> densePool, List<Vector2Int> sparsePool,
+                                   float halfW, float halfH)
+    {
+        if (settings.specialCityBuildings == null) return;
+
+        for (int s = 0; s < settings.specialCityBuildings.Count; s++)
+        {
+            var special = settings.specialCityBuildings[s];
+            if (special.daySprite == null || special.count <= 0) continue;
+
+            // Hedef havuzu belirle
+            List<Vector2Int> pool;
+            if (special.denseOnly)
+            {
+                pool = densePool;
+            }
+            else
+            {
+                pool = new List<Vector2Int>(densePool.Count + sparsePool.Count);
+                pool.AddRange(densePool);
+                pool.AddRange(sparsePool);
+            }
+
+            if (pool.Count == 0) continue;
+
+            int placed = 0;
+            int maxAttempts = pool.Count;
+
+            for (int attempt = 0; attempt < maxAttempts && placed < special.count; attempt++)
+            {
+                Vector2Int tile = pool[Random.Range(0, pool.Count)];
+                if (TryPlaceSpecialBuilding(map, special, tile.x, tile.y, halfW, halfH))
+                    placed++;
+            }
+
+            if (placed < special.count)
+                Debug.LogWarning($"MapDecorPlacer: özel bina '{special.daySprite.name}' — " +
+                                 $"hedef={special.count}, yerleşen={placed}");
+        }
+    }
+
+    bool TryPlaceSpecialBuilding(MapGenerator map, SpecialCityBuilding special,
+                                 int tx, int ty, float halfW, float halfH)
+    {
+        if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) return false;
+
+        // Güvenlik: yola çok yakın tile'a sprite koyma
+        if (RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated
+            && RoadGenerator.Instance.GetDistanceToRoadEdge(tx, ty) < cityMinRoadDistance)
+            return false;
+
+        float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
+        float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
+        if (IsOverlapping(wx, wy)) return false;
+        occupiedCenters.Add(new Vector2(wx, wy));
+
+        float scale    = Random.Range(citySpriteScaleRange.x, citySpriteScaleRange.y);
+        float baseA    = Random.Range(0.85f, 1f);
+        int sortOrder  = 10 + (int)(wy * -100f);
+
+        var (go, daySR, nightSR) = CreateCityBuildingObject(
+            special.daySprite, special.nightSprite, wx, wy, scale, baseA, sortOrder);
+
+        decorObjects.Add(go);
+        cityBuildings.Add(new BuildingData
+        {
+            go            = go,
+            dayRenderer   = daySR,
+            nightRenderer = nightSR,
+            tileX         = tx,
+            tileY         = ty,
+            isBroken      = false,
+            isSpecial     = true,
+            spriteIndex   = -1,
+            brokenIndex   = -1,
+            baseAlpha     = baseA
+        });
+
+        return true;
     }
 
     Sprite GetNightBrokenSprite(int index)
@@ -601,11 +872,78 @@ public class MapDecorPlacer : MonoBehaviour
         return true;
     }
 
+    (GameObject go, SpriteRenderer daySR, SpriteRenderer nightSR) CreateCityBuildingObject(
+        Sprite daySprite, Sprite nightSprite, float wx, float wy,
+        float scale, float baseA, int sortOrder)
+    {
+        GameObject go = new GameObject("CityBuilding");
+        go.transform.SetParent(transform);
+        go.transform.position   = new Vector3(wx, wy, spriteZ);
+        go.transform.localScale = new Vector3(scale, scale, 1f);
+        if (citySnapRotation)
+            go.transform.rotation = Quaternion.Euler(0f, 0f, Random.Range(0, 4) * 90f);
+
+        // Gölge
+        AddShadow(go, daySprite, sortOrder);
+
+        SpriteRenderer daySR = go.AddComponent<SpriteRenderer>();
+        daySR.sprite       = daySprite;
+        daySR.sortingOrder = sortOrder;
+        daySR.flipX        = false;
+        daySR.color        = new Color(1f, 1f, 1f, baseA);
+
+        SpriteRenderer nightSR = null;
+        if (nightSprite != null)
+        {
+            GameObject nightGo = new GameObject("NightOverlay");
+            nightGo.transform.SetParent(go.transform, false);
+            nightGo.transform.localPosition = Vector3.zero;
+            nightGo.transform.localScale    = Vector3.one;
+            nightGo.transform.localRotation = Quaternion.identity;
+
+            nightSR              = nightGo.AddComponent<SpriteRenderer>();
+            nightSR.sprite       = nightSprite;
+            nightSR.sortingOrder = sortOrder + 1;
+            nightSR.flipX        = false;
+            nightSR.color        = new Color(1f, 1f, 1f, 0f);
+        }
+
+        return (go, daySR, nightSR);
+    }
+
+    void AddShadow(GameObject parent, Sprite sprite, int sortOrder)
+    {
+        GameObject shadowGo = new GameObject("Shadow");
+        shadowGo.transform.SetParent(parent.transform, false);
+        shadowGo.transform.localPosition = new Vector3(shadowOffset.x, shadowOffset.y, 0f);
+        shadowGo.transform.localScale    = Vector3.one;
+        shadowGo.transform.localRotation = Quaternion.identity;
+
+        SpriteRenderer sr = shadowGo.AddComponent<SpriteRenderer>();
+        sr.sprite       = sprite;
+        sr.sortingOrder = sortOrder - 1;
+        sr.flipX        = false;
+        sr.color        = shadowColor;
+    }
+
     bool IsOverlapping(float wx, float wy)
     {
         float minDist = overlapRadius * 2f;
         foreach (var c in occupiedCenters)
             if (Vector2.Distance(new Vector2(wx, wy), c) < minDist) return true;
+        return false;
+    }
+
+    bool IsDenseOverlapping(float wx, float wy, float myRadius)
+    {
+        for (int i = 0; i < denseOccupied.Count; i++)
+        {
+            var other = denseOccupied[i];
+            float minDist = myRadius + other.z; // iki sprite'ın yarıçapı toplamı
+            float dx = wx - other.x;
+            float dy = wy - other.y;
+            if (dx * dx + dy * dy < minDist * minDist) return true;
+        }
         return false;
     }
 
@@ -2336,6 +2674,7 @@ public class MapDecorPlacer : MonoBehaviour
             if (go != null) Destroy(go);
         decorObjects.Clear();
         occupiedCenters.Clear();
+        denseOccupied.Clear();
         cityBuildings.Clear();
         ports.Clear();
         prevRatio = -1f;

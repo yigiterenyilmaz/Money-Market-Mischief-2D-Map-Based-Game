@@ -17,11 +17,12 @@ public class SocialMediaBubbleUI : MonoBehaviour
 
     [Header("Balon Ayarlari")]
     public float spacingBetweenBubbles = 8f;
-    public float slideSpeed = 5f; // smooth kayma hizi
+    public float slideSpeed = 5f;
 
-    // her balonun hedef y pozisyonunu tutar
     List<RectTransform> activeBubbles = new List<RectTransform>();
     List<float> targetYPositions = new List<float>();
+    // her balonun scaled yuksekligi (overflow dahil, gorsel hesap icin)
+    List<float> bubbleScaledHeights = new List<float>();
 
     void OnEnable()
     {
@@ -35,13 +36,13 @@ public class SocialMediaBubbleUI : MonoBehaviour
 
     void Update()
     {
-        // balonlari hedef pozisyonlarina dogru smooth kaydir
         for (int i = activeBubbles.Count - 1; i >= 0; i--)
         {
             if (activeBubbles[i] == null)
             {
                 activeBubbles.RemoveAt(i);
                 targetYPositions.RemoveAt(i);
+                bubbleScaledHeights.RemoveAt(i);
                 continue;
             }
 
@@ -58,25 +59,17 @@ public class SocialMediaBubbleUI : MonoBehaviour
         GameObject bubbleObj = Instantiate(bubblePrefab, bubbleContainer);
         RectTransform bubbleRect = bubbleObj.GetComponent<RectTransform>();
 
-        // hedef genislik
-        float containerWidth = bubbleContainer.rect.width;
-        float targetWidth = containerWidth - panelLeftMargin - panelRightMargin;
-
-        // orijinal prefab boyutunu oku, scale faktorunu hesapla
-        float originalWidth = bubbleRect.sizeDelta.x;
-        float scaleFactor = targetWidth / originalWidth;
-
-        // anchor'i alt-ortaya cek (container icindeki konum icin, ic duzeni etkilemez)
+        // anchor'i alt-ortaya cek
         bubbleRect.anchorMin = new Vector2(0.5f, 0f);
         bubbleRect.anchorMax = new Vector2(0.5f, 0f);
 
-        // localScale ile butunuyle buyut
-        bubbleRect.localScale = new Vector3(scaleFactor, scaleFactor, 1f);
+        // scale hesapla
+        float containerWidth = bubbleContainer.rect.width;
+        float targetWidth = containerWidth - panelLeftMargin - panelRightMargin;
+        float originalWidth = bubbleRect.sizeDelta.x;
+        float scaleFactor = targetWidth / originalWidth;
 
-        // scaled yukseklik
-        float scaledHeight = bubbleRect.sizeDelta.y * scaleFactor;
-
-        // text iceriklerini yaz
+        // text'leri yaz (scale oncesi, orijinal olcekte)
         TMP_Text contentText = bubbleObj.transform.Find("ContentText")?.GetComponent<TMP_Text>();
         TMP_Text authorText = bubbleObj.transform.Find("AuthorText")?.GetComponent<TMP_Text>();
 
@@ -85,20 +78,53 @@ public class SocialMediaBubbleUI : MonoBehaviour
         if (authorText != null)
             authorText.text = post.authorName;
 
+        // balon boyutuna DOKUNMA — content tasarsa, content'i yukari dogru tasir
+        float extraHeight = 0f;
+        if (contentText != null)
+        {
+            LayoutRebuilder.ForceRebuildLayoutImmediate(bubbleRect);
+            contentText.ForceMeshUpdate();
+
+            float contentAvailableHeight = contentText.rectTransform.rect.height;
+            float contentPreferredHeight = contentText.preferredHeight;
+
+            if (contentPreferredHeight > contentAvailableHeight)
+            {
+                extraHeight = contentPreferredHeight - contentAvailableHeight;
+                // content text'in rect'ini yukari dogru genislet
+                // overflow mode'u overflow olarak birak — text gorunsun
+                contentText.overflowMode = TextOverflowModes.Overflow;
+                // content rect'ini yukari buyut (anchoredPosition yukari kaydir)
+                contentText.rectTransform.anchoredPosition += new Vector2(0, extraHeight * 0.5f);
+                contentText.rectTransform.sizeDelta += new Vector2(0, extraHeight);
+            }
+        }
+
+        // scale uygula
+        bubbleRect.localScale = new Vector3(scaleFactor, scaleFactor, 1f);
+
+        // balon orijinal scaled yuksekligi (balon boyutu degismedi)
+        float baseScaledHeight = bubbleRect.sizeDelta.y * scaleFactor;
+        // content tasmasi dahil toplam alan (stacking icin)
+        float extraScaled = extraHeight * scaleFactor;
+        float totalScaledHeight = baseScaledHeight + extraScaled;
+
         // mevcut balonlarin hedef pozisyonlarini yukari kaydir
-        float shiftAmount = scaledHeight + spacingBetweenBubbles;
+        float shiftAmount = totalScaledHeight + spacingBetweenBubbles;
         for (int i = 0; i < targetYPositions.Count; i++)
         {
             targetYPositions[i] += shiftAmount;
         }
 
-        // yeni balonu panelin altina yerlestir (bu anlik, smooth degil)
+        // pozisyon: balonun alt kenari margin'de
+        // ekstra content yukari dogru tastigindan, balonun pozisyonu ayni
         float xOffset = (panelLeftMargin - panelRightMargin) / 2f;
-        float startY = panelBottomMargin + scaledHeight * 0.5f;
-        bubbleRect.anchoredPosition = new Vector2(xOffset, startY);
+        float startY = panelBottomMargin + baseScaledHeight * 0.5f;
 
+        bubbleRect.anchoredPosition = new Vector2(xOffset, startY);
         activeBubbles.Add(bubbleRect);
         targetYPositions.Add(startY);
+        bubbleScaledHeights.Add(totalScaledHeight);
 
         RemoveOverflowBubbles();
     }
@@ -113,17 +139,17 @@ public class SocialMediaBubbleUI : MonoBehaviour
             {
                 activeBubbles.RemoveAt(i);
                 targetYPositions.RemoveAt(i);
+                bubbleScaledHeights.RemoveAt(i);
                 continue;
             }
 
-            // hedef pozisyona gore kontrol et (gercek pozisyon henuz oraya ulasmamis olabilir)
-            float scaledHeight = activeBubbles[i].sizeDelta.y * activeBubbles[i].localScale.y;
-            float bubbleTop = targetYPositions[i] + scaledHeight * 0.5f;
+            float bubbleTop = targetYPositions[i] + bubbleScaledHeights[i] * 0.5f;
             if (bubbleTop > maxTop)
             {
                 Destroy(activeBubbles[i].gameObject);
                 activeBubbles.RemoveAt(i);
                 targetYPositions.RemoveAt(i);
+                bubbleScaledHeights.RemoveAt(i);
             }
         }
     }

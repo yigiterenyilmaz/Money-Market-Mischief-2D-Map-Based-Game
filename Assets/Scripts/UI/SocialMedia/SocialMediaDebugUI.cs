@@ -24,7 +24,7 @@ public class SocialMediaDebugUI : MonoBehaviour
     {
         // canvas bul
         Canvas canvas = GetComponentInParent<Canvas>();
-        if (canvas == null) canvas = FindObjectOfType<Canvas>();
+        if (canvas == null) canvas = FindFirstObjectByType<Canvas>();
         if (canvas == null) return;
 
         // buton objesi

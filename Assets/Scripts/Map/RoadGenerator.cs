@@ -94,6 +94,7 @@ public class RoadGenerator : MonoBehaviour
 
     private int[,] roadTypeMap;
     private int[,] roadDistanceField;
+    private int[,] visualRoadDistanceField;
 
     private float[,] roadThicknessMap;
     private Color[,] roadFillColorMap;
@@ -1294,6 +1295,53 @@ public class RoadGenerator : MonoBehaviour
                 queue.Enqueue(new Vector2Int(nx, ny));
             }
         }
+
+        // Görsel kenardan mesafe — yolun boyanmış halini baz alır
+        BuildVisualRoadDistanceField();
+    }
+
+    void BuildVisualRoadDistanceField()
+    {
+        visualRoadDistanceField = new int[_w, _h];
+        for (int x = 0; x < _w; x++)
+            for (int y = 0; y < _h; y++)
+                visualRoadDistanceField[x, y] = int.MaxValue;
+
+        // Seed: her yol tile'ının görsel yarıçapı içindeki tüm pikseller
+        Queue<Vector2Int> queue = new Queue<Vector2Int>();
+        foreach (var tile in allRoadTiles)
+        {
+            float thickness = roadThicknessMap[tile.x, tile.y];
+            int outW = roadOutlineWidthMap[tile.x, tile.y];
+            int totalHalf = Mathf.CeilToInt((thickness + outW * 2) / 2f);
+            int totalHalfSq = totalHalf * totalHalf;
+
+            for (int ddx = -totalHalf; ddx <= totalHalf; ddx++)
+                for (int ddy = -totalHalf; ddy <= totalHalf; ddy++)
+                {
+                    if (ddx * ddx + ddy * ddy > totalHalfSq) continue;
+                    int px = tile.x + ddx, py = tile.y + ddy;
+                    if (px < 0 || px >= _w || py < 0 || py >= _h) continue;
+                    if (visualRoadDistanceField[px, py] == 0) continue;
+                    visualRoadDistanceField[px, py] = 0;
+                    queue.Enqueue(new Vector2Int(px, py));
+                }
+        }
+
+        while (queue.Count > 0)
+        {
+            var pos = queue.Dequeue();
+            int d = visualRoadDistanceField[pos.x, pos.y];
+            if (d >= 30) continue;
+            for (int i = 0; i < 4; i++)
+            {
+                int nx = pos.x + dx4[i], ny = pos.y + dy4[i];
+                if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
+                if (visualRoadDistanceField[nx, ny] <= d + 1) continue;
+                visualRoadDistanceField[nx, ny] = d + 1;
+                queue.Enqueue(new Vector2Int(nx, ny));
+            }
+        }
     }
 
     // =========================================================================
@@ -1335,6 +1383,17 @@ public class RoadGenerator : MonoBehaviour
     {
         if (!_generated || x < 0 || x >= _w || y < 0 || y >= _h) return int.MaxValue;
         return roadDistanceField[x, y];
+    }
+
+    /// <summary>
+    /// Yolun görsel kenarından (boyanan piksel sınırı) mesafe döndürür.
+    /// Highway kalın, branch ince — her biri kendi genişliğine göre hesaplanır.
+    /// </summary>
+    public int GetDistanceToRoadEdge(int x, int y)
+    {
+        if (!_generated || visualRoadDistanceField == null || x < 0 || x >= _w || y < 0 || y >= _h)
+            return int.MaxValue;
+        return visualRoadDistanceField[x, y];
     }
 
     public bool IsNearRoad(int x, int y, int maxDistance)
@@ -1433,6 +1492,7 @@ public class RoadGenerator : MonoBehaviour
         regionCenters.Clear();
         roadTypeMap = null;
         roadDistanceField = null;
+        visualRoadDistanceField = null;
         roadThicknessMap = null;
         roadFillColorMap = null;
         roadOutlineColorMap = null;

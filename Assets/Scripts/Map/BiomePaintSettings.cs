@@ -1,6 +1,27 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[System.Serializable]
+public struct CityBuildingEntry
+{
+    public Sprite daySprite;
+    [Tooltip("Gece sprite'ı. Boş bırakılabilir.")]
+    public Sprite nightSprite;
+}
+
+[System.Serializable]
+public struct SpecialCityBuilding
+{
+    [Tooltip("Özel bina sprite'ı (gündüz).")]
+    public Sprite daySprite;
+    [Tooltip("Özel bina sprite'ı (gece). Boş bırakılabilir.")]
+    public Sprite nightSprite;
+    [Tooltip("Haritada kaç adet yerleştirilecek.")]
+    [Range(1, 10)] public int count;
+    [Tooltip("Sadece yoğun bölgeye mi yerleşsin?")]
+    public bool denseOnly;
+}
+
 [CreateAssetMenu(fileName = "BiomePaintSettings", menuName = "Map/BiomePaintSettings")]
 public class BiomePaintSettings : ScriptableObject
 {
@@ -43,8 +64,11 @@ public class BiomePaintSettings : ScriptableObject
     [Header("Decorative Sprites — Agricultural")]
     public List<Sprite> agriculturalDecor = new List<Sprite>();
 
-    [Header("Decorative Sprites — Cities")]
-    public List<Sprite> citiesDecor = new List<Sprite>();
+    [Header("Decorative Sprites — Cities (Genel Binalar)")]
+    public List<CityBuildingEntry> citiesDecor = new List<CityBuildingEntry>();
+
+    [Header("City Special Buildings — Sabit Sayılı Özel Binalar")]
+    public List<SpecialCityBuilding> specialCityBuildings = new List<SpecialCityBuilding>();
 
     [Header("Decorative Sprites — Industrial")]
     public List<Sprite> industrialDecor = new List<Sprite>();
