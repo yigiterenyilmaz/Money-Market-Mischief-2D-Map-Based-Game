@@ -1533,92 +1533,95 @@ public class RoadGenerator : MonoBehaviour
     }
 
     /// <summary>
-    /// Belediye binasına 3 farklı yönden (~120° aralıklı) yol çeker.
+    /// Belediye binasına 4 kardinal yönden (sağ, üst, sol, alt) TEMİZ + şeklinde yol çeker.
+    /// Mimari (basit):
+    ///   1. Her yönde düz bir ışın gönder. Adım adım ilerle.
+    ///   2. Her adımda ışının karşısında ±5 tile perpendicular pencereye bak.
+    ///      İlk rastlanan yol tile'ı hedef olur.
+    ///   3. Suya çarpınca veya haritadan çıkınca → o yönde yol yok, atlanır.
+    ///   4. Hedef bulunursa bina ile hedef arasına DÜZ çizgi çizilir (kavis yok).
+    /// BFS yok, smoothing yok — temiz + görüntüsü.
     /// </summary>
     public void ConnectCityHallToRoads(MapGenerator map, Vector2Int cityHallTile)
     {
         if (!_generated || allRoadTiles.Count == 0) return;
 
-        // Rastgele base angle — 3 yol eşit aralıklı
-        float baseAngle = UnityEngine.Random.Range(0f, 120f);
-        float[] targetAngles = { baseAngle, baseAngle + 120f, baseAngle + 240f };
+        // 4 kardinal yön vektörü: sağ, üst, sol, alt
+        Vector2Int[] directions = {
+            new Vector2Int(1, 0),
+            new Vector2Int(0, 1),
+            new Vector2Int(-1, 0),
+            new Vector2Int(0, -1),
+        };
 
-        int step = Mathf.Max(1, allRoadTiles.Count / 500);
-
-        // Kullanılmış yol tile'larını takip et (aynı tile'a 2 yol gitmesin)
-        var usedTiles = new HashSet<long>();
+        const int minTargetDistance = 35;  // binaya çok yakın yollar hedef alınmaz (bina içi buffer)
+        const int tooCloseThreshold = 30;  // ilk yol bu mesafeden yakınsa yön atlanır — zaten yakın, konektör gereksiz
+        const int maxRayLength = 1000;     // en uzun arama (harita büyük olabilir)
+        const int perpWindow = 5;          // ışın uç noktasında ±5 tile yanlara bak
 
         int connected = 0;
-
-        foreach (float targetAngleDeg in targetAngles)
+        foreach (var dir in directions)
         {
-            Vector2Int bestTile = new Vector2Int(-1, -1);
+            Vector2Int perp = new Vector2Int(-dir.y, dir.x); // ışına dik yön
+            Vector2Int hit = new Vector2Int(-1, -1);
 
-            // Önce sıkı sektörde dene (±60°), bulamazsan genişlet (±90°, ±150°)
-            float[] sectorWidths = { 60f, 90f, 150f };
-            foreach (float sectorDeg in sectorWidths)
+            for (int d = minTargetDistance; d < maxRayLength; d++)
             {
-                float bestDist = float.MaxValue;
+                int cx = cityHallTile.x + dir.x * d;
+                int cy = cityHallTile.y + dir.y * d;
+                if (cx < 0 || cx >= _w || cy < 0 || cy >= _h) break;
+                if (!map.IsLand(cx, cy)) break; // suya/harita dışına çarptı → yön iptal
 
-                for (int i = 0; i < allRoadTiles.Count; i += step)
+                // Perpendicular sweep — hafif sağa/sola yerleşik yolları da yakala
+                for (int p = 0; p <= perpWindow; p++)
                 {
-                    Vector2Int rt = allRoadTiles[i];
-                    long key = (long)rt.x << 32 | (uint)rt.y;
-                    if (usedTiles.Contains(key)) continue;
-
-                    float dx = rt.x - cityHallTile.x;
-                    float dy = rt.y - cityHallTile.y;
-                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
-                    if (dist < 8f) continue;
-
-                    float diff = Mathf.Abs(Mathf.DeltaAngle(Mathf.Atan2(dy, dx) * Mathf.Rad2Deg, targetAngleDeg));
-                    if (diff > sectorDeg) continue;
-
-                    if (dist < bestDist) { bestDist = dist; bestTile = rt; }
+                    // p = 0 merkez, sonra ±1, ±2 ... (merkeze en yakın önce)
+                    int[] offsets = p == 0 ? new[] { 0 } : new[] { p, -p };
+                    foreach (int off in offsets)
+                    {
+                        int nx = cx + perp.x * off;
+                        int ny = cy + perp.y * off;
+                        if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
+                        if (roadTypeMap[nx, ny] != 0) { hit = new Vector2Int(nx, ny); break; }
+                    }
+                    if (hit.x >= 0) break;
                 }
-
-                if (bestTile.x >= 0) break;
+                if (hit.x >= 0) break;
             }
 
-            // Sektörde hiç yol bulunamadıysa en yakın kullanılmamış yol tile'ını al
-            if (bestTile.x < 0)
+            if (hit.x < 0) continue; // bu yönde yol yok — atla, zorlamayı kaldırdık
+
+            // Yol zaten çok yakınsa konektör çizmeye gerek yok — bina o yola yeterince yakın
+            float hitDist = Vector2.Distance(new Vector2(cityHallTile.x, cityHallTile.y), new Vector2(hit.x, hit.y));
+            if (hitDist <= tooCloseThreshold) continue;
+
+            // Bina ile hedef arasında düz iskelet çizgi (Bresenham benzeri lerp)
+            int steps = Mathf.Max(Mathf.Abs(hit.x - cityHallTile.x), Mathf.Abs(hit.y - cityHallTile.y));
+            if (steps < 2) continue;
+
+            List<Vector2Int> rawPath = new List<Vector2Int>(steps + 1);
+            for (int s = 0; s <= steps; s++)
             {
-                float bestDist = float.MaxValue;
-                for (int i = 0; i < allRoadTiles.Count; i += step)
-                {
-                    Vector2Int rt = allRoadTiles[i];
-                    long key = (long)rt.x << 32 | (uint)rt.y;
-                    if (usedTiles.Contains(key)) continue;
-                    float dist = Vector2Int.Distance(rt, cityHallTile);
-                    if (dist < 8f) continue;
-                    if (dist < bestDist) { bestDist = dist; bestTile = rt; }
-                }
+                float t = (float)s / steps;
+                int px = Mathf.RoundToInt(Mathf.Lerp(cityHallTile.x, hit.x, t));
+                int py = Mathf.RoundToInt(Mathf.Lerp(cityHallTile.y, hit.y, t));
+                rawPath.Add(new Vector2Int(px, py));
             }
 
-            if (bestTile.x < 0) continue;
+            // Perlin tabanlı doğal kavis (kısa yollarda iskelet aynen döner)
+            List<Vector2Int> curved = SmoothBranchPath(map, rawPath);
+            if (curved.Count < 2) curved = rawPath;
 
-            long usedKey = (long)bestTile.x << 32 | (uint)bestTile.y;
-            usedTiles.Add(usedKey);
-
-            // BFS ile yol bul — belediyeden yola doğru
-            List<Vector2Int> rawPath = BFSPathOnLandSimple(map, cityHallTile, bestTile);
-            if (rawPath.Count < 2) continue;
-
-            List<Vector2Int> smoothed = SmoothBranchPath(map, rawPath);
-            if (smoothed.Count < 2) smoothed = rawPath;
-
-            // Yola ulaşınca dur
+            // İlk yol tile'ında kes — anayolun içine dalmayı engeller (temiz T-kavşak)
             List<Vector2Int> trimmed = new List<Vector2Int>();
-            for (int i = 0; i < smoothed.Count; i++)
+            for (int i = 0; i < curved.Count; i++)
             {
-                trimmed.Add(smoothed[i]);
-                if (i > 3 && roadTypeMap[smoothed[i].x, smoothed[i].y] != 0) break;
+                trimmed.Add(curved[i]);
+                if (i > 0 && roadTypeMap[curved[i].x, curved[i].y] != 0) break;
             }
-
             if (trimmed.Count < 2) continue;
 
             branchPaths.Add(new List<Vector2Int>(trimmed));
-            // İnce yol: sabit 1px kalınlık, branch sonu görünümü
             RegisterThinRoadPixels(map, trimmed);
             connected++;
         }
