@@ -207,4 +207,30 @@ public class DayNightCycle : MonoBehaviour
     }
 
     public bool IsDark() => LightingRatio > 0.7f;
+
+    /// <summary>
+    /// 0 = şafak (güneş doğuda, gölge batıya uzun)
+    /// 0.5 = öğle (güneş tepede, gölge kısa, arkada)
+    /// 1 = akşam (güneş batıda, gölge doğuya uzun)
+    /// -1 = gece
+    /// </summary>
+    public float SunProgress
+    {
+        get
+        {
+            if (CurrentPhase == Phase.Night) return -1f;
+
+            float lightPeriod = dawnLength + dayLength + duskLength;
+            float pos;
+
+            if (CurrentPhase == Phase.Dawn)
+                pos = cycleTimer - nightEnd;          // 0 → dawnLength
+            else if (CurrentPhase == Phase.Day)
+                pos = dawnLength + cycleTimer;        // dawnLength → dawnLength+dayLength
+            else // Dusk
+                pos = dawnLength + dayLength + (cycleTimer - dayEnd);
+
+            return Mathf.Clamp01(pos / lightPeriod);
+        }
+    }
 }

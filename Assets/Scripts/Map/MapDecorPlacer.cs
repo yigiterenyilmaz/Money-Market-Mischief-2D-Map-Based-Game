@@ -23,11 +23,19 @@ public class MapDecorPlacer : MonoBehaviour
     [Tooltip("Yoldan minimum uzaklık — sprite'ların yol üstüne taşmasını önler.")]
     [Range(1, 10)]     public int   cityMinRoadDistance         = 2;
 
-    [Header("City Building Shadow")]
-    [Tooltip("Gölge offset (world unit). X=sağ, Y=aşağı.")]
-    public Vector2 shadowOffset = new Vector2(0.02f, -0.02f);
+    [Header("City Building Shadow — Dinamik Güneş Gölgesi")]
     [Tooltip("Gölge rengi ve saydamlığı.")]
-    public Color shadowColor = new Color(0f, 0f, 0f, 0.4f);
+    public Color shadowColor = new Color(0f, 0f, 0f, 0.35f);
+    [Tooltip("Near edge (binaya yakın kenar) Y ölçeği. 1 = bina kenarı kadar tam yükseklik.")]
+    [Range(0.2f, 1.2f)] public float shadowNearScale = 1f;
+    [Tooltip("Far edge (uzak uç) trapez incelme oranı. 0 = sivri uç, 1 = dikdörtgen.")]
+    [Range(0f, 1f)] public float shadowTipRatio = 0.3f;
+    [Tooltip("Binanın sanal yükseklik çarpanı. Uzunluk = yükseklik/tan(elev).")]
+    [Range(0.2f, 3f)] public float shadowHeightRatio = 1f;
+    [Tooltip("Gölge uzunluk tavanı (bina tam genişliği çarpanı).")]
+    [Range(0.1f, 5f)] public float shadowMaxLength = 0.4f;
+    [Tooltip("Öğlede minimum gölge uzunluk oranı.")]
+    [Range(0f, 1f)] public float shadowMidScale = 0.1f;
 
     [Header("City Hall — Belediye Binası")]
     [Tooltip("Belediye binası scale aralığı. Büyük yapılabilir.")]
@@ -124,11 +132,23 @@ public class MapDecorPlacer : MonoBehaviour
 
     // -------------------------------------------------------------------------
 
+    private class ShadowHandle
+    {
+        public Transform    transform;
+        public MeshRenderer renderer;
+        public Mesh         mesh;
+        public Material     material;
+        public Vector3[]    verts;
+        public float        halfWidth;
+        public float        halfHeight;
+    }
+
     private struct BuildingData
     {
         public GameObject      go;
         public SpriteRenderer  dayRenderer;
         public SpriteRenderer  nightRenderer;
+        public ShadowHandle    shadow;
         public int             tileX, tileY;
         public bool            isBroken;
         public bool            isSpecial;
@@ -356,6 +376,10 @@ public class MapDecorPlacer : MonoBehaviour
             }
         }
 
+        // Dinamik gölge güncelle
+        float sunProgress = (dayNight != null) ? dayNight.SunProgress : 0.5f;
+        UpdateShadows(sunProgress);
+
         // Ship tick
         UpdateShips(ratio);
 
@@ -427,6 +451,74 @@ public class MapDecorPlacer : MonoBehaviour
                 crossfadeTemp.a = baseA * nightAlphaMultiplier;
                 ship.nightRenderer.color = crossfadeTemp;
             }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // DYNAMIC SHADOW — Güneş pozisyonuna göre gölge güncelleme
+    // -------------------------------------------------------------------------
+
+    void UpdateShadows(float sunProgress)
+    {
+        bool isNight = sunProgress < 0f;
+
+        // Gündüz → alpha 1, gece → alpha 0. Şafak/akşam geçişinde smoothstep ile fade.
+        float lightingRatio = (dayNight != null) ? dayNight.LightingRatio : 0f;
+        float alphaFactor = 1f - lightingRatio;
+
+        // Gölge yönü: -1=batı (sabah, güneş doğuda), 0=öğle, +1=doğu (akşam, güneş batıda)
+        float shadowDir = sunProgress * 2f - 1f;
+        float dirSign   = shadowDir >= 0f ? 1f : -1f;
+
+        // Güneş yükseklik faktörü (altitude, 0-1): parabolik yörünge, şafak 0 → öğle 1 → akşam 0
+        float altitude = Mathf.Sin(Mathf.PI * Mathf.Clamp01(sunProgress));
+        // Fiziksel cast shadow: length = height / tan(elevation)
+        // Çok alçak açılarda tan → 0 ve uzunluk sonsuza gider → clamp
+        float clampedAlt  = Mathf.Max(altitude, 0.15f);
+        float elevRad     = Mathf.Asin(clampedAlt);
+        float lengthFactor = shadowHeightRatio / Mathf.Tan(elevRad);
+        lengthFactor = Mathf.Clamp(lengthFactor, shadowMidScale, shadowMaxLength);
+
+        Color col = shadowColor;
+        col.a = shadowColor.a * alphaFactor;
+
+        for (int i = 0; i < cityBuildings.Count; i++)
+        {
+            BuildingData bd = cityBuildings[i];
+            if (bd.shadow == null || bd.shadow.transform == null) continue;
+            ShadowHandle sh = bd.shadow;
+
+            if (isNight || alphaFactor <= 0.001f)
+            {
+                sh.transform.gameObject.SetActive(false);
+                continue;
+            }
+
+            sh.transform.gameObject.SetActive(true);
+
+            // Pivot = gölgenin binaya bitişik kenarı = binanın güneş karşı taban kenarı.
+            // shadowDir=-1 (sabah): pivot binanın sol kenarı (-hw), gölge sola uzanır.
+            // shadowDir=+1 (akşam): pivot binanın sağ kenarı (+hw), gölge sağa uzanır.
+            // Container scale.x = dirSign: mesh +x yönünde uzanır, flip ile diğer tarafa yansır.
+            sh.transform.localPosition = new Vector3(shadowDir * sh.halfWidth, 0f, 0f);
+            sh.transform.localScale    = new Vector3(dirSign, 1f, 1f);
+
+            // Trapez vertex güncellemesi — yakın uç tam bina kenarı, uzak uç tipRatio'ya göre incelmiş.
+            // Uzunluk = binanın tam genişliği (halfWidth*2) × lengthFactor.
+            float near   = sh.halfHeight * shadowNearScale;
+            float far    = near * shadowTipRatio;
+            float length = sh.halfWidth * 2f * lengthFactor;
+
+            sh.verts[0] = new Vector3(0f,     -near, 0f);
+            sh.verts[1] = new Vector3(0f,     +near, 0f);
+            sh.verts[2] = new Vector3(length, +far, 0f);
+            sh.verts[3] = new Vector3(length, -far, 0f);
+            sh.mesh.vertices = sh.verts;
+            sh.mesh.RecalculateBounds();
+
+            // Alpha fade — şafakta yavaş yavaş oluşur, akşamda yavaş yavaş kaybolur
+            if (sh.material != null)
+                sh.material.color = col;
         }
     }
 
@@ -647,7 +739,7 @@ public class MapDecorPlacer : MonoBehaviour
         float baseA = 1f;
         int sortOrder = 20 + (int)(wy * -100f);
 
-        var (go, daySR, nightSR) = CreateCityBuildingObject(
+        var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
             daySprite, settings.cityHallEntry.nightSprite, wx, wy, scale, baseA, sortOrder);
 
         go.name = "CityHall";
@@ -663,13 +755,14 @@ public class MapDecorPlacer : MonoBehaviour
             go            = go,
             dayRenderer   = daySR,
             nightRenderer = nightSR,
+            shadow        = shadow,
             tileX         = tile.x,
             tileY         = tile.y,
             isBroken      = false,
             isSpecial     = true,
             spriteIndex   = -1,
             brokenIndex   = -1,
-            baseAlpha     = baseA
+            baseAlpha     = baseA,
         });
     }
 
@@ -774,7 +867,7 @@ public class MapDecorPlacer : MonoBehaviour
             float baseA   = 1f;
             int sortOrder = 10 + (int)(wy * -100f);
 
-            var (go, daySR, nightSR) = CreateCityBuildingObject(
+            var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
                 daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder);
 
             decorObjects.Add(go);
@@ -783,13 +876,14 @@ public class MapDecorPlacer : MonoBehaviour
                 go            = go,
                 dayRenderer   = daySR,
                 nightRenderer = nightSR,
+                shadow        = shadow,
                 tileX         = jx,
                 tileY         = jy,
                 isBroken      = false,
                 isSpecial     = false,
                 spriteIndex   = spriteIdx,
                 brokenIndex   = -1,
-                baseAlpha     = baseA
+                baseAlpha     = baseA,
             });
             placed++;
         }
@@ -825,7 +919,7 @@ public class MapDecorPlacer : MonoBehaviour
         float baseA    = Random.Range(0.85f, 1f);
         int sortOrder  = 10 + (int)(wy * -100f);
 
-        var (go, daySR, nightSR) = CreateCityBuildingObject(
+        var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
             daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder);
 
         decorObjects.Add(go);
@@ -834,13 +928,14 @@ public class MapDecorPlacer : MonoBehaviour
             go            = go,
             dayRenderer   = daySR,
             nightRenderer = nightSR,
+            shadow        = shadow,
             tileX         = tx,
             tileY         = ty,
             isBroken      = false,
             isSpecial     = false,
             spriteIndex   = spriteIdx,
             brokenIndex   = -1,
-            baseAlpha     = baseA
+            baseAlpha     = baseA,
         });
     }
 
@@ -919,7 +1014,7 @@ public class MapDecorPlacer : MonoBehaviour
         float baseA    = Random.Range(0.85f, 1f);
         int sortOrder  = 10 + (int)(wy * -100f);
 
-        var (go, daySR, nightSR) = CreateCityBuildingObject(
+        var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
             special.daySprite, special.nightSprite, wx, wy, scale, baseA, sortOrder);
 
         decorObjects.Add(go);
@@ -928,13 +1023,14 @@ public class MapDecorPlacer : MonoBehaviour
             go            = go,
             dayRenderer   = daySR,
             nightRenderer = nightSR,
+            shadow        = shadow,
             tileX         = tx,
             tileY         = ty,
             isBroken      = false,
             isSpecial     = true,
             spriteIndex   = -1,
             brokenIndex   = -1,
-            baseAlpha     = baseA
+            baseAlpha     = baseA,
         });
 
         return true;
@@ -964,7 +1060,7 @@ public class MapDecorPlacer : MonoBehaviour
         return true;
     }
 
-    (GameObject go, SpriteRenderer daySR, SpriteRenderer nightSR) CreateCityBuildingObject(
+    (GameObject go, SpriteRenderer daySR, SpriteRenderer nightSR, ShadowHandle shadow) CreateCityBuildingObject(
         Sprite daySprite, Sprite nightSprite, float wx, float wy,
         float scale, float baseA, int sortOrder)
     {
@@ -973,8 +1069,8 @@ public class MapDecorPlacer : MonoBehaviour
         go.transform.position   = new Vector3(wx, wy, spriteZ);
         go.transform.localScale = new Vector3(scale, scale, 1f);
 
-        // Gölge
-        AddShadow(go, daySprite, sortOrder);
+        // Gölge — trapez mesh. UpdateShadows her frame vertex + pozisyon günceller.
+        ShadowHandle shadow = AddShadow(go, daySprite, sortOrder);
 
         SpriteRenderer daySR = go.AddComponent<SpriteRenderer>();
         daySR.sprite       = daySprite;
@@ -998,24 +1094,77 @@ public class MapDecorPlacer : MonoBehaviour
             nightSR.color        = new Color(1f, 1f, 1f, 0f);
         }
 
-        return (go, daySR, nightSR);
+        return (go, daySR, nightSR, shadow);
     }
 
-    void AddShadow(GameObject parent, Sprite sprite, int sortOrder)
+    ShadowHandle AddShadow(GameObject parent, Sprite sprite, int sortOrder)
     {
-        GameObject shadowGo = new GameObject("Shadow");
-        shadowGo.transform.SetParent(parent.transform, false);
-        // Yukarı kaydır — top-down'da "arka" ekranın üstüdür, önden gölge görünmez
-        shadowGo.transform.localPosition = new Vector3(shadowOffset.x, shadowOffset.y, 0f);
-        // Yatayda biraz genişlet, dikeyde hafif sıkıştır — zemine yayılmış his
-        shadowGo.transform.localScale    = new Vector3(1.05f, 0.6f, 1f);
-        shadowGo.transform.localRotation = Quaternion.identity;
+        // Container — bina merkezinde sabit; UpdateShadows localPosition + scale.x (flip) günceller.
+        GameObject containerGo = new GameObject("Shadow");
+        containerGo.transform.SetParent(parent.transform, false);
+        containerGo.transform.localPosition = Vector3.zero;
+        containerGo.transform.localScale    = Vector3.one;
+        containerGo.transform.localRotation = Quaternion.identity;
 
-        SpriteRenderer sr = shadowGo.AddComponent<SpriteRenderer>();
-        sr.sprite       = sprite;
-        sr.sortingOrder = sortOrder - 1;
-        sr.flipX        = false;
-        sr.color        = shadowColor;
+        float halfWidth  = sprite.rect.width  / sprite.pixelsPerUnit * 0.5f;
+        float halfHeight = sprite.rect.height / sprite.pixelsPerUnit * 0.5f;
+
+        // Trapez mesh — 4 vertex:
+        //   [0] near-bottom  (x=0, -halfH)
+        //   [1] near-top     (x=0, +halfH)
+        //   [2] far-top      (x=length, +halfH*tipRatio)
+        //   [3] far-bottom   (x=length, -halfH*tipRatio)
+        // UpdateShadows her frame bu vertex'leri yeniden hesaplar.
+        Vector3[] verts = new Vector3[4];
+        verts[0] = new Vector3(0f,              -halfHeight, 0f);
+        verts[1] = new Vector3(0f,              +halfHeight, 0f);
+        verts[2] = new Vector3(halfWidth * 2f,  +halfHeight * shadowTipRatio, 0f);
+        verts[3] = new Vector3(halfWidth * 2f,  -halfHeight * shadowTipRatio, 0f);
+
+        // UV — bina sprite atlas rect'i. Yakın uç sol kenar (uvMin.x), uzak uç sağ kenar (uvMax.x).
+        // Böylece sprite silueti gölgeye basılır (binaya benzer leke).
+        Rect r   = sprite.rect;
+        float tw = sprite.texture.width;
+        float th = sprite.texture.height;
+        Vector2 uvMin = new Vector2(r.x / tw, r.y / th);
+        Vector2 uvMax = new Vector2((r.x + r.width) / tw, (r.y + r.height) / th);
+
+        Vector2[] uvs = new Vector2[4];
+        uvs[0] = new Vector2(uvMin.x, uvMin.y);
+        uvs[1] = new Vector2(uvMin.x, uvMax.y);
+        uvs[2] = new Vector2(uvMax.x, uvMax.y);
+        uvs[3] = new Vector2(uvMax.x, uvMin.y);
+
+        int[] tris = new int[] { 0, 1, 2, 0, 2, 3 };
+
+        Mesh mesh = new Mesh();
+        mesh.name = "ShadowTrapezoid";
+        mesh.MarkDynamic();
+        mesh.vertices  = verts;
+        mesh.uv        = uvs;
+        mesh.triangles = tris;
+        mesh.RecalculateBounds();
+
+        MeshFilter mf = containerGo.AddComponent<MeshFilter>();
+        mf.sharedMesh = mesh;
+
+        MeshRenderer mr = containerGo.AddComponent<MeshRenderer>();
+        Material mat = new Material(Shader.Find("Sprites/Default"));
+        mat.mainTexture = sprite.texture;
+        mat.color       = shadowColor;
+        mr.sharedMaterial = mat;
+        mr.sortingOrder   = sortOrder - 1;
+
+        return new ShadowHandle
+        {
+            transform  = containerGo.transform,
+            renderer   = mr,
+            mesh       = mesh,
+            material   = mat,
+            verts      = verts,
+            halfWidth  = halfWidth,
+            halfHeight = halfHeight,
+        };
     }
 
     bool IsOverlapping(float wx, float wy)
