@@ -22,6 +22,8 @@ public class MapPainter : MonoBehaviour
     [Header("Beaches")]
     [Range(0f, 1f)] public float beachChance = 0.5f;
     [Range(1, 40)]  public int   beachWidth  = 10;
+    [Range(0f, 1f)] public float beachSouthFullY = 0.3f;
+    [Range(0f, 1f)] public float beachNorthZeroY = 0.8f;
 
     private MapDecorPlacer decorPlacer;
     private Texture2D      mapTexture;
@@ -291,7 +293,11 @@ public class MapPainter : MonoBehaviour
             if (sd == int.MaxValue || sd > beachWidth) continue;
             float selector   = Mathf.PerlinNoise(x * 0.015f + beachSeed, y * 0.015f + beachSeed);
             float inlandFade = 1f - ((float)sd / beachWidth);
-            if (selector * inlandFade > (1f - beachChance))
+            // Isometric his: kuzeye gittikce kumsal yogunlugu azalir
+            float yNorm           = (float)y / (h - 1);
+            float northFade       = 1f - Mathf.SmoothStep(beachSouthFullY, beachNorthZeroY, yNorm);
+            float effectiveChance = beachChance * northFade;
+            if (selector * inlandFade > (1f - effectiveChance))
                 beachDistMap[x, y] = (float)sd / beachWidth;
         }
     }

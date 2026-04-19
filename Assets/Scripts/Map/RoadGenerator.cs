@@ -768,7 +768,12 @@ public class RoadGenerator : MonoBehaviour
     // DALLANMA — BFS TABANLI KAPSAMA SİSTEMİ
     // =========================================================================
 
-    private const int BRANCH_CLEARANCE = 15;
+    // Branchin varolan yol bandina ne kadar yakin gecmesine izin verildigi (tile)
+    // Bu degerden daha yakin tile'lara BFS step atilamaz — sadece from/to corridor istisnasi
+    private const int BRANCH_CLEARANCE = 7;
+    // Branch painted bandinin highway band'iyla cakistigi tile'lar boyamada atlanir
+    // (corridor exception bolgesinde branch centerline highway'in icinde gecebilir)
+    private const int BRANCH_PAINT_SKIP_DIST = 5;
 
     void GenerateBranches(MapGenerator map, float areaScale)
     {
@@ -890,7 +895,7 @@ public class RoadGenerator : MonoBehaviour
             bool pathBroken = false;
             for (int w = 0; w < branchWaypoints.Count - 1; w++)
             {
-                List<Vector2Int> seg = BFSPathOnLandSimple(map, branchWaypoints[w], branchWaypoints[w + 1]);
+                List<Vector2Int> seg = BFSPathOnLandSimple(map, branchWaypoints[w], branchWaypoints[w + 1], roadDist, BRANCH_CLEARANCE);
                 if (seg.Count == 0) { pathBroken = true; break; }
                 int skip = (w > 0 && rawPath.Count > 0) ? 1 : 0;
                 for (int s = skip; s < seg.Count; s++) rawPath.Add(seg[s]);
@@ -899,7 +904,7 @@ public class RoadGenerator : MonoBehaviour
             //waypoint'li yol başarısızsa, direkt BFS dene (tek segment)
             if (pathBroken || rawPath.Count < 15)
             {
-                rawPath = BFSPathOnLandSimple(map, hwStart, target);
+                rawPath = BFSPathOnLandSimple(map, hwStart, target, roadDist, BRANCH_CLEARANCE);
                 pathBroken = rawPath.Count < 10;
             }
 
@@ -929,7 +934,7 @@ public class RoadGenerator : MonoBehaviour
             // Store the branch path for the traffic system
             branchPaths.Add(new List<Vector2Int>(smoothed));
 
-            RegisterBranchPixels(map, smoothed, tStart, tEnd);
+            RegisterBranchPixels(map, smoothed, tStart, tEnd, roadDist, BRANCH_PAINT_SKIP_DIST);
             for (int ri = 0; ri < smoothed.Count; ri += 5)
                 allRoadNodes.Add(smoothed[ri]);
             placed++;
@@ -970,7 +975,8 @@ public class RoadGenerator : MonoBehaviour
     /// Branches prefer inland routes but CAN reach coastal areas.
     /// This prevents the old hard-cutoff from blocking all branch generation.
     /// </summary>
-    List<Vector2Int> BFSPathOnLandSimple(MapGenerator map, Vector2Int from, Vector2Int to)
+    List<Vector2Int> BFSPathOnLandSimple(MapGenerator map, Vector2Int from, Vector2Int to,
+        int[,] roadDist = null, int clearance = 0)
     {
         Vector2Int[,] parent = new Vector2Int[_w, _h];
         bool[,] visited = new bool[_w, _h];
@@ -994,6 +1000,14 @@ public class RoadGenerator : MonoBehaviour
                 if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
                 if (visited[nx, ny]) continue;
                 if (!map.IsLand(nx, ny)) continue;
+
+                // Yol bandina girmeyi engelle — sadece from/to corridor'da izin ver
+                if (roadDist != null && clearance > 0 && roadDist[nx, ny] < clearance)
+                {
+                    int chebFrom = Mathf.Max(Mathf.Abs(nx - from.x), Mathf.Abs(ny - from.y));
+                    int chebTo   = Mathf.Max(Mathf.Abs(nx - to.x),   Mathf.Abs(ny - to.y));
+                    if (chebFrom > clearance && chebTo > clearance) continue;
+                }
 
                 visited[nx, ny] = true;
                 parent[nx, ny] = pos;
@@ -1120,7 +1134,8 @@ public class RoadGenerator : MonoBehaviour
         return new Vector2Int(-1, -1);
     }
 
-    void RegisterBranchPixels(MapGenerator map, List<Vector2Int> pixels, float tStart, float tEnd)
+    void RegisterBranchPixels(MapGenerator map, List<Vector2Int> pixels, float tStart, float tEnd,
+        int[,] roadDist = null, int skipThreshold = 0)
     {
         bool isSubBranch = tStart > 0.15f;
         float thickStart = isSubBranch
@@ -1129,6 +1144,10 @@ public class RoadGenerator : MonoBehaviour
 
         for (int p = 0; p < pixels.Count; p++)
         {
+            // Highway band'iyla cakisan tile'lari atla — branch highway kenarindan basliyor gozuksun
+            if (roadDist != null && skipThreshold > 0 && roadDist[pixels[p].x, pixels[p].y] < skipThreshold)
+                continue;
+
             float localT = (float)p / Mathf.Max(1, pixels.Count - 1);
 
             float colorT = Mathf.Lerp(tStart, tEnd, localT);
