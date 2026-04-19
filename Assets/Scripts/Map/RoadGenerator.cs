@@ -1483,6 +1483,169 @@ public class RoadGenerator : MonoBehaviour
         Debug.Log($"RoadGenerator: Port road ({portTile.x},{portTile.y}) → ({bestRoadTile.x},{bestRoadTile.y}), {trimmed.Count}px");
     }
 
+    /// <summary>
+    /// Özel bina tile'ına en yakın yola ince bir bağlantı yolu çeker.
+    /// ConnectPortToRoad ile aynı mantık; daha ince yol (0.4f-0.5f kalınlık).
+    /// </summary>
+    public void ConnectBuildingToRoad(MapGenerator map, Vector2Int buildingTile)
+    {
+        if (!_generated || roadDistanceField == null) return;
+
+        int bestDist = int.MaxValue;
+        Vector2Int bestRoadTile = buildingTile;
+
+        int searchRadius = 120;
+        for (int ddx = -searchRadius; ddx <= searchRadius; ddx++)
+        for (int ddy = -searchRadius; ddy <= searchRadius; ddy++)
+        {
+            int nx = buildingTile.x + ddx, ny = buildingTile.y + ddy;
+            if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
+            if (roadTypeMap[nx, ny] == 0) continue;
+            int dist = ddx * ddx + ddy * ddy;
+            if (dist < bestDist) { bestDist = dist; bestRoadTile = new Vector2Int(nx, ny); }
+        }
+
+        if (bestDist == 0 || bestDist == int.MaxValue) return;
+
+        List<Vector2Int> rawPath = BFSPathOnLandSimple(map, bestRoadTile, buildingTile);
+        if (rawPath.Count < 2) return;
+
+        List<Vector2Int> smoothed = SmoothBranchPath(map, rawPath);
+        if (smoothed.Count < 2) smoothed = rawPath;
+
+        List<Vector2Int> trimmed = new List<Vector2Int>();
+        for (int i = 0; i < smoothed.Count; i++)
+        {
+            trimmed.Add(smoothed[i]);
+            if (i > 2 && roadTypeMap[smoothed[i].x, smoothed[i].y] != 0) break;
+        }
+
+        if (trimmed.Count < 2) return;
+
+        branchPaths.Add(new List<Vector2Int>(trimmed));
+        RegisterThinRoadPixels(map, trimmed);
+
+        PaintRoadsByType(2);
+        _tex.Apply();
+        BuildRoadDistanceField();
+
+        Debug.Log($"RoadGenerator: Building road ({buildingTile.x},{buildingTile.y}), {trimmed.Count}px");
+    }
+
+    /// <summary>
+    /// Belediye binasına 3 farklı yönden (~120° aralıklı) yol çeker.
+    /// </summary>
+    public void ConnectCityHallToRoads(MapGenerator map, Vector2Int cityHallTile)
+    {
+        if (!_generated || allRoadTiles.Count == 0) return;
+
+        // Rastgele base angle — 3 yol eşit aralıklı
+        float baseAngle = UnityEngine.Random.Range(0f, 120f);
+        float[] targetAngles = { baseAngle, baseAngle + 120f, baseAngle + 240f };
+
+        int step = Mathf.Max(1, allRoadTiles.Count / 500);
+
+        // Kullanılmış yol tile'larını takip et (aynı tile'a 2 yol gitmesin)
+        var usedTiles = new HashSet<long>();
+
+        int connected = 0;
+
+        foreach (float targetAngleDeg in targetAngles)
+        {
+            Vector2Int bestTile = new Vector2Int(-1, -1);
+
+            // Önce sıkı sektörde dene (±60°), bulamazsan genişlet (±90°, ±150°)
+            float[] sectorWidths = { 60f, 90f, 150f };
+            foreach (float sectorDeg in sectorWidths)
+            {
+                float bestDist = float.MaxValue;
+
+                for (int i = 0; i < allRoadTiles.Count; i += step)
+                {
+                    Vector2Int rt = allRoadTiles[i];
+                    long key = (long)rt.x << 32 | (uint)rt.y;
+                    if (usedTiles.Contains(key)) continue;
+
+                    float dx = rt.x - cityHallTile.x;
+                    float dy = rt.y - cityHallTile.y;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (dist < 8f) continue;
+
+                    float diff = Mathf.Abs(Mathf.DeltaAngle(Mathf.Atan2(dy, dx) * Mathf.Rad2Deg, targetAngleDeg));
+                    if (diff > sectorDeg) continue;
+
+                    if (dist < bestDist) { bestDist = dist; bestTile = rt; }
+                }
+
+                if (bestTile.x >= 0) break;
+            }
+
+            // Sektörde hiç yol bulunamadıysa en yakın kullanılmamış yol tile'ını al
+            if (bestTile.x < 0)
+            {
+                float bestDist = float.MaxValue;
+                for (int i = 0; i < allRoadTiles.Count; i += step)
+                {
+                    Vector2Int rt = allRoadTiles[i];
+                    long key = (long)rt.x << 32 | (uint)rt.y;
+                    if (usedTiles.Contains(key)) continue;
+                    float dist = Vector2Int.Distance(rt, cityHallTile);
+                    if (dist < 8f) continue;
+                    if (dist < bestDist) { bestDist = dist; bestTile = rt; }
+                }
+            }
+
+            if (bestTile.x < 0) continue;
+
+            long usedKey = (long)bestTile.x << 32 | (uint)bestTile.y;
+            usedTiles.Add(usedKey);
+
+            // BFS ile yol bul — belediyeden yola doğru
+            List<Vector2Int> rawPath = BFSPathOnLandSimple(map, cityHallTile, bestTile);
+            if (rawPath.Count < 2) continue;
+
+            List<Vector2Int> smoothed = SmoothBranchPath(map, rawPath);
+            if (smoothed.Count < 2) smoothed = rawPath;
+
+            // Yola ulaşınca dur
+            List<Vector2Int> trimmed = new List<Vector2Int>();
+            for (int i = 0; i < smoothed.Count; i++)
+            {
+                trimmed.Add(smoothed[i]);
+                if (i > 3 && roadTypeMap[smoothed[i].x, smoothed[i].y] != 0) break;
+            }
+
+            if (trimmed.Count < 2) continue;
+
+            branchPaths.Add(new List<Vector2Int>(trimmed));
+            // İnce yol: sabit 1px kalınlık, branch sonu görünümü
+            RegisterThinRoadPixels(map, trimmed);
+            connected++;
+        }
+
+        if (connected > 0)
+        {
+            PaintRoadsByType(2);
+            _tex.Apply();
+            BuildRoadDistanceField();
+            Debug.Log($"RoadGenerator: CityHall connected with {connected} roads.");
+        }
+    }
+
+    /// <summary>
+    /// Belediye ve özel bina yolları için ince sabit kalınlıklı yol kaydı.
+    /// </summary>
+    void RegisterThinRoadPixels(MapGenerator map, List<Vector2Int> pixels)
+    {
+        for (int p = 0; p < pixels.Count; p++)
+        {
+            int biome = map.GetBiome(pixels[p].x, pixels[p].y);
+            GetBiomeBranchAppearance(biome, out Color fill, out Color outline);
+            // Sabit 1px kalınlık — çok ince erişim yolu
+            RegisterRoadTile(pixels[p], 2, 1f, Mathf.Max(0, branchOutlineWidth - 1), fill, outline);
+        }
+    }
+
     public void Clear()
     {
         allRoadTiles.Clear();

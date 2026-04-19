@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum CityZone { Core, Mid, Outer }
+
 [System.Serializable]
 public struct CityBuildingEntry
 {
@@ -18,8 +20,12 @@ public struct SpecialCityBuilding
     public Sprite nightSprite;
     [Tooltip("Haritada kaç adet yerleştirilecek.")]
     [Range(1, 10)] public int count;
-    [Tooltip("Sadece yoğun bölgeye mi yerleşsin?")]
-    public bool denseOnly;
+    [Tooltip("Hangi zone'a yerleşsin.")]
+    public CityZone targetZone;
+    [Tooltip("Özel ince yol çekilsin mi?")]
+    public bool connectToRoad;
+    [Tooltip("Etrafında bina olmayacak alan (tile cinsinden).")]
+    [Range(0, 30)] public int clearingRadius;
 }
 
 [CreateAssetMenu(fileName = "BiomePaintSettings", menuName = "Map/BiomePaintSettings")]
@@ -64,12 +70,25 @@ public class BiomePaintSettings : ScriptableObject
     [Header("Decorative Sprites — Agricultural")]
     public List<Sprite> agriculturalDecor = new List<Sprite>();
 
-    [Header("Decorative Sprites — Cities (Genel Binalar)")]
-    public List<CityBuildingEntry> citiesDecor = new List<CityBuildingEntry>();
+    [Header("Decorative Sprites — Industrial")]
+    public List<Sprite> industrialDecor = new List<Sprite>();
+
+    // =========================================================================
+    // ŞEHİR BİNALARI
+    // =========================================================================
+
+    [Header("City Hall — Belediye Binası (tek)")]
+    public CityBuildingEntry cityHallEntry;
+
+    [Header("City Core — Belediye Etrafı (en yoğun)")]
+    public List<CityBuildingEntry> citiesCoreDecor = new List<CityBuildingEntry>();
+
+    [Header("City Mid — Orta Bölge")]
+    public List<CityBuildingEntry> citiesMidDecor = new List<CityBuildingEntry>();
+
+    [Header("City Outer — Seyrek Dış Bölge")]
+    public List<CityBuildingEntry> citiesOuterDecor = new List<CityBuildingEntry>();
 
     [Header("City Special Buildings — Sabit Sayılı Özel Binalar")]
     public List<SpecialCityBuilding> specialCityBuildings = new List<SpecialCityBuilding>();
-
-    [Header("Decorative Sprites — Industrial")]
-    public List<Sprite> industrialDecor = new List<Sprite>();
 }
