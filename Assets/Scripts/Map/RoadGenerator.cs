@@ -37,6 +37,12 @@ public class RoadGenerator : MonoBehaviour
     [Range(5, 50)] public int highwayShoreBuffer = 30;
     public Color highwayFill = new Color(0.38f, 0.36f, 0.32f);
     public Color highwayOutline = new Color(0.25f, 0.23f, 0.20f);
+    [Tooltip("Highway noise (Perlin) frekansi. Yuksek = daha kucuk yamalar.")]
+    [Range(0.01f, 0.5f)] public float highwayNoiseScale = 0.12f;
+    [Tooltip("Highway noise (Perlin) siddeti. Yuksek = daha belirgin asfalt yamasi.")]
+    [Range(0f, 0.5f)] public float highwayNoiseStrength = 0.15f;
+    [Tooltip("Highway grain (rastgele) siddeti. Yuksek = daha kumlu doku.")]
+    [Range(0f, 0.2f)] public float highwayGrainStrength = 0.05f;
 
     // -------------------------------------------------------------------------
     // DALLANMA
@@ -1276,10 +1282,29 @@ public class RoadGenerator : MonoBehaviour
                 {
                     if (ddx * ddx + ddy * ddy > fillHalfSq) continue;
                     int px = tile.x + ddx, py = tile.y + ddy;
-                    if (px >= 0 && px < _w && py >= 0 && py < _h)
-                        _tex.SetPixel(px, py, fillColor);
+                    if (px < 0 || px >= _w || py < 0 || py >= _h) continue;
+
+                    Color outColor = fillColor;
+                    if (targetType == 1)
+                        outColor = ApplyHighwayNoise(fillColor, px, py);
+
+                    _tex.SetPixel(px, py, outColor);
                 }
         }
+    }
+
+    // Perlin (buyuk olcekli yama) + random grain (kumlu doku) ile parlaklik modulasyonu
+    Color ApplyHighwayNoise(Color baseColor, int px, int py)
+    {
+        float perlin = Mathf.PerlinNoise(px * highwayNoiseScale, py * highwayNoiseScale);
+        float perlinMod = (perlin - 0.5f) * 2f * highwayNoiseStrength;
+        float grain = (UnityEngine.Random.value - 0.5f) * 2f * highwayGrainStrength;
+        float mod = 1f + perlinMod + grain;
+        return new Color(
+            Mathf.Clamp01(baseColor.r * mod),
+            Mathf.Clamp01(baseColor.g * mod),
+            Mathf.Clamp01(baseColor.b * mod),
+            baseColor.a);
     }
 
     // =========================================================================
