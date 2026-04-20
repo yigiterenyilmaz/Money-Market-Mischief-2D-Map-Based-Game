@@ -77,15 +77,23 @@ public class OceanWaveOverlay : MonoBehaviour
         int[,] waterShoreDist = BuildWaterShoreDistField(w, h);
 
         // mask texture — R: kara=1/su=0, G: kıyı mesafesi (normalize 0-1)
+        // Yol pikselleri (su uzerinden gecen kopruler dahil) "kara" sayilir,
+        // boylece dalga animasyonu yolun ustune cizmez.
+        var roadGen = RoadGenerator.Instance;
+        bool roadsReady = roadGen != null && roadGen.IsGenerated;
+
         Texture2D mask = new Texture2D(w, h, TextureFormat.RGBA32, false);
         mask.filterMode = FilterMode.Point;
         Color[] maskPx = new Color[w * h];
         for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
             {
-                float land = mapGenerator.IsLand(x, y) ? 1f : 0f;
+                bool isLand = mapGenerator.IsLand(x, y);
+                bool isRoadPixel = roadsReady && roadGen.GetDistanceToRoadEdge(x, y) == 0;
+
+                float land = (isLand || isRoadPixel) ? 1f : 0f;
                 float shoreDist = 1f;
-                if (!mapGenerator.IsLand(x, y) && waterShoreDist[x, y] < int.MaxValue)
+                if (!isLand && !isRoadPixel && waterShoreDist[x, y] < int.MaxValue)
                     shoreDist = Mathf.Clamp01((float)waterShoreDist[x, y] / shoreWaveMaxDist);
                 maskPx[x + y * w] = new Color(land, shoreDist, 0f, 1f);
             }
