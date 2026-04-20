@@ -69,6 +69,15 @@ public class RoadTrafficSystem : MonoBehaviour
         public bool           pendingRespawn; // fade-out bittikten sonra yeniden spawn olacak mı
         public float          switchCooldown; // yol değiştirdikten sonra tekrar değiştiremez (piksel)
         public int            previousPathIndex; // son geldiği yol — hemen geri dönmeyi engeller
+        //Kavsak gecisi: cubic bezier ile yumusak donus. Transition aktifken path ilerleme durur.
+        public bool           transitioning;
+        public float          transT;
+        public float          transDuration;
+        public Vector3        transP0, transP1, transP2, transP3;
+        public int            pendingPathIndex;
+        public float          pendingPosition;
+        public float          pendingSpeed;
+        public Vector2        pendingEndDir;
     }
 
     private List<List<Vector2Int>>    allPaths       = new List<List<Vector2Int>>();
@@ -356,6 +365,40 @@ public class RoadTrafficSystem : MonoBehaviour
                     car.isFadingIn = false;
             }
 
+            //Kavsak gecis animasyonu — cubic bezier ile pozisyon+yon. Transition bitince yeni yola yerlesir.
+            if (car.transitioning)
+            {
+                car.transT += dt / Mathf.Max(0.001f, car.transDuration);
+                float t = Mathf.Clamp01(car.transT);
+                float u = 1f - t;
+                Vector3 pos = u*u*u*car.transP0 + 3f*u*u*t*car.transP1
+                            + 3f*u*t*t*car.transP2 + t*t*t*car.transP3;
+                Vector3 deriv = 3f*u*u*(car.transP1 - car.transP0)
+                              + 6f*u*t*(car.transP2 - car.transP1)
+                              + 3f*t*t*(car.transP3 - car.transP2);
+                Vector2 dir = new Vector2(deriv.x, deriv.y);
+                if (dir.sqrMagnitude > 0.0001f) dir.Normalize();
+                else dir = car.pendingEndDir;
+
+                car.smoothedWorldPos = pos;
+                car.smoothedDir = dir;
+                car.currentRotation = DirToRotation(dir);
+                car.go.transform.position = pos;
+                car.go.transform.rotation = car.currentRotation;
+
+                if (t >= 1f)
+                {
+                    car.transitioning = false;
+                    car.pathIndex     = car.pendingPathIndex;
+                    car.position      = car.pendingPosition;
+                    car.speedInPixels = car.pendingSpeed;
+                    car.smoothedDir   = car.pendingEndDir;
+                }
+
+                activeCars[i] = car;
+                continue;
+            }
+
             if (Mathf.Approximately(car.speedInPixels, 0f))
             {
                 activeCars[i] = car;
@@ -403,14 +446,14 @@ public class RoadTrafficSystem : MonoBehaviour
                 {
                     var target    = midConns[Random.Range(0, midConns.Count)];
                     var currentPx = path[currentIdx];
-                    float absSpd = Mathf.Abs(car.speedInPixels);
+                    float absSpd  = Mathf.Abs(car.speedInPixels);
+                    float newPos  = FindNearestPixelOnPath(allPaths[target.pathIndex], currentPx);
+                    float newSpd  = AlignSpeedAwayFromJunction(target.pathIndex, Mathf.RoundToInt(newPos), currentPx, absSpd);
                     car.previousPathIndex = car.pathIndex;
-                    car.pathIndex = target.pathIndex;
-                    car.position  = FindNearestPixelOnPath(allPaths[car.pathIndex], currentPx);
-                    car.speedInPixels = AlignSpeedAwayFromJunction(car.pathIndex, Mathf.RoundToInt(car.position), currentPx, absSpd);
-                    path = allPaths[car.pathIndex];
                     car.switchCooldown = 150f;
-                    didFlip = true;
+                    BeginCarTransition(car, target.pathIndex, newPos, newSpd);
+                    activeCars[i] = car;
+                    continue;
                 }
             }
 
@@ -440,13 +483,14 @@ public class RoadTrafficSystem : MonoBehaviour
                 {
                     var target    = connections[Random.Range(0, connections.Count)];
                     var currentPx = path[endIdx];
-                    float absSpd = Mathf.Abs(car.speedInPixels);
+                    float absSpd  = Mathf.Abs(car.speedInPixels);
+                    float newPos  = FindNearestPixelOnPath(allPaths[target.pathIndex], currentPx);
+                    float newSpd  = AlignSpeedAwayFromJunction(target.pathIndex, Mathf.RoundToInt(newPos), currentPx, absSpd);
                     car.previousPathIndex = car.pathIndex;
-                    car.pathIndex = target.pathIndex;
-                    car.position  = FindNearestPixelOnPath(allPaths[car.pathIndex], currentPx);
-                    car.speedInPixels = AlignSpeedAwayFromJunction(car.pathIndex, Mathf.RoundToInt(car.position), currentPx, absSpd);
-                    path = allPaths[car.pathIndex];
                     car.switchCooldown = 150f;
+                    BeginCarTransition(car, target.pathIndex, newPos, newSpd);
+                    activeCars[i] = car;
+                    continue;
                 }
                 else if (unfilteredCount > 0 || car.pathIndex < highwayPathCount)
                 {
@@ -653,6 +697,53 @@ public class RoadTrafficSystem : MonoBehaviour
         float bwdDist = Vector2Int.Distance(newPath[bwdIdx], junctionTile);
 
         return fwdDist >= bwdDist ? absSpeed : -absSpeed;
+    }
+
+    //Kavsakta araba yumusak bir kavisle yeni yola geciyor. Cubic bezier kontrol noktalari:
+    //P0=baslangic, P1=P0 + startDir*handle (mevcut yon), P2=P3 - endDir*handle (yeni yol yonu), P3=hedef.
+    //Aric uzunlugu ~ distance*1.15 ile hizin korunacagi sekilde transDuration hesaplanir.
+    void BeginCarTransition(Car car, int newPathIndex, float newPos, float newSpeed)
+    {
+        var newPath = allPaths[newPathIndex];
+        int newIdx = Mathf.Clamp(Mathf.RoundToInt(newPos), 0, newPath.Count - 1);
+        Vector3 endWorld = InterpolatedWorldPos(newPathIndex, newPos);
+        Vector2 endDir = GetDirectionAtIndex(newPathIndex, newIdx, newSpeed);
+        if (endDir.sqrMagnitude > 0.0001f) endDir.Normalize(); else endDir = Vector2.right;
+
+        Vector3 startWorld = car.smoothedWorldPos;
+        Vector2 startDir = car.smoothedDir.sqrMagnitude > 0.0001f ? car.smoothedDir.normalized : endDir;
+
+        float distWorld = Vector3.Distance(startWorld, endWorld);
+        //Cok yakinsa kivrilmaya gerek yok — direkt yerlestir.
+        if (distWorld < worldUnitsPerPixel * 0.5f)
+        {
+            car.pathIndex     = newPathIndex;
+            car.position      = newPos;
+            car.speedInPixels = newSpeed;
+            car.smoothedWorldPos = endWorld;
+            car.smoothedDir   = endDir;
+            car.currentRotation = DirToRotation(endDir);
+            car.go.transform.position = endWorld;
+            car.go.transform.rotation = car.currentRotation;
+            return;
+        }
+
+        float handleLen = distWorld * 0.45f;
+        car.transP0 = startWorld;
+        car.transP1 = startWorld + new Vector3(startDir.x, startDir.y, 0f) * handleLen;
+        car.transP2 = endWorld   - new Vector3(endDir.x,   endDir.y,   0f) * handleLen;
+        car.transP3 = endWorld;
+        car.pendingEndDir = endDir;
+
+        //Gercek hizda kat etsin: worldSpeed = piksel hizi * unit/piksel. Arc uzunlugu ~ dist*1.15.
+        float worldSpeed = Mathf.Max(0.001f, Mathf.Abs(car.speedInPixels) * worldUnitsPerPixel);
+        car.transDuration = Mathf.Max(0.15f, distWorld * 1.15f / worldSpeed);
+        car.transT = 0f;
+        car.transitioning = true;
+
+        car.pendingPathIndex = newPathIndex;
+        car.pendingPosition  = newPos;
+        car.pendingSpeed     = newSpeed;
     }
 
     int FindNearestPixelOnPath(List<Vector2Int> path, Vector2Int fromPixel)

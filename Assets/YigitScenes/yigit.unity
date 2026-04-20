@@ -10976,12 +10976,14 @@ MonoBehaviour:
   citiesShoulder: {r: 0.4, g: 0.36, b: 0.3, a: 1}
   industrialShoulder: {r: 0.26, g: 0.22, b: 0.18, a: 1}
   urbanShoulder: {r: 0.4, g: 0.38, b: 0.32, a: 1}
-  roadCoreDarkness: 0.637
-  junctionTireTrackLength: 9
-  tireTrackOffset: 1
-  tireTrackWidth: 3
   enableJunctionPlateaus: 1
   junctionPlateauRadius: 2
+  enableCenterStripes: 0
+  enableBranchStripes: 0
+  centerStripeColor: {r: 0.82, g: 0.7, b: 0.22, a: 1}
+  stripeDashLength: 1
+  stripeGapLength: 3
+  stripeMinThickness: 2
   shoreBuffer: 2
   scaleWithMapSize: 1
 --- !u!114 &1710072575
