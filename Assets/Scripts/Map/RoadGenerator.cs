@@ -63,6 +63,8 @@ public class RoadGenerator : MonoBehaviour
     [Range(0, 2)] public int branchOutlineWidth = 1;
     [Tooltip("Preferred shore distance for branch roads. Uses soft penalty — branches prefer inland but CAN reach coastal areas.")]
     [Range(2, 30)] public int branchShoreBuffer = 12;
+    [Tooltip("Highway -> biyom rengine gecis sertligi. 1 = lineer (yumusak), yuksek = dar gecis bandi (sert).")]
+    [Range(1f, 20f)] public float branchColorTransitionSharpness = 4f;
 
     // -------------------------------------------------------------------------
     // BİYOM GÖRÜNÜMLERİ (dallanma hedef renkleri)
@@ -1164,8 +1166,11 @@ public class RoadGenerator : MonoBehaviour
             float thickness = Mathf.Lerp(thickStart, branchEndThickness, localT);
             int outW = localT < 0.6f ? branchOutlineWidth : Mathf.Max(0, branchOutlineWidth - 1);
 
-            Color fill = Color.Lerp(highwayFill, targetFill, colorT);
-            Color outline = Color.Lerp(highwayOutline, targetOutline, colorT);
+            // Sharpness ile gecis bandini daralt: 1 = lineer, yuksek = step fonksiyonuna yakin
+            float sharpenedT = Mathf.Clamp01((colorT - 0.5f) * branchColorTransitionSharpness + 0.5f);
+
+            Color fill = Color.Lerp(highwayFill, targetFill, sharpenedT);
+            Color outline = Color.Lerp(highwayOutline, targetOutline, sharpenedT);
 
             RegisterRoadTile(pixels[p], 2, thickness, outW, fill, outline);
         }

@@ -24,6 +24,10 @@ public class MapPainter : MonoBehaviour
     [Range(1, 40)]  public int   beachWidth  = 10;
     [Range(0f, 1f)] public float beachSouthFullY = 0.3f;
     [Range(0f, 1f)] public float beachNorthZeroY = 0.8f;
+    [Tooltip("Guneye dogru ek kumsal yogunlugu. 0 = boost yok, yuksek = guney kiyilarinda dolu kumsal.")]
+    [Range(0f, 1f)] public float beachSouthBoost = 0.4f;
+    [Tooltip("Guneydeki kumsal seridinin ek genislik carpani. 0 = ayni genislik, 1 = iki kati.")]
+    [Range(0f, 1.5f)] public float beachSouthWidthBoost = 0.5f;
 
     private MapDecorPlacer decorPlacer;
     private Texture2D      mapTexture;
@@ -290,15 +294,19 @@ public class MapPainter : MonoBehaviour
             if (!mapGenerator.IsLand(x, y)) continue;
             if (mapGenerator.IsSeaRock(x, y)) continue;
             int sd = shoreDistField[x, y];
-            if (sd == int.MaxValue || sd > beachWidth) continue;
+            if (sd == int.MaxValue) continue;
+            // Isometric his: kuzeye gittikce kumsal yogunlugu hem genislik hem sans olarak azalir
+            float yNorm     = (float)y / (h - 1);
+            float southBias = 1f - Mathf.SmoothStep(0f, beachSouthFullY, yNorm); // yNorm=0 -> 1, >=beachSouthFullY -> 0
+            float northFade = 1f - Mathf.SmoothStep(beachSouthFullY, beachNorthZeroY, yNorm); // >=beachNorthZeroY -> 0
+            float effectiveWidth = beachWidth * (1f + beachSouthWidthBoost * southBias) * northFade;
+            if (effectiveWidth < 1f) continue; // kuzeyde tamamen yok
+            if (sd > effectiveWidth) continue;
             float selector   = Mathf.PerlinNoise(x * 0.015f + beachSeed, y * 0.015f + beachSeed);
-            float inlandFade = 1f - ((float)sd / beachWidth);
-            // Isometric his: kuzeye gittikce kumsal yogunlugu azalir
-            float yNorm           = (float)y / (h - 1);
-            float northFade       = 1f - Mathf.SmoothStep(beachSouthFullY, beachNorthZeroY, yNorm);
-            float effectiveChance = beachChance * northFade;
+            float inlandFade = 1f - ((float)sd / effectiveWidth);
+            float effectiveChance = Mathf.Clamp01(beachChance * northFade + beachSouthBoost * southBias * northFade);
             if (selector * inlandFade > (1f - effectiveChance))
-                beachDistMap[x, y] = (float)sd / beachWidth;
+                beachDistMap[x, y] = (float)sd / effectiveWidth;
         }
     }
 

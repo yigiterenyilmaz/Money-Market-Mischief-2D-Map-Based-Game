@@ -32,54 +32,11 @@ MonoBehaviour:
   urbanDecor:
   - {fileID: 7944620761231817343, guid: 2102a7978623df343a343c25ecaa185c, type: 3}
   agriculturalDecor: []
-  citiesDecor:
-  - daySprite: {fileID: 2657497095755069095, guid: c78d82842f3801c4989413c5848c6cd0, type: 3}
-    nightSprite: {fileID: 8963089382026946795, guid: 33590a6143c5c1940bc757053a59ca67, type: 3}
-  - daySprite: {fileID: 1654669735461834112, guid: c78d82842f3801c4989413c5848c6cd0, type: 3}
-    nightSprite: {fileID: -2797432659408610760, guid: 33590a6143c5c1940bc757053a59ca67, type: 3}
-  - daySprite: {fileID: -2128945126265203181, guid: c78d82842f3801c4989413c5848c6cd0, type: 3}
-    nightSprite: {fileID: 6511575095824185068, guid: 33590a6143c5c1940bc757053a59ca67, type: 3}
-  - daySprite: {fileID: -7007015885422264531, guid: 2837ea678ea9970408d43fe3e5ae8e17, type: 3}
-    nightSprite: {fileID: 4032100867891086619, guid: 02a6d743607d2944d8943e37a45c35b7, type: 3}
-  - daySprite: {fileID: 8691306157993646656, guid: 2837ea678ea9970408d43fe3e5ae8e17, type: 3}
-    nightSprite: {fileID: 3053181745880894819, guid: 02a6d743607d2944d8943e37a45c35b7, type: 3}
-  - daySprite: {fileID: -6220289108734230671, guid: 80a2ff944a6cf114ebba254013d55a24, type: 3}
-    nightSprite: {fileID: 4234011773453933137, guid: a02771aaf0ba6dc45ba9e0d37a211f0f, type: 3}
-  - daySprite: {fileID: -63983191097957109, guid: 80a2ff944a6cf114ebba254013d55a24, type: 3}
-    nightSprite: {fileID: 7379314396559699167, guid: a02771aaf0ba6dc45ba9e0d37a211f0f, type: 3}
-  - daySprite: {fileID: -63983191097957109, guid: 80a2ff944a6cf114ebba254013d55a24, type: 3}
-    nightSprite: {fileID: 7379314396559699167, guid: a02771aaf0ba6dc45ba9e0d37a211f0f, type: 3}
-  - daySprite: {fileID: 8865997073894888203, guid: ff8a128f81263d2479e63a065be58a17, type: 3}
-    nightSprite: {fileID: 336528853887727454, guid: ee6fd2f55bca7654bb21b81333d8b605, type: 3}
-  - daySprite: {fileID: 1949823387975857118, guid: ff8a128f81263d2479e63a065be58a17, type: 3}
-    nightSprite: {fileID: 2654164150152027261, guid: ee6fd2f55bca7654bb21b81333d8b605, type: 3}
-  specialCityBuildings:
-  - daySprite: {fileID: 3784044773748525269, guid: c78d82842f3801c4989413c5848c6cd0, type: 3}
-    nightSprite: {fileID: -6462919336489874526, guid: 33590a6143c5c1940bc757053a59ca67, type: 3}
-    count: 3
-    denseOnly: 1
-  - daySprite: {fileID: 8612573801730189545, guid: c78d82842f3801c4989413c5848c6cd0, type: 3}
-    nightSprite: {fileID: -3599151902080255789, guid: 33590a6143c5c1940bc757053a59ca67, type: 3}
-    count: 3
-    denseOnly: 1
-  - daySprite: {fileID: 3433167960205455343, guid: 2837ea678ea9970408d43fe3e5ae8e17, type: 3}
-    nightSprite: {fileID: 2330837071347565581, guid: 02a6d743607d2944d8943e37a45c35b7, type: 3}
-    count: 3
-    denseOnly: 1
-  - daySprite: {fileID: 5717908224979701516, guid: 80a2ff944a6cf114ebba254013d55a24, type: 3}
-    nightSprite: {fileID: 4645758454846901831, guid: a02771aaf0ba6dc45ba9e0d37a211f0f, type: 3}
-    count: 3
-    denseOnly: 1
-  - daySprite: {fileID: 543630438925568867, guid: c78d82842f3801c4989413c5848c6cd0, type: 3}
-    nightSprite: {fileID: 635107119953426478, guid: 33590a6143c5c1940bc757053a59ca67, type: 3}
-    count: 6
-    denseOnly: 1
-  - daySprite: {fileID: 332860784572593404, guid: ff8a128f81263d2479e63a065be58a17, type: 3}
-    nightSprite: {fileID: -4105550933443819035, guid: ee6fd2f55bca7654bb21b81333d8b605, type: 3}
-    count: 4
-    denseOnly: 1
-  - daySprite: {fileID: 332860784572593404, guid: ff8a128f81263d2479e63a065be58a17, type: 3}
-    nightSprite: {fileID: -4105550933443819035, guid: ee6fd2f55bca7654bb21b81333d8b605, type: 3}
-    count: 2
-    denseOnly: 1
   industrialDecor: []
+  cityHallEntry:
+    daySprite: {fileID: 3230281143415141360, guid: 9609f21029933e44686e016e30c93926, type: 3}
+    nightSprite: {fileID: 3230281143415141360, guid: 9609f21029933e44686e016e30c93926, type: 3}
+  citiesCoreDecor: []
+  citiesMidDecor: []
+  citiesOuterDecor: []
+  specialCityBuildings: []

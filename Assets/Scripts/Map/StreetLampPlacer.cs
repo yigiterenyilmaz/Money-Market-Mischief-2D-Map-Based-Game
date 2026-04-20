@@ -27,6 +27,10 @@ public class StreetLampPlacer : MonoBehaviour
     [Range(0.001f, 0.1f)] public float lampScale = 0.00125f;
     [Tooltip("Isik halo sprite olcegi (direge gore carpan).")]
     [Range(0.1f, 4f)] public float haloScaleMultiplier = 0.15f;
+    [Tooltip("Halo saydamlik carpani — 1=renkteki alpha aynen, 0.3=cok saydam.")]
+    [Range(0.05f, 1f)] public float haloAlphaMultiplier = 0.5f;
+    [Tooltip("Halo sprite cozunurlugu (radius). Yuksek deger = yumusak gradient.")]
+    [Range(4, 32)] public int haloSpriteRadius = 16;
     [Tooltip("Direk rengi.")]
     public Color poleColor = new Color(0.15f, 0.15f, 0.15f, 1f);
 
@@ -139,7 +143,7 @@ public class StreetLampPlacer : MonoBehaviour
         {
             Color lc = GetLightColorForBiome(b);
             poleNightSprites[b] = CreatePoleSprite(poleColor, lc);
-            haloSprites[b]      = CreateHaloSprite(3, lc);
+            haloSprites[b]      = CreateHaloSprite(haloSpriteRadius, lc);
         }
     }
 
@@ -181,13 +185,15 @@ public class StreetLampPlacer : MonoBehaviour
             {
                 float dist = Vector2.Distance(new Vector2(x, y), center);
                 float t = Mathf.Clamp01(dist / radius);
-                float alpha = color.a * (1f - t * t);
+                // Yumusak ucsuz gradient — kenarlar tamamen saydam
+                float falloff = (1f - t) * (1f - t);
+                float alpha = color.a * haloAlphaMultiplier * falloff;
                 tex.SetPixel(x, y, new Color(color.r, color.g, color.b, alpha));
             }
         }
 
         tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.3f), 1f);
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 1f);
     }
 
     // -------------------------------------------------------------------------
