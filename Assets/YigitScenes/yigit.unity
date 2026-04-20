@@ -10956,9 +10956,9 @@ MonoBehaviour:
   highwayShoreBuffer: 11
   highwayFill: {r: 0.25490198, g: 0.2509804, b: 0.2509804, a: 1}
   highwayOutline: {r: 0.1764706, g: 0.1764706, b: 0.18823531, a: 1}
-  highwayNoiseScale: 0.12
-  highwayNoiseStrength: 0.15
-  highwayGrainStrength: 0.05
+  highwayNoiseScale: 0.35
+  highwayNoiseStrength: 0.05
+  highwayGrainStrength: 0.02
   branchMinCoverageDistance: 35
   branchMaxCount: 35
   branchCurviness: 0.085
@@ -10967,14 +10967,21 @@ MonoBehaviour:
   branchOutlineWidth: 0
   branchShoreBuffer: 12
   branchColorTransitionSharpness: 2.3
-  agriculturalFill: {r: 0.4867924, g: 0.4437594, b: 0.27462438, a: 1}
-  agriculturalOutline: {r: 0.38, g: 0.32, b: 0.2, a: 1}
-  citiesFill: {r: 0.42, g: 0.4, b: 0.37, a: 1}
-  citiesOutline: {r: 0.28, g: 0.26, b: 0.24, a: 1}
-  industrialFill: {r: 0.5764706, g: 0.48627454, b: 0.18823531, a: 1}
-  industrialOutline: {r: 0.43865523, g: 0.4566037, b: 0.12664291, a: 1}
-  urbanFill: {r: 0.41176474, g: 0.45882356, b: 0.3921569, a: 1}
-  urbanOutline: {r: 0.2784314, g: 0.3254902, b: 0.25882354, a: 1}
+  branchFill: {r: 0.42, g: 0.36, b: 0.26, a: 1}
+  branchOutline: {r: 0.22, g: 0.18, b: 0.12, a: 1}
+  shoulderWidth: 1
+  shoulderBlend: 0.45
+  highwayShoulder: {r: 0.3, g: 0.28, b: 0.24, a: 1}
+  agriculturalShoulder: {r: 0.35, g: 0.3, b: 0.2, a: 1}
+  citiesShoulder: {r: 0.4, g: 0.36, b: 0.3, a: 1}
+  industrialShoulder: {r: 0.26, g: 0.22, b: 0.18, a: 1}
+  urbanShoulder: {r: 0.4, g: 0.38, b: 0.32, a: 1}
+  roadCoreDarkness: 0.637
+  junctionTireTrackLength: 9
+  tireTrackOffset: 1
+  tireTrackWidth: 3
+  enableJunctionPlateaus: 1
+  junctionPlateauRadius: 2
   shoreBuffer: 2
   scaleWithMapSize: 1
 --- !u!114 &1710072575
@@ -11079,7 +11086,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8443ab0d670317844a49227cd214e806, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DayNightCycle
-  dayLength: 5
+  dayLength: 60
   nightLength: 5
   duskLength: 5
   dawnLength: 5
@@ -11170,7 +11177,9 @@ MonoBehaviour:
   branchLampInterval: 51
   roadEdgeOffset: 7
   lampScale: 0.0102
-  haloScaleMultiplier: 1.83
+  haloScaleMultiplier: 1.08
+  haloAlphaMultiplier: 0.5
+  haloSpriteRadius: 16
   poleColor: {r: 0.4566037, g: 0.41266638, b: 0.41266638, a: 1}
   highwayLightColor: {r: 1, g: 0.95, b: 0.7, a: 0.6}
   agriculturalLightColor: {r: 1, g: 0.85, b: 0.4, a: 0.5}

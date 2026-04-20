@@ -37,12 +37,12 @@ public class RoadGenerator : MonoBehaviour
     [Range(5, 50)] public int highwayShoreBuffer = 30;
     public Color highwayFill = new Color(0.38f, 0.36f, 0.32f);
     public Color highwayOutline = new Color(0.25f, 0.23f, 0.20f);
-    [Tooltip("Highway noise (Perlin) frekansi. Yuksek = daha kucuk yamalar.")]
-    [Range(0.01f, 0.5f)] public float highwayNoiseScale = 0.12f;
-    [Tooltip("Highway noise (Perlin) siddeti. Yuksek = daha belirgin asfalt yamasi.")]
-    [Range(0f, 0.5f)] public float highwayNoiseStrength = 0.15f;
-    [Tooltip("Highway grain (rastgele) siddeti. Yuksek = daha kumlu doku.")]
-    [Range(0f, 0.2f)] public float highwayGrainStrength = 0.05f;
+    [Tooltip("Yol noise (Perlin) frekansi. Yuksek = daha kucuk yamalar (yolun camur gorunmemesi icin 0.3+ onerilir).")]
+    [Range(0.01f, 0.8f)] public float highwayNoiseScale = 0.35f;
+    [Tooltip("Yol noise (Perlin) siddeti. Dusuk = yumusak doku, yuksek = lekeli/camurlu.")]
+    [Range(0f, 0.5f)] public float highwayNoiseStrength = 0.05f;
+    [Tooltip("Yol grain (rastgele) siddeti. Yuksek = kumlu doku (fazlasi gorsel kirlilik).")]
+    [Range(0f, 0.2f)] public float highwayGrainStrength = 0.02f;
 
     // -------------------------------------------------------------------------
     // DALLANMA
@@ -57,8 +57,8 @@ public class RoadGenerator : MonoBehaviour
     [Range(0f, 0.3f)] public float branchCurviness = 0.08f;
     [Tooltip("Dal başlangıç kalınlığı (highway'e yakın uç).")]
     [Range(1, 6)] public int branchStartThickness = 3;
-    [Tooltip("Dal bitiş kalınlığı (en uç).")]
-    [Range(1, 4)] public int branchEndThickness = 1;
+    [Tooltip("Dal bitiş kalınlığı (en uç). 2 alti dal ucunu cime eritir — 2+ onerilir.")]
+    [Range(1, 4)] public int branchEndThickness = 2;
     [Tooltip("Dal outline genişliği.")]
     [Range(0, 2)] public int branchOutlineWidth = 1;
     [Tooltip("Preferred shore distance for branch roads. Uses soft penalty — branches prefer inland but CAN reach coastal areas.")]
@@ -67,24 +67,53 @@ public class RoadGenerator : MonoBehaviour
     [Range(1f, 20f)] public float branchColorTransitionSharpness = 4f;
 
     // -------------------------------------------------------------------------
-    // BİYOM GÖRÜNÜMLERİ (dallanma hedef renkleri)
+    // DALLANMA UNIFIYE RENGI (tum biyomlarda ayni yol govdesi rengi)
     // -------------------------------------------------------------------------
 
-    [Header("Agricultural (Forest/Biome 1) — Toprak Yol")]
-    public Color agriculturalFill = new Color(0.50f, 0.42f, 0.28f);
-    public Color agriculturalOutline = new Color(0.38f, 0.32f, 0.20f);
+    [Header("Dallanma Unifiye Rengi — Toprak Yol")]
+    [Tooltip("Dallanmanin govde (fill) rengi — tum biyomlarda ayni. Biyom etkisi shoulder bandinda yapilir.")]
+    public Color branchFill = new Color(0.42f, 0.36f, 0.26f);
+    [Tooltip("Dallanmanin kenar (outline) rengi — tum biyomlarda ayni.")]
+    public Color branchOutline = new Color(0.22f, 0.18f, 0.12f);
 
-    [Header("Cities (Desert/Biome 2) — Şehir Yolu")]
-    public Color citiesFill = new Color(0.42f, 0.40f, 0.37f);
-    public Color citiesOutline = new Color(0.28f, 0.26f, 0.24f);
+    // -------------------------------------------------------------------------
+    // SHOULDER (OMUZ) — yoldan araziye yumusak gecis bandi, biyoma gore renklenir
+    // -------------------------------------------------------------------------
 
-    [Header("Industrial (Mountains/Biome 3) — Sanayi Yolu")]
-    public Color industrialFill = new Color(0.32f, 0.28f, 0.24f);
-    public Color industrialOutline = new Color(0.20f, 0.17f, 0.14f);
+    [Header("Shoulder (Omuz) Bandi — Biyom Tinti")]
+    [Tooltip("Yolun dis kenari ile arazi arasindaki gecis bandi genisligi (piksel).")]
+    [Range(0, 3)] public int shoulderWidth = 1;
+    [Tooltip("Omuzun arazi uzerine alpha blend orani (0 = gorunmez, 1 = tam opak).")]
+    [Range(0f, 1f)] public float shoulderBlend = 0.45f;
+    [Tooltip("Highway (anayol) omuz rengi.")]
+    public Color highwayShoulder = new Color(0.30f, 0.28f, 0.24f);
+    [Tooltip("Forest (Biome 1) — toprak yol omuz tonu.")]
+    public Color agriculturalShoulder = new Color(0.35f, 0.30f, 0.20f);
+    [Tooltip("Desert (Biome 2) — sehir yolu omuz tonu.")]
+    public Color citiesShoulder = new Color(0.40f, 0.36f, 0.30f);
+    [Tooltip("Mountains (Biome 3) — sanayi yolu omuz tonu.")]
+    public Color industrialShoulder = new Color(0.26f, 0.22f, 0.18f);
+    [Tooltip("Plains (Biome 4) — kentsel yol omuz tonu.")]
+    public Color urbanShoulder = new Color(0.40f, 0.38f, 0.32f);
 
-    [Header("Urban (Plains/Biome 4) — Kentsel Yol")]
-    public Color urbanFill = new Color(0.45f, 0.43f, 0.40f);
-    public Color urbanOutline = new Color(0.30f, 0.28f, 0.25f);
+    [Header("Faz 2 — Yol Detaylari")]
+    [Tooltip("Dal uc noktalarinda (kavsaklarda) highway renginde kucuk plato bas.")]
+    public bool enableJunctionPlateaus = true;
+    [Tooltip("Kavsak platosunun yaricap (piksel).")]
+    [Range(1, 4)] public int junctionPlateauRadius = 2;
+
+    [Header("Faz 3 — Orta Serit")]
+    [Tooltip("Highway merkezine kesikli sari serit ciz.")]
+    public bool enableCenterStripes = true;
+    [Tooltip("Dal yollarinda da serit cizilsin mi.")]
+    public bool enableBranchStripes = false;
+    public Color centerStripeColor = new Color(0.82f, 0.70f, 0.22f);
+    [Tooltip("Dash uzunlugu (tangent yonunde piksel). Path'i takip etmez, hesaplanmis yolda uzar.")]
+    [Range(1, 6)] public int stripeDashLength = 2;
+    [Tooltip("Dash'ler arasi path-pikseli bosluk.")]
+    [Range(1, 8)] public int stripeGapLength = 4;
+    [Tooltip("Bu kalinligin altindaki path pikselinde serit cizme (taper uclari).")]
+    [Range(2, 6)] public int stripeMinThickness = 3;
 
     // -------------------------------------------------------------------------
     // GENEL
@@ -103,6 +132,7 @@ public class RoadGenerator : MonoBehaviour
     private int[,] roadTypeMap;
     private int[,] roadDistanceField;
     private int[,] visualRoadDistanceField;
+    private bool[,] branchFillMask; //T-kavsak acikligi: branch fill pikselleri; highway outline bu piksellerde cizilmez
 
     private float[,] roadThicknessMap;
     private Color[,] roadFillColorMap;
@@ -172,10 +202,19 @@ public class RoadGenerator : MonoBehaviour
         GenerateHighways(map, areaScale);
         GenerateBranches(map, areaScale);
 
-        PaintAllRoads();
-        _tex.Apply();
+        // Iki ayri centerline arasindaki 2-5 tile'lik gap'lere ara centerline enjekte et.
+        // Paint ve distance-field pass'leri bunu otomatik yansitacak (allRoadTiles uzerinden).
+        InjectBridgeCenterlines(map);
 
+        // visualRoadDistanceField'in bridge sonrasi taze olmasi icin once build — Fill buna dayaniyor
         BuildRoadDistanceField();
+
+        PaintAllRoads();
+        PaintJunctionPlateaus();
+        PaintCenterStripes();
+        // Kavis acisi / noise mikro-gap'leri icin guvenlik agi
+        FillInteriorSandwichPixels();
+        _tex.Apply();
 
         _generated = true;
 
@@ -783,6 +822,16 @@ public class RoadGenerator : MonoBehaviour
     // (corridor exception bolgesinde branch centerline highway'in icinde gecebilir)
     private const int BRANCH_PAINT_SKIP_DIST = 5;
 
+    // Bridge injection: iki ayri yol centerline'i arasindaki gorsel gap'leri kapatmak icin
+    // ara centerline tile'lari enjekte edilir. Cheb mesafe [MIN,MAX] araligindaki cift
+    // centerline'lar hedef. Altindaki mesafede diskler zaten ortusuyor, ustunde ise iki
+    // ayri yol saymak gerek.
+    private const int BRIDGE_MIN_DIST = 2;
+    private const int BRIDGE_MAX_DIST = 5;
+    // Iki centerline zaten komsu-zincir ile bagliysa bridge gereksiz — bu kadar cap'li
+    // BFS ile bagli mi diye bakariz.
+    private const int BRIDGE_CONNECTIVITY_CHECK_RADIUS = 7;
+
     void GenerateBranches(MapGenerator map, float areaScale)
     {
         if (highwaySegments.Count == 0) return;
@@ -924,6 +973,38 @@ public class RoadGenerator : MonoBehaviour
 
             List<Vector2Int> smoothed = SmoothBranchPath(map, rawPath);
             if (smoothed.Count < 10) smoothed = rawPath;
+
+            // Highway'i gecip diger tarafa cikmayi onle.
+            // Branch basinda hwStart'in corridor'u (roadDist<SKIP_DIST) dogal olarak var.
+            // Corridor'dan cikip (roadDist>=SKIP_DIST) sonra tekrar highway yakinina donulurse
+            // baska bir highway segmentini geciyor demektir — path'i o noktada kes.
+            int truncateAt = smoothed.Count;
+            bool escapedStartCorridor = false;
+            for (int p = 0; p < smoothed.Count; p++)
+            {
+                int d = roadDist[smoothed[p].x, smoothed[p].y];
+                if (d >= BRANCH_PAINT_SKIP_DIST)
+                {
+                    escapedStartCorridor = true;
+                }
+                else if (escapedStartCorridor)
+                {
+                    truncateAt = p;
+                    break;
+                }
+            }
+            if (truncateAt < smoothed.Count)
+            {
+                if (truncateAt < 10)
+                {
+                    roadDist[target.x, target.y] = 0;
+                    continue;
+                }
+                smoothed = smoothed.GetRange(0, truncateAt);
+                //corridor kenarinda kesildi — fill band'i diger yolla kesin ortussun
+                //diye centerline'a pad et (gorsel gap kapanir)
+                PadPathToNearestCenterline(map, smoothed, roadDist);
+            }
 
             float hwDist = float.MaxValue;
             foreach (var seg in highwaySegments)
@@ -1150,56 +1231,70 @@ public class RoadGenerator : MonoBehaviour
             ? Mathf.Lerp(branchStartThickness, branchEndThickness, 0.5f)
             : branchStartThickness;
 
+        //Skip mantigi SADECE baslangic corridor'u icin — hwStart'ta highway bandina
+        //taşmamak icin gereklidir. Path corridor'dan cikip (d>=threshold) sonra
+        //baska bir yolun corridor'una tekrar girerse (re-entry), o piksellerin
+        //boyanmasi GEREKIYOR — aksi halde iki yol arasinda gorsel gap olusur.
+        bool escapedStartCorridor = false;
+
         for (int p = 0; p < pixels.Count; p++)
         {
-            // Highway band'iyla cakisan tile'lari atla — branch highway kenarindan basliyor gozuksun
-            if (roadDist != null && skipThreshold > 0 && roadDist[pixels[p].x, pixels[p].y] < skipThreshold)
-                continue;
+            int d = (roadDist != null) ? roadDist[pixels[p].x, pixels[p].y] : int.MaxValue;
+
+            if (skipThreshold > 0 && roadDist != null)
+            {
+                if (d >= skipThreshold)
+                    escapedStartCorridor = true;
+                //yalnizca baslangic corridor'undayken atla
+                if (!escapedStartCorridor && d < skipThreshold)
+                    continue;
+            }
 
             float localT = (float)p / Mathf.Max(1, pixels.Count - 1);
 
             float colorT = Mathf.Lerp(tStart, tEnd, localT);
 
-            int biome = map.GetBiome(pixels[p].x, pixels[p].y);
-            GetBiomeBranchAppearance(biome, out Color targetFill, out Color targetOutline);
-
             float thickness = Mathf.Lerp(thickStart, branchEndThickness, localT);
             int outW = localT < 0.6f ? branchOutlineWidth : Mathf.Max(0, branchOutlineWidth - 1);
 
-            // Sharpness ile gecis bandini daralt: 1 = lineer, yuksek = step fonksiyonuna yakin
+            // Unifiye renk: tum dallar ayni toprak govdesini paylasir. highway junction'da
+            // asfalttan topraga yumusak gecis icin ilk tile'larda short lerp (sharpness ile).
             float sharpenedT = Mathf.Clamp01((colorT - 0.5f) * branchColorTransitionSharpness + 0.5f);
 
-            Color fill = Color.Lerp(highwayFill, targetFill, sharpenedT);
-            Color outline = Color.Lerp(highwayOutline, targetOutline, sharpenedT);
+            Color fill = Color.Lerp(highwayFill, branchFill, sharpenedT);
+            Color outline = Color.Lerp(highwayOutline, branchOutline, sharpenedT);
 
             RegisterRoadTile(pixels[p], 2, thickness, outW, fill, outline);
         }
     }
 
     // =========================================================================
-    // BİYOM GÖRÜNÜMÜ
+    // SHOULDER (OMUZ) RENGI — biyoma gore disariya gecis tonu
     // =========================================================================
 
-    void GetBiomeBranchAppearance(int biome, out Color fill, out Color outline)
+    Color GetBiomeShoulderColor(int biome)
     {
         switch (biome)
         {
-            case 1:
-                fill = agriculturalFill; outline = agriculturalOutline;
-                break;
-            case 2:
-                fill = citiesFill; outline = citiesOutline;
-                break;
-            case 3:
-                fill = industrialFill; outline = industrialOutline;
-                break;
-            case 4:
-                fill = urbanFill; outline = urbanOutline;
-                break;
-            default:
-                fill = agriculturalFill; outline = agriculturalOutline;
-                break;
+            case 1: return agriculturalShoulder;
+            case 2: return citiesShoulder;
+            case 3: return industrialShoulder;
+            case 4: return urbanShoulder;
+            default: return agriculturalShoulder;
         }
+    }
+
+    /// <summary>
+    /// Yolun tipine ve uzerinde bulundugu biyoma gore shoulder rengi dondur.
+    /// Highway icin sabit highwayShoulder, branch icin biyoma gore tonlanir.
+    /// </summary>
+    Color GetShoulderColorForTile(Vector2Int tile)
+    {
+        int type = roadTypeMap[tile.x, tile.y];
+        if (type == 1) return highwayShoulder;
+        if (mapGenerator == null) return highwayShoulder;
+        int biome = mapGenerator.GetBiome(tile.x, tile.y);
+        return GetBiomeShoulderColor(biome);
     }
 
     // =========================================================================
@@ -1238,6 +1333,122 @@ public class RoadGenerator : MonoBehaviour
     }
 
     // =========================================================================
+    // BRIDGE CENTERLINE INJECTION — GORSEL GAP KAPATMA
+    // =========================================================================
+
+    /// <summary>
+    /// Iki ayri centerline cheb-mesafe [BRIDGE_MIN_DIST, BRIDGE_MAX_DIST] araliginda
+    /// ve centerline-komsuluk zinciriyle bagli DEGIL ise, aralarina ara centerline
+    /// tile'lari enjekte eder. Bu sayede fill pass daireleri ortusur, arka plan
+    /// pikseli kalmaz. Silueti korumak icin Min(thickness) kullanilir.
+    /// </summary>
+    void InjectBridgeCenterlines(MapGenerator map)
+    {
+        if (map == null || allRoadTiles == null) return;
+        if (roadTypeMap == null) return;
+
+        int originalCount = allRoadTiles.Count;
+        // Tile indeksi: _w buyukluklu coord kodlamasi (ai = x * _h + y kullanamayiz
+        // cunku _h uyuk degisebilir). (long)x<<32 | (uint)y daha guvenli.
+        HashSet<long> bridgedPairs = new HashSet<long>();
+
+        for (int i = 0; i < originalCount; i++)
+        {
+            Vector2Int a = allRoadTiles[i];
+
+            for (int ddx = -BRIDGE_MAX_DIST; ddx <= BRIDGE_MAX_DIST; ddx++)
+            for (int ddy = -BRIDGE_MAX_DIST; ddy <= BRIDGE_MAX_DIST; ddy++)
+            {
+                int absX = ddx < 0 ? -ddx : ddx;
+                int absY = ddy < 0 ? -ddy : ddy;
+                int cheb = absX > absY ? absX : absY;
+                if (cheb < BRIDGE_MIN_DIST || cheb > BRIDGE_MAX_DIST) continue;
+
+                int bx = a.x + ddx;
+                int by = a.y + ddy;
+                if (bx < 0 || bx >= _w || by < 0 || by >= _h) continue;
+                if (roadTypeMap[bx, by] == 0) continue;
+
+                // cift tekilligi (a,b ve b,a ayni sayilir)
+                long aKey = ((long)a.x << 32) | (uint)a.y;
+                long bKey = ((long)bx << 32) | (uint)by;
+                long pairKey = aKey < bKey ? (aKey * 73856093L) ^ bKey : (bKey * 73856093L) ^ aKey;
+                if (bridgedPairs.Contains(pairKey)) continue;
+                bridgedPairs.Add(pairKey);
+
+                Vector2Int b = new Vector2Int(bx, by);
+
+                // normal branch kavisi ise bridge gereksiz
+                if (IsAlreadyConnected(a, b, BRIDGE_CONNECTIVITY_CHECK_RADIUS)) continue;
+
+                // parametre kaynaklari — silueti korumak icin Min(thickness)
+                float thickness = Mathf.Min(roadThicknessMap[a.x, a.y], roadThicknessMap[bx, by]);
+                int outlineW = Mathf.Min(roadOutlineWidthMap[a.x, a.y], roadOutlineWidthMap[bx, by]);
+                int type = Mathf.Min(roadTypeMap[a.x, a.y], roadTypeMap[bx, by]);
+                Color fill = roadFillColorMap[a.x, a.y];
+                Color outline = roadOutlineColorMap[a.x, a.y];
+
+                // a → b arasi ara tile'lari (endpoint'ler disinda) linear interp
+                int steps = cheb;
+                for (int s = 1; s < steps; s++)
+                {
+                    float t = (float)s / steps;
+                    int mx = Mathf.RoundToInt(Mathf.Lerp(a.x, bx, t));
+                    int my = Mathf.RoundToInt(Mathf.Lerp(a.y, by, t));
+                    if (mx < 0 || mx >= _w || my < 0 || my >= _h) continue;
+                    if (!map.IsLand(mx, my)) continue;
+                    if (roadTypeMap[mx, my] != 0) continue;
+
+                    RegisterRoadTile(new Vector2Int(mx, my), type, thickness, outlineW, fill, outline);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// a ve b centerline tile'lari, centerline komsuluk zinciriyle (roadTypeMap != 0
+    /// 8-komsu adimlar) maxRadius cheb capi icinde birbirine bagli mi?
+    /// Bagli ise bridge enjeksiyonu gereksiz (bu zaten normal bir kavis/kavsak).
+    /// </summary>
+    bool IsAlreadyConnected(Vector2Int a, Vector2Int b, int maxRadius)
+    {
+        if (a == b) return true;
+        Queue<Vector2Int> queue = new Queue<Vector2Int>();
+        HashSet<long> visited = new HashSet<long>();
+        queue.Enqueue(a);
+        visited.Add(((long)a.x << 32) | (uint)a.y);
+
+        // performans sinir — ufak capli BFS, pattern patlamasin
+        int iterCap = (2 * maxRadius + 1) * (2 * maxRadius + 1) * 2;
+
+        while (queue.Count > 0 && iterCap-- > 0)
+        {
+            var pos = queue.Dequeue();
+            for (int ddx = -1; ddx <= 1; ddx++)
+            for (int ddy = -1; ddy <= 1; ddy++)
+            {
+                if (ddx == 0 && ddy == 0) continue;
+                int nx = pos.x + ddx;
+                int ny = pos.y + ddy;
+                if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
+
+                int absDX = nx - a.x; if (absDX < 0) absDX = -absDX;
+                int absDY = ny - a.y; if (absDY < 0) absDY = -absDY;
+                if (absDX > maxRadius || absDY > maxRadius) continue;
+                if (roadTypeMap[nx, ny] == 0) continue;
+
+                long key = ((long)nx << 32) | (uint)ny;
+                if (visited.Contains(key)) continue;
+                visited.Add(key);
+
+                if (nx == b.x && ny == b.y) return true;
+                queue.Enqueue(new Vector2Int(nx, ny));
+            }
+        }
+        return false;
+    }
+
+    // =========================================================================
     // BOYAMA
     // =========================================================================
 
@@ -1247,8 +1458,146 @@ public class RoadGenerator : MonoBehaviour
         PaintRoadsByType(1);
     }
 
+    //Dal uc noktalarinda (highway ile birlesim) kucuk yuvarlak plato — sert T-birlesimi yerine
+    //planlanmis kavsak hissi verir. Sadece zaten boyali yol piksellerinin uzerine yazar.
+    void PaintJunctionPlateaus()
+    {
+        if (!enableJunctionPlateaus || branchPaths == null || visualRoadDistanceField == null) return;
+        int plateauHalf = junctionPlateauRadius;
+        int plateauHalfSq = plateauHalf * plateauHalf;
+        foreach (var path in branchPaths)
+        {
+            if (path == null || path.Count == 0) continue;
+            PaintPlateauAt(path[0], plateauHalf, plateauHalfSq);
+            if (path.Count > 1)
+            {
+                Vector2Int last = path[path.Count - 1];
+                if (last != path[0]) PaintPlateauAt(last, plateauHalf, plateauHalfSq);
+            }
+        }
+    }
+
+    void PaintPlateauAt(Vector2Int j, int plateauHalf, int plateauHalfSq)
+    {
+        if (j.x < 0 || j.x >= _w || j.y < 0 || j.y >= _h) return;
+        Color fillColor = roadFillColorMap[j.x, j.y];
+        for (int ddx = -plateauHalf; ddx <= plateauHalf; ddx++)
+        for (int ddy = -plateauHalf; ddy <= plateauHalf; ddy++)
+        {
+            int distSq = ddx * ddx + ddy * ddy;
+            if (distSq > plateauHalfSq) continue;
+            int px = j.x + ddx, py = j.y + ddy;
+            if (px < 0 || px >= _w || py < 0 || py >= _h) continue;
+            //Sadece yol ustu — cim/shoulder tasmasi olmasin.
+            if (visualRoadDistanceField[px, py] != 0) continue;
+            Color outColor = ApplyRoadNoise(fillColor, px, py);
+            _tex.SetPixel(px, py, outColor);
+        }
+    }
+
+    //Highway + (opsiyonel) branch path pixellerine kesikli sari orta serit bas.
+    void PaintCenterStripes()
+    {
+        if (!enableCenterStripes || visualRoadDistanceField == null) return;
+        int period = stripeDashLength + stripeGapLength;
+        if (period < 1) return;
+        int plateauSkip = enableJunctionPlateaus ? junctionPlateauRadius + 1 : 0;
+
+        if (highwaySegments != null)
+            foreach (var seg in highwaySegments) PaintStripeOnPath(seg, period, plateauSkip);
+        if (enableBranchStripes && branchPaths != null)
+            foreach (var path in branchPaths) PaintStripeOnPath(path, period, plateauSkip);
+    }
+
+    void PaintStripeOnPath(List<Vector2Int> path, int period, int plateauSkip)
+    {
+        if (path == null || path.Count == 0) return;
+        int start = Mathf.Min(plateauSkip, path.Count);
+        int end = Mathf.Max(start, path.Count - plateauSkip);
+        //Anchor'lar her 'period' path pikselinde bir; dash anchor'dan tangent yonunde uzanir — path staircase'ini
+        //takip etmez, cunku staircase'i takip edince capraz yolda zigzag yumru cikiyordu.
+        for (int i = start; i < end; i += period)
+        {
+            Vector2Int anchor = path[i];
+            //Tangent smoothing: path[i-3] ile path[i+3] arasi — staircase artefaktini yumusatmak icin genis pencere.
+            int lo = Mathf.Max(0, i - 3);
+            int hi = Mathf.Min(path.Count - 1, i + 3);
+            float dx = path[hi].x - path[lo].x;
+            float dy = path[hi].y - path[lo].y;
+            float len = Mathf.Sqrt(dx * dx + dy * dy);
+            if (len < 0.0001f) { PaintStripePixel(anchor.x, anchor.y); continue; }
+            float tx = dx / len, ty = dy / len;
+            //Dash: anchor'dan tangent yonunde stripeDashLength piksel. Float->round ayni pixel'e denk gelirse atla.
+            int prevPx = int.MinValue, prevPy = int.MinValue;
+            for (int k = 0; k < stripeDashLength; k++)
+            {
+                int px = anchor.x + Mathf.RoundToInt(tx * k);
+                int py = anchor.y + Mathf.RoundToInt(ty * k);
+                if (px == prevPx && py == prevPy) continue;
+                prevPx = px; prevPy = py;
+                PaintStripePixel(px, py);
+            }
+        }
+    }
+
+    void PaintStripePixel(int px, int py)
+    {
+        if (px < 0 || px >= _w || py < 0 || py >= _h) return;
+        //Taper uclari / ince yerlerde serit atla.
+        if (roadThicknessMap[px, py] < stripeMinThickness) return;
+        //Sadece yol ic pikselinde (cim/shoulder tasmasi yok).
+        if (visualRoadDistanceField[px, py] != 0) return;
+        _tex.SetPixel(px, py, ApplyRoadNoise(centerStripeColor, px, py));
+    }
+
     void PaintRoadsByType(int targetType)
     {
+        // Branch pass'i baslarken mask'i sifirla — highway outline pass'i bu mask'i okuyarak
+        // T-kavsak noktalarinda (branch fill'in oldugu piksellerde) outline'i atlar ve
+        // anayolun dis hattini "kesip" branch'in saçaklanmis goruntusunu ortaya cikarir.
+        if (targetType == 2)
+        {
+            if (branchFillMask == null || branchFillMask.GetLength(0) != _w || branchFillMask.GetLength(1) != _h)
+                branchFillMask = new bool[_w, _h];
+            else
+                System.Array.Clear(branchFillMask, 0, branchFillMask.Length);
+        }
+
+        // Shoulder (omuz) pass: outline'dan daha disariya, araziye yumusak biyom-tonlu bant.
+        // Arazi / alt yol piksellerinin UZERINE alpha-blend ile yazilir — outline ve fill
+        // sonradan ustune geldigi icin yol icini etkilemez.
+        if (shoulderWidth > 0 && shoulderBlend > 0f)
+        {
+            foreach (var tile in allRoadTiles)
+            {
+                if (roadTypeMap[tile.x, tile.y] != targetType) continue;
+
+                float thickness = roadThicknessMap[tile.x, tile.y];
+                int outlineW = roadOutlineWidthMap[tile.x, tile.y];
+
+                int totalHalf = Mathf.CeilToInt((thickness + outlineW * 2) / 2f);
+                int shoulderHalf = totalHalf + shoulderWidth;
+                int shoulderHalfSq = shoulderHalf * shoulderHalf;
+                int totalHalfSq = totalHalf * totalHalf;
+
+                Color shoulderColor = GetShoulderColorForTile(tile);
+
+                for (int ddx = -shoulderHalf; ddx <= shoulderHalf; ddx++)
+                for (int ddy = -shoulderHalf; ddy <= shoulderHalf; ddy++)
+                {
+                    int distSq = ddx * ddx + ddy * ddy;
+                    if (distSq > shoulderHalfSq) continue;
+                    if (distSq <= totalHalfSq) continue; //sadece dis halka
+
+                    int px = tile.x + ddx, py = tile.y + ddy;
+                    if (px < 0 || px >= _w || py < 0 || py >= _h) continue;
+
+                    Color existing = _tex.GetPixel(px, py);
+                    _tex.SetPixel(px, py, Color.Lerp(existing, shoulderColor, shoulderBlend));
+                }
+            }
+        }
+
         foreach (var tile in allRoadTiles)
         {
             if (roadTypeMap[tile.x, tile.y] != targetType) continue;
@@ -1267,8 +1616,13 @@ public class RoadGenerator : MonoBehaviour
                 {
                     if (ddx * ddx + ddy * ddy > totalHalfSq) continue;
                     int px = tile.x + ddx, py = tile.y + ddy;
-                    if (px >= 0 && px < _w && py >= 0 && py < _h)
-                        _tex.SetPixel(px, py, outlineColor);
+                    if (px < 0 || px >= _w || py < 0 || py >= _h) continue;
+
+                    //T-kavsak acikligi: highway outline'i branch fill piksellerinde cizme —
+                    //branch fill highway bandinin icine saçaklanarak gorsel kavsak olusur.
+                    if (targetType == 1 && branchFillMask != null && branchFillMask[px, py]) continue;
+
+                    _tex.SetPixel(px, py, outlineColor);
                 }
         }
 
@@ -1289,17 +1643,19 @@ public class RoadGenerator : MonoBehaviour
                     int px = tile.x + ddx, py = tile.y + ddy;
                     if (px < 0 || px >= _w || py < 0 || py >= _h) continue;
 
-                    Color outColor = fillColor;
-                    if (targetType == 1)
-                        outColor = ApplyHighwayNoise(fillColor, px, py);
-
+                    // Noise tum yol tiplerine uygulanir — anayol ve arayol ayni kirli doku hissini paylasir.
+                    Color outColor = ApplyRoadNoise(fillColor, px, py);
                     _tex.SetPixel(px, py, outColor);
+
+                    //Branch fill pass'inde mask'i doldur — highway outline pass'i bunu okuyacak.
+                    if (targetType == 2 && branchFillMask != null)
+                        branchFillMask[px, py] = true;
                 }
         }
     }
 
     // Perlin (buyuk olcekli yama) + random grain (kumlu doku) ile parlaklik modulasyonu
-    Color ApplyHighwayNoise(Color baseColor, int px, int py)
+    Color ApplyRoadNoise(Color baseColor, int px, int py)
     {
         float perlin = Mathf.PerlinNoise(px * highwayNoiseScale, py * highwayNoiseScale);
         float perlinMod = (perlin - 0.5f) * 2f * highwayNoiseStrength;
@@ -1391,6 +1747,102 @@ public class RoadGenerator : MonoBehaviour
                 queue.Enqueue(new Vector2Int(nx, ny));
             }
         }
+    }
+
+    // =========================================================================
+    // POST-PAINT SANDWICH FILTER — GAP GUVENLIK AGI
+    // =========================================================================
+
+    /// <summary>
+    /// Paint pass'lerinden sonra, yol piksellerinin arasinda sikismis tekil arka plan
+    /// piksellerini kapatir. 4 eksen (yatay, dikey, 2 diagonal) boyunca her iki yonde
+    /// [1, R] mesafede yol pikseli varsa, o piksel "sandwich" demektir ve en yakin yol
+    /// rengiyle doldurulur. Bridge injection sonrasi kalan kavis-aci kaynakli mikro
+    /// delikleri kapatan guvenlik agi.
+    /// </summary>
+    void FillInteriorSandwichPixels()
+    {
+        if (_tex == null || visualRoadDistanceField == null) return;
+
+        const int R = 3;
+
+        Color32[] pixels = _tex.GetPixels32();
+        bool modified = false;
+
+        // 4 eksen: yatay, dikey, iki kosegen
+        int[] axDX = { 1, 0, 1, 1 };
+        int[] axDY = { 0, 1, 1, -1 };
+
+        for (int y = 0; y < _h; y++)
+        for (int x = 0; x < _w; x++)
+        {
+            int d = visualRoadDistanceField[x, y];
+            if (d == 0) continue;
+            if (d > R + 1) continue; // yol cok uzak — sandwich olamaz
+
+            bool sandwich = false;
+            for (int a = 0; a < 4; a++)
+            {
+                int ax = axDX[a];
+                int ay = axDY[a];
+
+                bool posFound = false;
+                bool negFound = false;
+                for (int s = 1; s <= R; s++)
+                {
+                    int nx = x + ax * s;
+                    int ny = y + ay * s;
+                    if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) break;
+                    if (visualRoadDistanceField[nx, ny] == 0) { posFound = true; break; }
+                }
+                if (!posFound) continue;
+                for (int s = 1; s <= R; s++)
+                {
+                    int nx = x - ax * s;
+                    int ny = y - ay * s;
+                    if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) break;
+                    if (visualRoadDistanceField[nx, ny] == 0) { negFound = true; break; }
+                }
+                if (posFound && negFound) { sandwich = true; break; }
+            }
+
+            if (!sandwich) continue;
+
+            int idx = x + y * _w;
+            pixels[idx] = SampleNearestRoadColor32(x, y, pixels);
+            modified = true;
+        }
+
+        if (modified)
+        {
+            _tex.SetPixels32(pixels);
+        }
+    }
+
+    /// <summary>
+    /// (x, y) piksel etrafinda en yakin yol pikselinin rengini dondur. Bulamazsa
+    /// mevcut rengi dondurur (no-op fallback).
+    /// </summary>
+    Color32 SampleNearestRoadColor32(int x, int y, Color32[] pixels)
+    {
+        for (int r = 1; r <= 3; r++)
+        {
+            for (int ddx = -r; ddx <= r; ddx++)
+            for (int ddy = -r; ddy <= r; ddy++)
+            {
+                int absX = ddx < 0 ? -ddx : ddx;
+                int absY = ddy < 0 ? -ddy : ddy;
+                int cheb = absX > absY ? absX : absY;
+                if (cheb != r) continue;
+
+                int nx = x + ddx;
+                int ny = y + ddy;
+                if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
+                if (visualRoadDistanceField[nx, ny] != 0) continue;
+                return pixels[nx + ny * _w];
+            }
+        }
+        return pixels[x + y * _w];
     }
 
     // =========================================================================
@@ -1500,15 +1952,52 @@ public class RoadGenerator : MonoBehaviour
 
         if (bestDist == 0 || bestDist == int.MaxValue) return;
 
-        //BFS ile doğal yol bul (mevcut branch sistemiyle aynı)
-        List<Vector2Int> rawPath = BFSPathOnLandSimple(map, bestRoadTile, portTile);
-        if (rawPath.Count < 2) return;
+        //BFS ile doğal yol bul — clearance ile mevcut yollarin corridor'ina girmeyi engelle.
+        //Boylece path, highway veya baska branch'leri pathfinding seviyesinde zaten KESEMEZ.
+        List<Vector2Int> rawPath = BFSPathOnLandSimple(map, bestRoadTile, portTile, roadDistanceField, BRANCH_CLEARANCE);
+        if (rawPath.Count < 2)
+        {
+            //kisitli modda bulunamadi — kisitsiz fallback (nadir edge case)
+            rawPath = BFSPathOnLandSimple(map, bestRoadTile, portTile);
+            if (rawPath.Count < 2) return;
+        }
 
         //kıvrımlı yumuşatma uygula
         List<Vector2Int> smoothed = SmoothBranchPath(map, rawPath);
         if (smoothed.Count < 2) smoothed = rawPath;
 
-        //yolun otobana girdiği kısmı kes — en yakın yol tile'ında bitir
+        //iki tarafli corridor tespit + orta tarama — start ve end dogal olarak
+        //yol yakininda olabilir; ortada d<SKIP_DIST pikseli varsa orada bir BASKA
+        //yolu gecmeye calisiyoruz demektir. O noktada truncate — port artik o
+        //kesilen yola baglanir (bestRoadTile yerine). Path iptal edilmez.
+        if (roadDistanceField != null)
+        {
+            int startCorrEnd = 0;
+            for (int i = 0; i < smoothed.Count; i++)
+            {
+                if (roadDistanceField[smoothed[i].x, smoothed[i].y] < BRANCH_PAINT_SKIP_DIST)
+                    startCorrEnd = i + 1;
+                else break;
+            }
+            int endCorrStart = smoothed.Count;
+            for (int i = smoothed.Count - 1; i >= 0; i--)
+            {
+                if (roadDistanceField[smoothed[i].x, smoothed[i].y] < BRANCH_PAINT_SKIP_DIST)
+                    endCorrStart = i;
+                else break;
+            }
+            for (int i = startCorrEnd; i < endCorrStart; i++)
+            {
+                if (roadDistanceField[smoothed[i].x, smoothed[i].y] < BRANCH_PAINT_SKIP_DIST)
+                {
+                    if (i >= 2)
+                        smoothed = smoothed.GetRange(0, i + 1);
+                    break;
+                }
+            }
+        }
+
+        //yolun otobana girdiği kısmı kes — en yakın yol tile'ında bitir (centerline)
         List<Vector2Int> trimmed = new List<Vector2Int>();
         for (int i = 0; i < smoothed.Count; i++)
         {
@@ -1520,14 +2009,26 @@ public class RoadGenerator : MonoBehaviour
 
         if (trimmed.Count < 2) return;
 
+        //corridor'da bitti ama centerline'a ulasmadi (ornek: truncation corridor
+        //kenarinda d=3/4'te durdu) — gradient descent ile centerline'a kadar pad
+        //et. Boylece iki yolun fill disc'leri centerline'da kesin ortusur; arada
+        //arka plan pikseli kalmaz.
+        PadPathToNearestCenterline(map, trimmed);
+
         //branch olarak kaydet ve boya
         branchPaths.Add(new List<Vector2Int>(trimmed));
         RegisterBranchPixels(map, trimmed, 0.8f, 1f);
 
-        PaintRoadsByType(2);
-        _tex.Apply();
-
+        // Yeni eklenen connector tile'larinin mevcut yol bandlariyla olasi gap'lerini kapat
+        InjectBridgeCenterlines(map);
         BuildRoadDistanceField();
+
+        PaintRoadsByType(2);
+        PaintRoadsByType(1); //highway'i uste tekrar boya — konektor bandi asmis olsa dahi highway goruntusu korunur
+        PaintJunctionPlateaus();
+        PaintCenterStripes();
+        FillInteriorSandwichPixels();
+        _tex.Apply();
 
         Debug.Log($"RoadGenerator: Port road ({portTile.x},{portTile.y}) → ({bestRoadTile.x},{bestRoadTile.y}), {trimmed.Count}px");
     }
@@ -1556,11 +2057,46 @@ public class RoadGenerator : MonoBehaviour
 
         if (bestDist == 0 || bestDist == int.MaxValue) return;
 
-        List<Vector2Int> rawPath = BFSPathOnLandSimple(map, bestRoadTile, buildingTile);
-        if (rawPath.Count < 2) return;
+        //BFS ile doğal yol bul — clearance ile mevcut yollari KESEMEZ
+        List<Vector2Int> rawPath = BFSPathOnLandSimple(map, bestRoadTile, buildingTile, roadDistanceField, BRANCH_CLEARANCE);
+        if (rawPath.Count < 2)
+        {
+            //kisitli modda bulunamadi — fallback
+            rawPath = BFSPathOnLandSimple(map, bestRoadTile, buildingTile);
+            if (rawPath.Count < 2) return;
+        }
 
         List<Vector2Int> smoothed = SmoothBranchPath(map, rawPath);
         if (smoothed.Count < 2) smoothed = rawPath;
+
+        //iki tarafli corridor tespit + orta tarama — crossing noktasinda truncate,
+        //bina o kesilen yola baglanir (bestRoadTile yerine). Path iptal edilmez.
+        if (roadDistanceField != null)
+        {
+            int startCorrEnd = 0;
+            for (int i = 0; i < smoothed.Count; i++)
+            {
+                if (roadDistanceField[smoothed[i].x, smoothed[i].y] < BRANCH_PAINT_SKIP_DIST)
+                    startCorrEnd = i + 1;
+                else break;
+            }
+            int endCorrStart = smoothed.Count;
+            for (int i = smoothed.Count - 1; i >= 0; i--)
+            {
+                if (roadDistanceField[smoothed[i].x, smoothed[i].y] < BRANCH_PAINT_SKIP_DIST)
+                    endCorrStart = i;
+                else break;
+            }
+            for (int i = startCorrEnd; i < endCorrStart; i++)
+            {
+                if (roadDistanceField[smoothed[i].x, smoothed[i].y] < BRANCH_PAINT_SKIP_DIST)
+                {
+                    if (i >= 2)
+                        smoothed = smoothed.GetRange(0, i + 1);
+                    break;
+                }
+            }
+        }
 
         List<Vector2Int> trimmed = new List<Vector2Int>();
         for (int i = 0; i < smoothed.Count; i++)
@@ -1571,12 +2107,23 @@ public class RoadGenerator : MonoBehaviour
 
         if (trimmed.Count < 2) return;
 
+        //corridor'da bitti ama centerline'a ulasmadi — gradient descent ile
+        //centerline'a kadar pad et (branch-to-branch junction'daki gorsel kopukluk fix'i)
+        PadPathToNearestCenterline(map, trimmed);
+
         branchPaths.Add(new List<Vector2Int>(trimmed));
         RegisterThinRoadPixels(map, trimmed);
 
-        PaintRoadsByType(2);
-        _tex.Apply();
+        // Yeni eklenen connector tile'larinin mevcut yol bandlariyla olasi gap'lerini kapat
+        InjectBridgeCenterlines(map);
         BuildRoadDistanceField();
+
+        PaintRoadsByType(2);
+        PaintRoadsByType(1); //highway'i uste tekrar boya
+        PaintJunctionPlateaus();
+        PaintCenterStripes();
+        FillInteriorSandwichPixels();
+        _tex.Apply();
 
         Debug.Log($"RoadGenerator: Building road ({buildingTile.x},{buildingTile.y}), {trimmed.Count}px");
     }
@@ -1661,6 +2208,37 @@ public class RoadGenerator : MonoBehaviour
             List<Vector2Int> curved = SmoothBranchPath(map, rawPath);
             if (curved.Count < 2) curved = rawPath;
 
+            // Kıvrım path'i hit'e varmadan baska bir yolu geciyor mu kontrol et.
+            // Bina ve hit uclarinda dogal olarak road-yakini corridor'lar var.
+            // Bu iki corridor'un dışında d<SKIP_DIST bulursak, path o yolu kesiyor —
+            // o noktada path'i kes. Bina artik o gecilen yola baglanir (hit yerine).
+            if (roadDistanceField != null)
+            {
+                int startCorrEnd = 0;
+                for (int i = 0; i < curved.Count; i++)
+                {
+                    if (roadDistanceField[curved[i].x, curved[i].y] < BRANCH_PAINT_SKIP_DIST)
+                        startCorrEnd = i + 1;
+                    else break;
+                }
+                int endCorrStart = curved.Count;
+                for (int i = curved.Count - 1; i >= 0; i--)
+                {
+                    if (roadDistanceField[curved[i].x, curved[i].y] < BRANCH_PAINT_SKIP_DIST)
+                        endCorrStart = i;
+                    else break;
+                }
+                for (int i = startCorrEnd; i < endCorrStart; i++)
+                {
+                    if (roadDistanceField[curved[i].x, curved[i].y] < BRANCH_PAINT_SKIP_DIST)
+                    {
+                        if (i >= 2)
+                            curved = curved.GetRange(0, i + 1);
+                        break;
+                    }
+                }
+            }
+
             // İlk yol tile'ında kes — anayolun içine dalmayı engeller (temiz T-kavşak)
             List<Vector2Int> trimmed = new List<Vector2Int>();
             for (int i = 0; i < curved.Count; i++)
@@ -1670,6 +2248,9 @@ public class RoadGenerator : MonoBehaviour
             }
             if (trimmed.Count < 2) continue;
 
+            //corridor-aware truncation ortada tetiklenmis olabilir — gap onlem
+            PadPathToNearestCenterline(map, trimmed);
+
             branchPaths.Add(new List<Vector2Int>(trimmed));
             RegisterThinRoadPixels(map, trimmed);
             connected++;
@@ -1677,10 +2258,60 @@ public class RoadGenerator : MonoBehaviour
 
         if (connected > 0)
         {
-            PaintRoadsByType(2);
-            _tex.Apply();
+            // Yeni eklenen cityhall yollarinin mevcut bandlariyla olasi gap'lerini kapat
+            InjectBridgeCenterlines(map);
             BuildRoadDistanceField();
+
+            PaintRoadsByType(2);
+            PaintRoadsByType(1); //highway'i uste tekrar boya — konektor bandi asmis olsa dahi highway goruntusu korunur
+            PaintJunctionPlateaus();
+            PaintCenterStripes();
+                FillInteriorSandwichPixels();
+            _tex.Apply();
             Debug.Log($"RoadGenerator: CityHall connected with {connected} roads.");
+        }
+    }
+
+    /// <summary>
+    /// Path corridor kenarinda (d=1..BRANCH_PAINT_SKIP_DIST-1) bittiyse,
+    /// distance-field gradient'ini takip ederek centerline'a (d=0) kadar pad
+    /// eder. Amac: iki yolun fill disc'leri centerline'da kesin ortussun; arada
+    /// arka plan pikseli ("gorsel kopukluk") kalmasin.
+    /// Path zaten centerline'da bitiyorsa veya hedefte boslukta ise (d cok
+    /// buyuk — port/bina asil hedef) hicbir sey yapmaz.
+    /// </summary>
+    void PadPathToNearestCenterline(MapGenerator map, List<Vector2Int> path, int[,] distField = null)
+    {
+        int[,] df = distField ?? roadDistanceField;
+        if (path.Count == 0 || df == null) return;
+        Vector2Int cur = path[path.Count - 1];
+        if (cur.x < 0 || cur.x >= _w || cur.y < 0 || cur.y >= _h) return;
+
+        int curD = df[cur.x, cur.y];
+        //sadece corridor icinde bitenler icin pad. d==0 => zaten centerline.
+        //d>=SKIP_DIST => dogal son (hedef boslukta — port/bina/target).
+        if (curD <= 0 || curD >= BRANCH_PAINT_SKIP_DIST) return;
+
+        int safety = BRANCH_PAINT_SKIP_DIST + 2;
+        while (curD > 0 && safety-- > 0)
+        {
+            Vector2Int best = cur;
+            int bestD = curD;
+            //8-komsu icinde en dusuk d'ye yurur (Chebyshev adim — diyagonal serbest)
+            for (int ddx = -1; ddx <= 1; ddx++)
+            for (int ddy = -1; ddy <= 1; ddy++)
+            {
+                if (ddx == 0 && ddy == 0) continue;
+                int nx = cur.x + ddx, ny = cur.y + ddy;
+                if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
+                if (!map.IsLand(nx, ny)) continue;
+                int nd = df[nx, ny];
+                if (nd < bestD) { bestD = nd; best = new Vector2Int(nx, ny); }
+            }
+            if (bestD >= curD) break; //yerel minimum — daha ileri gidemiyoruz
+            path.Add(best);
+            cur = best;
+            curD = bestD;
         }
     }
 
@@ -1691,10 +2322,8 @@ public class RoadGenerator : MonoBehaviour
     {
         for (int p = 0; p < pixels.Count; p++)
         {
-            int biome = map.GetBiome(pixels[p].x, pixels[p].y);
-            GetBiomeBranchAppearance(biome, out Color fill, out Color outline);
-            // Sabit 1px kalınlık — çok ince erişim yolu
-            RegisterRoadTile(pixels[p], 2, 1f, Mathf.Max(0, branchOutlineWidth - 1), fill, outline);
+            // Sabit 1px kalınlık — çok ince erişim yolu. Renk dallanma ile ayni unifiye govde.
+            RegisterRoadTile(pixels[p], 2, 1f, Mathf.Max(0, branchOutlineWidth - 1), branchFill, branchOutline);
         }
     }
 
