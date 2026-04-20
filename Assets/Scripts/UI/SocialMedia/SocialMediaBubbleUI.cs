@@ -5,6 +5,10 @@ using TMPro;
 
 public class SocialMediaBubbleUI : MonoBehaviour
 {
+    [Header("Kaynak")]
+    [Tooltip("Tik: mock feed (MockSocialMediaFeedManager). Bos: gercek feed (SocialMediaManager).")]
+    public bool useMock = false;
+
     [Header("Referanslar")]
     public RectTransform bubbleContainer;
     public GameObject bubblePrefab;
@@ -26,12 +30,28 @@ public class SocialMediaBubbleUI : MonoBehaviour
 
     void OnEnable()
     {
-        MockSocialMediaFeedManager.OnNewMockPost += HandleNewPost;
+        if (useMock)
+            MockSocialMediaFeedManager.OnNewMockPost += HandleMockPost;
+        else
+            SocialMediaManager.OnNewPost += HandleRealPost;
     }
 
     void OnDisable()
     {
-        MockSocialMediaFeedManager.OnNewMockPost -= HandleNewPost;
+        if (useMock)
+            MockSocialMediaFeedManager.OnNewMockPost -= HandleMockPost;
+        else
+            SocialMediaManager.OnNewPost -= HandleRealPost;
+    }
+
+    void HandleMockPost(MockSocialMediaPost post)
+    {
+        HandleNewPost(post.authorName, post.content);
+    }
+
+    void HandleRealPost(SocialMediaPost post)
+    {
+        HandleNewPost(post.authorName, post.content);
     }
 
     void Update()
@@ -52,7 +72,7 @@ public class SocialMediaBubbleUI : MonoBehaviour
         }
     }
 
-    void HandleNewPost(MockSocialMediaPost post)
+    void HandleNewPost(string authorName, string content)
     {
         if (bubblePrefab == null || bubbleContainer == null) return;
 
@@ -74,9 +94,9 @@ public class SocialMediaBubbleUI : MonoBehaviour
         TMP_Text authorText = bubbleObj.transform.Find("AuthorText")?.GetComponent<TMP_Text>();
 
         if (contentText != null)
-            contentText.text = post.content;
+            contentText.text = content;
         if (authorText != null)
-            authorText.text = post.authorName;
+            authorText.text = authorName;
 
         // balon boyutuna DOKUNMA — content tasarsa, content'i yukari dogru tasir
         float extraHeight = 0f;
