@@ -373,10 +373,10 @@ public class StreetLampPlacer : MonoBehaviour
             var lamp = lamps[i];
             if (lamp.poleDaySR == null) continue;
 
-            // Gun diregi — gece kayboluyor
-            lamp.poleDaySR.color = new Color(1f, 1f, 1f, 1f - ratio);
+            // Gun diregi sabit opak — altta silueti doldurur, arka plan sizmaz.
+            lamp.poleDaySR.color = new Color(1f, 1f, 1f, 1f);
 
-            // Gece diregi (isikli) — gece beliriyor
+            // Gece diregi (isikli) ustte — ratio ile fade in/out.
             if (lamp.poleNightSR != null)
                 lamp.poleNightSR.color = new Color(1f, 1f, 1f, ratio);
 

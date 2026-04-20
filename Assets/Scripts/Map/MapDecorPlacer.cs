@@ -390,7 +390,9 @@ public class MapDecorPlacer : MonoBehaviour
 
     void ApplyCrossfade(float ratio)
     {
-        float dayAlphaMultiplier   = 1f - ratio;
+        // Gunduz sprite her zaman tam opak — altta, silueti doldurur.
+        // Gece sprite ustte, ratio ile fade in/out olur. Boylece gecis sirasinda
+        // arka plan asla sizmaz, sadece gunduz ve gece arasinda blend yapilir.
         float nightAlphaMultiplier = ratio;
 
         // Buildings
@@ -402,7 +404,7 @@ public class MapDecorPlacer : MonoBehaviour
             float baseA = bd.baseAlpha;
 
             crossfadeTemp   = bd.dayRenderer.color;
-            crossfadeTemp.a = baseA * dayAlphaMultiplier;
+            crossfadeTemp.a = baseA;
             bd.dayRenderer.color = crossfadeTemp;
 
             if (bd.nightRenderer != null)
@@ -422,7 +424,7 @@ public class MapDecorPlacer : MonoBehaviour
             float baseA = pd.baseAlpha;
 
             crossfadeTemp   = pd.dayRenderer.color;
-            crossfadeTemp.a = baseA * dayAlphaMultiplier;
+            crossfadeTemp.a = baseA;
             pd.dayRenderer.color = crossfadeTemp;
 
             if (pd.nightRenderer != null)
@@ -442,7 +444,7 @@ public class MapDecorPlacer : MonoBehaviour
             float baseA = ship.baseAlpha;
 
             crossfadeTemp   = ship.dayRenderer.color;
-            crossfadeTemp.a = baseA * dayAlphaMultiplier;
+            crossfadeTemp.a = baseA;
             ship.dayRenderer.color = crossfadeTemp;
 
             if (ship.nightRenderer != null)
@@ -2051,9 +2053,9 @@ public class MapDecorPlacer : MonoBehaviour
             nightSR.color        = new Color(1f, 1f, 1f, 0f);
         }
 
-        // Apply current day/night ratio immediately
+        // Apply current day/night ratio immediately — gunduz sabit opak, gece ustte fade.
         float ratio = (dayNight != null) ? dayNight.LightingRatio : 0f;
-        daySR.color = new Color(1f, 1f, 1f, baseA * (1f - ratio));
+        daySR.color = new Color(1f, 1f, 1f, baseA);
         if (nightSR != null)
             nightSR.color = new Color(1f, 1f, 1f, baseA * ratio);
 
