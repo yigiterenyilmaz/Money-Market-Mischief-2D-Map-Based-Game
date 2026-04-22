@@ -36,7 +36,11 @@ MonoBehaviour:
   cityHallEntry:
     daySprite: {fileID: 3230281143415141360, guid: 9609f21029933e44686e016e30c93926, type: 3}
     nightSprite: {fileID: 3230281143415141360, guid: 9609f21029933e44686e016e30c93926, type: 3}
-  citiesCoreDecor: []
+  citiesCoreDecor:
+  - daySprite: {fileID: 3836954968553550457, guid: ae053028a9b345943966734df00c2e47, type: 3}
+    nightSprite: {fileID: 3836954968553550457, guid: ae053028a9b345943966734df00c2e47, type: 3}
+  - daySprite: {fileID: -1134114314932274614, guid: 43e36440c32f1224aac83ae63fd12828, type: 3}
+    nightSprite: {fileID: -1134114314932274614, guid: 43e36440c32f1224aac83ae63fd12828, type: 3}
   citiesMidDecor: []
   citiesOuterDecor: []
   specialCityBuildings: []

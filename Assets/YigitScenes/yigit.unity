@@ -8764,6 +8764,7 @@ GameObject:
   - component: {fileID: 1395091672}
   - component: {fileID: 1395091671}
   - component: {fileID: 1395091670}
+  - component: {fileID: 1395091674}
   m_Layer: 5
   m_Name: FeedPanel
   m_TagString: Untagged
@@ -8787,7 +8788,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 633.71, y: 30.075}
+  m_AnchoredPosition: {x: 670.1995, y: -981}
   m_SizeDelta: {x: -1340.399, y: -46.9946}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &1395091670
@@ -8802,6 +8803,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39eca2071ecf55341a36da566b3dec0e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SocialMediaBubbleUI
+  useMock: 1
   bubbleContainer: {fileID: 1395091669}
   bubblePrefab: {fileID: 4748750834876208567, guid: 5fa63298b7283274589cf4d1d1a58c1a, type: 3}
   panelTopMargin: 100
@@ -8861,6 +8863,22 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1395091668}
   m_CullTransparentMesh: 1
+--- !u!114 &1395091674
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1395091668}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: acb0078c65e7709488330188ded91e81, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FeedPanelSlideUI
+  slideUpAmount: 1000
+  slideSpeed: 8
+  snapThreshold: 0.5
+  toggleButton: {fileID: 0}
 --- !u!1 &1398281782
 GameObject:
   m_ObjectHideFlags: 0
@@ -11642,10 +11660,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2eb1b4ea86cb12e42913e758dd935b11, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SocialMediaDebugUI
-  feedPanel: {fileID: 1395091668}
-  fontSize: 14
-  buttonSize: {x: 80, y: 35}
-  buttonOffset: {x: -10, y: 10}
 --- !u!1 &1954222730
 GameObject:
   m_ObjectHideFlags: 0

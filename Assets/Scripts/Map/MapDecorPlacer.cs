@@ -49,6 +49,9 @@ public class MapDecorPlacer : MonoBehaviour
     [Tooltip("coreRadius..midRadius arası = mid. Ötesi = outer.")]
     [Range(10, 120)] public int midRadius = 55;
 
+    [Tooltip("Core bölge X-bölme dilimlerinde yabancı dilimin listesinden sprite seçilme olasılığı. Default 0.2 → kendi dilimi %80, karşı dilim %20.")]
+    [Range(0f, 0.5f)] public float coreZoneLeakWeight = 0.2f;
+
     [Header("Zone Densities")]
     [Tooltip("Core grid adımı (pixel). Küçük = daha sık.")]
     [Range(2, 20)] public int coreDensityStep = 4;
@@ -281,16 +284,28 @@ public class MapDecorPlacer : MonoBehaviour
         }
 
         // 2) Tile'ları zone'lara ayır (clearing zone dışındakiler)
-        var corePool  = new List<Vector2Int>();
-        var midPool   = new List<Vector2Int>();
-        var outerPool = new List<Vector2Int>();
-        ClassifyZones(allCityTiles, cityHallTile, corePool, midPool, outerPool);
+        var coreHorizontalPool = new List<Vector2Int>();
+        var coreVerticalPool   = new List<Vector2Int>();
+        var midPool            = new List<Vector2Int>();
+        var outerPool          = new List<Vector2Int>();
+        ClassifyZones(allCityTiles, cityHallTile,
+                      coreHorizontalPool, coreVerticalPool, midPool, outerPool);
+
+        // Özel binalar için 2 core dilimini birleştir
+        var corePool = new List<Vector2Int>(coreHorizontalPool.Count + coreVerticalPool.Count);
+        corePool.AddRange(coreHorizontalPool);
+        corePool.AddRange(coreVerticalPool);
 
         // 3) Özel binaları yerleştir
         PlaceSpecialCityBuildings(map, settings, corePool, midPool, outerPool, halfW, halfH);
 
-        // 4) Core bölge — grid tarama, sıkı doldurma
-        FillZoneGrid(map, settings.citiesCoreDecor, corePool, coreDensityStep, coreSpriteScaleRange, halfW, halfH);
+        // 4) Core bölge — X şeklinde 2 dilim, karşı dilim coreZoneLeakWeight kadar sızar
+        FillZoneGrid(map,
+                     settings.citiesCoreHorizontalDecor, settings.citiesCoreVerticalDecor, null,
+                     coreZoneLeakWeight, coreHorizontalPool, coreDensityStep, coreSpriteScaleRange, halfW, halfH);
+        FillZoneGrid(map,
+                     settings.citiesCoreVerticalDecor, settings.citiesCoreHorizontalDecor, null,
+                     coreZoneLeakWeight, coreVerticalPool, coreDensityStep, coreSpriteScaleRange, halfW, halfH);
 
         // 5) Mid bölge — grid tarama, orta yoğunluk
         FillZoneGrid(map, settings.citiesMidDecor, midPool, midDensityStep, midSpriteScaleRange, halfW, halfH);
@@ -773,7 +788,8 @@ public class MapDecorPlacer : MonoBehaviour
     // -------------------------------------------------------------------------
 
     void ClassifyZones(List<Vector2Int> allTiles, Vector2Int hallTile,
-                       List<Vector2Int> coreOut, List<Vector2Int> midOut, List<Vector2Int> outerOut)
+                       List<Vector2Int> coreHorizontalOut, List<Vector2Int> coreVerticalOut,
+                       List<Vector2Int> midOut, List<Vector2Int> outerOut)
     {
         float clearWorldTile = cityHallClearingRadius; // tile cinsinden
 
@@ -786,14 +802,23 @@ public class MapDecorPlacer : MonoBehaviour
             if (hallTile.x >= 0 && dist <= clearWorldTile) continue;
 
             if (dist <= coreRadius)
-                coreOut.Add(t);
+            {
+                // X şeklinde çapraz bölme: |dx| vs |dy|
+                int dx = t.x - hallTile.x;
+                int dy = t.y - hallTile.y;
+                if (Mathf.Abs(dx) >= Mathf.Abs(dy))
+                    coreHorizontalOut.Add(t); // doğu veya batı dilimi
+                else
+                    coreVerticalOut.Add(t);   // kuzey veya güney dilimi
+            }
             else if (dist <= midRadius)
                 midOut.Add(t);
             else
                 outerOut.Add(t);
         }
 
-        Debug.Log($"MapDecorPlacer: city zones — core={coreOut.Count}, mid={midOut.Count}, outer={outerOut.Count}");
+        Debug.Log($"MapDecorPlacer: city zones — coreH={coreHorizontalOut.Count}, coreV={coreVerticalOut.Count}, " +
+                  $"mid={midOut.Count}, outer={outerOut.Count}");
     }
 
     // -------------------------------------------------------------------------
@@ -804,7 +829,26 @@ public class MapDecorPlacer : MonoBehaviour
                       List<Vector2Int> pool, int step, Vector2 scaleRange,
                       float halfW, float halfH)
     {
-        if (decor == null || decor.Count == 0) return;
+        FillZoneGrid(map, decor, null, null, 0f, pool, step, scaleRange, halfW, halfH);
+    }
+
+    /// <summary>
+    /// Core şerit doldurma. Kendi şeridinin listesi (primary) ağırlıklı,
+    /// yabancı iki şeridin listeleri (foreign1, foreign2) leakWeight oranında sızar.
+    /// leakWeight=0 ise sadece primary kullanılır.
+    /// </summary>
+    void FillZoneGrid(MapGenerator map,
+                      List<CityBuildingEntry> primary,
+                      List<CityBuildingEntry> foreign1,
+                      List<CityBuildingEntry> foreign2,
+                      float leakWeight,
+                      List<Vector2Int> pool, int step, Vector2 scaleRange,
+                      float halfW, float halfH)
+    {
+        bool hasPrimary = primary != null && primary.Count > 0;
+        bool hasForeign1 = foreign1 != null && foreign1.Count > 0;
+        bool hasForeign2 = foreign2 != null && foreign2.Count > 0;
+        if (!hasPrimary && !hasForeign1 && !hasForeign2) return;
         if (pool.Count == 0) return;
 
         var poolSet = new HashSet<Vector2Int>(pool);
@@ -852,8 +896,27 @@ public class MapDecorPlacer : MonoBehaviour
                 && RoadGenerator.Instance.GetDistanceToRoadEdge(jx, jy) < cityMinRoadDistance)
                 continue;
 
-            int spriteIdx = Random.Range(0, decor.Count);
-            var entry = decor[spriteIdx];
+            // Leak weight ile şerit listesi seç: primary ağırlıklı, foreign'lar leakWeight kadar sızar
+            List<CityBuildingEntry> chosenList;
+            if (leakWeight > 0f && (hasForeign1 || hasForeign2))
+            {
+                float r = Random.value;
+                float w1 = hasForeign1 ? leakWeight : 0f;
+                float w2 = hasForeign2 ? leakWeight : 0f;
+                if (hasForeign1 && r < w1)
+                    chosenList = foreign1;
+                else if (hasForeign2 && r < w1 + w2)
+                    chosenList = foreign2;
+                else
+                    chosenList = hasPrimary ? primary : (hasForeign1 ? foreign1 : foreign2);
+            }
+            else
+            {
+                chosenList = hasPrimary ? primary : (hasForeign1 ? foreign1 : foreign2);
+            }
+
+            int spriteIdx = Random.Range(0, chosenList.Count);
+            var entry = chosenList[spriteIdx];
             Sprite daySprite = entry.daySprite;
             if (daySprite == null) continue;
 
