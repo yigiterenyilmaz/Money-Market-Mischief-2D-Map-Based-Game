@@ -10734,9 +10734,10 @@ MonoBehaviour:
   shadowMaxLength: 0.5
   shadowMidScale: 0.1
   cityHallScaleRange: {x: 1.5, y: 2}
-  cityHallClearingRadius: 8
-  coreRadius: 25
-  midRadius: 55
+  cityHallClearingRadius: 15
+  coreRadius: 45
+  midRadius: 120
+  coreZoneLeakWeight: 0.15
   coreDensityStep: 4
   midDensityStep: 7
   outerSpawnRate: 1

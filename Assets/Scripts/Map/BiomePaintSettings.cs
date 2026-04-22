@@ -9,6 +9,8 @@ public struct CityBuildingEntry
     public Sprite daySprite;
     [Tooltip("Gece sprite'ı. Boş bırakılabilir.")]
     public Sprite nightSprite;
+    [Tooltip("İzometrik sprite ise işaretle. Gölge mekanizması binanın tabanından diyagonal çıkacak şekilde değişir.")]
+    public bool isIsometric;
 }
 
 [System.Serializable]
@@ -26,6 +28,8 @@ public struct SpecialCityBuilding
     public bool connectToRoad;
     [Tooltip("Etrafında bina olmayacak alan (tile cinsinden).")]
     [Range(0, 30)] public int clearingRadius;
+    [Tooltip("İzometrik sprite ise işaretle. Gölge mekanizması binanın tabanından diyagonal çıkacak şekilde değişir.")]
+    public bool isIsometric;
 }
 
 [CreateAssetMenu(fileName = "BiomePaintSettings", menuName = "Map/BiomePaintSettings")]

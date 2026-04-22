@@ -37,6 +37,20 @@ public class MapDecorPlacer : MonoBehaviour
     [Tooltip("Öğlede minimum gölge uzunluk oranı.")]
     [Range(0f, 1f)] public float shadowMidScale = 0.1f;
 
+    [Header("Isometric Shadow — İzometrik İkonlar İçin")]
+    [Tooltip("İzometrik açı (derece). Gölge bu yönde diyagonal uzar. 30 = klasik iso.")]
+    [Range(0f, 60f)] public float isoShadowAngleDegrees = 30f;
+    [Tooltip("Pivot'un sprite alt kenarından yukarı kaydırma oranı (0=tam alt, 0.5=orta). İzometrik sprite'ta binanın yere değdiği görsel nokta.")]
+    [Range(0f, 0.5f)] public float isoShadowPivotOffsetRatio = 0.10f;
+    [Tooltip("Gölgenin yakın kenar yarı-kalınlığı, sprite YARIM GENİŞLİĞİNE oranla. Bina taban kalınlığı. 1.0 = tam sprite genişliği.")]
+    [Range(0.1f, 2f)] public float isoShadowNearScale = 0.7f;
+    [Tooltip("Gölge uzunluk hesabında bina yükseklik çarpanı. Yüksek = uzun gölge.")]
+    [Range(0.2f, 3f)] public float isoShadowHeightRatio = 1f;
+    [Tooltip("İzometrik gölge uzunluk tavanı (sprite YARIM YÜKSEKLİĞİNİN çarpanı). Flat'tekinden bağımsız — iso bina yüksek olduğu için büyük tutulmalı.")]
+    [Range(0.5f, 5f)] public float isoShadowMaxLength = 2f;
+    [Tooltip("Öğlen ölü bölgesi: |shadowDir| bu eşiğin altındayken gölge tamamen 0'da kalır (güneş tepe noktasına yakınken gölge yok). 0.25 = günün ortasındaki ~%25'lik bölümde gölge sıfır, sonra smooth büyür.")]
+    [Range(0f, 0.4f)] public float isoShadowNoonDeadZone = 0.25f;
+
     [Header("City Hall — Belediye Binası")]
     [Tooltip("Belediye binası scale aralığı. Büyük yapılabilir.")]
     public Vector2 cityHallScaleRange = new Vector2(1.5f, 2.0f);
@@ -144,6 +158,7 @@ public class MapDecorPlacer : MonoBehaviour
         public Vector3[]    verts;
         public float        halfWidth;
         public float        halfHeight;
+        public bool         isIsometric;
     }
 
     private struct BuildingData
@@ -513,25 +528,82 @@ public class MapDecorPlacer : MonoBehaviour
 
             sh.transform.gameObject.SetActive(true);
 
-            // Pivot = gölgenin binaya bitişik kenarı = binanın güneş karşı taban kenarı.
-            // shadowDir=-1 (sabah): pivot binanın sol kenarı (-hw), gölge sola uzanır.
-            // shadowDir=+1 (akşam): pivot binanın sağ kenarı (+hw), gölge sağa uzanır.
-            // Container scale.x = dirSign: mesh +x yönünde uzanır, flip ile diğer tarafa yansır.
-            sh.transform.localPosition = new Vector3(shadowDir * sh.halfWidth, 0f, 0f);
-            sh.transform.localScale    = new Vector3(dirSign, 1f, 1f);
+            if (sh.isIsometric)
+            {
+                // Iso branch — pivot sprite tabanına kaydırılır, gölge diyagonal uzar.
+                // Uzunluk halfHeight üzerinden hesaplanır (iso sprite yüksekliği bina perspektif yüksekliğini kodlar).
+                // Kalınlık halfWidth üzerinden (sprite genişliği binanın taban genişliğine yakın).
+                // Kendi parametre seti (isoShadowMaxLength/isoShadowNoonDeadZone) kullanılır — flat moddan bağımsız.
+                //
+                // ÖNEMLİ: Öğlende dirSign anlık -1 → +1 flip yapar; bu görsel sıçramayı gizlemek için
+                // hem uzunluk hem kalınlık t (smoothstep'li dead zone) ile çarpılır — t=0 olunca
+                // mesh sıfır boyuta çöker, flip arkasında gizlenir. Dead zone'dan çıkışta smooth grow.
+                //
+                // Ölü bölge (deadZone): |shadowDir| eşiğin altındayken t=0 sabit kalır → gölge öğlen
+                // tepe noktası civarında bir süre 0'da plate kalır, sonra eşik aşılınca smoothstep ile büyür.
+                float absDir   = Mathf.Abs(shadowDir);
+                float deadZone = Mathf.Clamp(isoShadowNoonDeadZone, 0f, 0.99f);
+                float remapped = Mathf.Max(0f, absDir - deadZone) / Mathf.Max(0.0001f, 1f - deadZone);
+                float t        = Mathf.SmoothStep(0f, 1f, remapped);
 
-            // Trapez vertex güncellemesi — yakın uç tam bina kenarı, uzak uç tipRatio'ya göre incelmiş.
-            // Uzunluk = binanın tam genişliği (halfWidth*2) × lengthFactor.
-            float near   = sh.halfHeight * shadowNearScale;
-            float far    = near * shadowTipRatio;
-            float length = sh.halfWidth * 2f * lengthFactor;
+                // Safety guard: t neredeyse sıfır → mesh tamamen gizlenir (floating-point artifact'i kalmaz).
+                if (t < 0.001f)
+                {
+                    sh.transform.gameObject.SetActive(false);
+                    continue;
+                }
 
-            sh.verts[0] = new Vector3(0f,     -near, 0f);
-            sh.verts[1] = new Vector3(0f,     +near, 0f);
-            sh.verts[2] = new Vector3(length, +far, 0f);
-            sh.verts[3] = new Vector3(length, -far, 0f);
-            sh.mesh.vertices = sh.verts;
-            sh.mesh.RecalculateBounds();
+                float isoLengthFactor = isoShadowHeightRatio / Mathf.Tan(elevRad);
+                isoLengthFactor = Mathf.Min(isoLengthFactor, isoShadowMaxLength);
+                isoLengthFactor *= t;
+
+                // Pivot Y: sprite alt kenarından yukarı doğru ofset (binanın yere değdiği görsel nokta).
+                // Pivot X: izometrik footprint sprite ortasında — sabah/akşam kayma yok, hep merkezde.
+                float baseY = -sh.halfHeight + sh.halfHeight * 2f * isoShadowPivotOffsetRatio;
+                sh.transform.localPosition = new Vector3(0f, baseY, 0f);
+                sh.transform.localScale    = new Vector3(dirSign, 1f, 1f);
+
+                // Iso trapez:
+                //   isoNear  = halfWidth * scale * t → taban kalınlığı, t ile birlikte küçülür → öğlen 0
+                //   isoLength = halfHeight * factor → uzunluk (bina yüksekliğinin gölgeye izdüşümü)
+                float isoNear   = sh.halfWidth  * isoShadowNearScale * t;
+                float isoFar    = isoNear * shadowTipRatio;
+                float isoLength = sh.halfHeight * isoLengthFactor;
+
+                // Iso skew: uzak uç -Y'ye doğru kayar → diyagonal görünüm.
+                float isoRad = isoShadowAngleDegrees * Mathf.Deg2Rad;
+                float skew   = isoLength * Mathf.Tan(isoRad) * 0.5f;
+
+                sh.verts[0] = new Vector3(0f,        -isoNear,           0f);
+                sh.verts[1] = new Vector3(0f,        +isoNear,           0f);
+                sh.verts[2] = new Vector3(isoLength, +isoFar - skew,     0f);
+                sh.verts[3] = new Vector3(isoLength, -isoFar - skew,     0f);
+                sh.mesh.vertices = sh.verts;
+                sh.mesh.RecalculateBounds();
+            }
+            else
+            {
+                // Flat branch — mevcut algoritma, sprite merkezinden yatay trapez.
+                // Pivot = gölgenin binaya bitişik kenarı = binanın güneş karşı taban kenarı.
+                // shadowDir=-1 (sabah): pivot binanın sol kenarı (-hw), gölge sola uzanır.
+                // shadowDir=+1 (akşam): pivot binanın sağ kenarı (+hw), gölge sağa uzanır.
+                // Container scale.x = dirSign: mesh +x yönünde uzanır, flip ile diğer tarafa yansır.
+                sh.transform.localPosition = new Vector3(shadowDir * sh.halfWidth, 0f, 0f);
+                sh.transform.localScale    = new Vector3(dirSign, 1f, 1f);
+
+                // Trapez vertex güncellemesi — yakın uç tam bina kenarı, uzak uç tipRatio'ya göre incelmiş.
+                // Uzunluk = binanın tam genişliği (halfWidth*2) × lengthFactor.
+                float near   = sh.halfHeight * shadowNearScale;
+                float far    = near * shadowTipRatio;
+                float length = sh.halfWidth * 2f * lengthFactor;
+
+                sh.verts[0] = new Vector3(0f,     -near, 0f);
+                sh.verts[1] = new Vector3(0f,     +near, 0f);
+                sh.verts[2] = new Vector3(length, +far, 0f);
+                sh.verts[3] = new Vector3(length, -far, 0f);
+                sh.mesh.vertices = sh.verts;
+                sh.mesh.RecalculateBounds();
+            }
 
             // Alpha fade — şafakta yavaş yavaş oluşur, akşamda yavaş yavaş kaybolur
             if (sh.material != null)
@@ -757,7 +829,8 @@ public class MapDecorPlacer : MonoBehaviour
         int sortOrder = 20 + (int)(wy * -100f);
 
         var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
-            daySprite, settings.cityHallEntry.nightSprite, wx, wy, scale, baseA, sortOrder);
+            daySprite, settings.cityHallEntry.nightSprite, wx, wy, scale, baseA, sortOrder,
+            settings.cityHallEntry.isIsometric);
 
         go.name = "CityHall";
 
@@ -933,7 +1006,7 @@ public class MapDecorPlacer : MonoBehaviour
             int sortOrder = 10 + (int)(wy * -100f);
 
             var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
-                daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder);
+                daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder, entry.isIsometric);
 
             decorObjects.Add(go);
             cityBuildings.Add(new BuildingData
@@ -985,7 +1058,7 @@ public class MapDecorPlacer : MonoBehaviour
         int sortOrder  = 10 + (int)(wy * -100f);
 
         var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
-            daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder);
+            daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder, entry.isIsometric);
 
         decorObjects.Add(go);
         cityBuildings.Add(new BuildingData
@@ -1080,7 +1153,7 @@ public class MapDecorPlacer : MonoBehaviour
         int sortOrder  = 10 + (int)(wy * -100f);
 
         var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
-            special.daySprite, special.nightSprite, wx, wy, scale, baseA, sortOrder);
+            special.daySprite, special.nightSprite, wx, wy, scale, baseA, sortOrder, special.isIsometric);
 
         decorObjects.Add(go);
         cityBuildings.Add(new BuildingData
@@ -1127,7 +1200,7 @@ public class MapDecorPlacer : MonoBehaviour
 
     (GameObject go, SpriteRenderer daySR, SpriteRenderer nightSR, ShadowHandle shadow) CreateCityBuildingObject(
         Sprite daySprite, Sprite nightSprite, float wx, float wy,
-        float scale, float baseA, int sortOrder)
+        float scale, float baseA, int sortOrder, bool isIsometric)
     {
         GameObject go = new GameObject("CityBuilding");
         go.transform.SetParent(transform);
@@ -1135,7 +1208,8 @@ public class MapDecorPlacer : MonoBehaviour
         go.transform.localScale = new Vector3(scale, scale, 1f);
 
         // Gölge — trapez mesh. UpdateShadows her frame vertex + pozisyon günceller.
-        ShadowHandle shadow = AddShadow(go, daySprite, sortOrder);
+        // isIsometric=true ise pivot/UV/yön izometrik moda göre ayarlanır.
+        ShadowHandle shadow = AddShadow(go, daySprite, sortOrder, isIsometric);
 
         SpriteRenderer daySR = go.AddComponent<SpriteRenderer>();
         daySR.sprite       = daySprite;
@@ -1162,7 +1236,7 @@ public class MapDecorPlacer : MonoBehaviour
         return (go, daySR, nightSR, shadow);
     }
 
-    ShadowHandle AddShadow(GameObject parent, Sprite sprite, int sortOrder)
+    ShadowHandle AddShadow(GameObject parent, Sprite sprite, int sortOrder, bool isIsometric)
     {
         // Container — bina merkezinde sabit; UpdateShadows localPosition + scale.x (flip) günceller.
         GameObject containerGo = new GameObject("Shadow");
@@ -1174,20 +1248,30 @@ public class MapDecorPlacer : MonoBehaviour
         float halfWidth  = sprite.rect.width  / sprite.pixelsPerUnit * 0.5f;
         float halfHeight = sprite.rect.height / sprite.pixelsPerUnit * 0.5f;
 
-        // Trapez mesh — 4 vertex:
-        //   [0] near-bottom  (x=0, -halfH)
-        //   [1] near-top     (x=0, +halfH)
-        //   [2] far-top      (x=length, +halfH*tipRatio)
-        //   [3] far-bottom   (x=length, -halfH*tipRatio)
-        // UpdateShadows her frame bu vertex'leri yeniden hesaplar.
+        // Başlangıç vertex'leri — UpdateShadows zaten her frame yeniden yazıyor, sadece bounds için.
+        // Iso modda kalınlık halfWidth, uzunluk halfHeight üzerinden hesaplanır.
         Vector3[] verts = new Vector3[4];
-        verts[0] = new Vector3(0f,              -halfHeight, 0f);
-        verts[1] = new Vector3(0f,              +halfHeight, 0f);
-        verts[2] = new Vector3(halfWidth * 2f,  +halfHeight * shadowTipRatio, 0f);
-        verts[3] = new Vector3(halfWidth * 2f,  -halfHeight * shadowTipRatio, 0f);
+        if (isIsometric)
+        {
+            float startNear   = halfWidth  * isoShadowNearScale;
+            float startLength = halfHeight * isoShadowMaxLength;
+            verts[0] = new Vector3(0f,           -startNear, 0f);
+            verts[1] = new Vector3(0f,           +startNear, 0f);
+            verts[2] = new Vector3(startLength,  +startNear * shadowTipRatio, 0f);
+            verts[3] = new Vector3(startLength,  -startNear * shadowTipRatio, 0f);
+        }
+        else
+        {
+            verts[0] = new Vector3(0f,              -halfHeight, 0f);
+            verts[1] = new Vector3(0f,              +halfHeight, 0f);
+            verts[2] = new Vector3(halfWidth * 2f,  +halfHeight * shadowTipRatio, 0f);
+            verts[3] = new Vector3(halfWidth * 2f,  -halfHeight * shadowTipRatio, 0f);
+        }
 
-        // UV — bina sprite atlas rect'i. Yakın uç sol kenar (uvMin.x), uzak uç sağ kenar (uvMax.x).
-        // Böylece sprite silueti gölgeye basılır (binaya benzer leke).
+        // UV — bina sprite atlas rect'i.
+        // Flat modda tüm sprite UV'si gölgeye basılır.
+        // Iso modda sadece sprite'ın alt bandı (taban kısmı) sample edilir → gölgeye binanın
+        // üst yüzeyi/çatı sızmaz, sadece taban silueti düşer.
         Rect r   = sprite.rect;
         float tw = sprite.texture.width;
         float th = sprite.texture.height;
@@ -1195,10 +1279,25 @@ public class MapDecorPlacer : MonoBehaviour
         Vector2 uvMax = new Vector2((r.x + r.width) / tw, (r.y + r.height) / th);
 
         Vector2[] uvs = new Vector2[4];
-        uvs[0] = new Vector2(uvMin.x, uvMin.y);
-        uvs[1] = new Vector2(uvMin.x, uvMax.y);
-        uvs[2] = new Vector2(uvMax.x, uvMax.y);
-        uvs[3] = new Vector2(uvMax.x, uvMin.y);
+        if (isIsometric)
+        {
+            // Iso UV: sprite 90° döndürülerek trapez'e basılır.
+            //   Sprite ALT kenarı  → trapez yakın kenarı (binaya bitişik) → silueti binanın "ayağı"ndan başlatır.
+            //   Sprite ÜST kenarı  → trapez uzak ucu                    → bina silueti uzar gibi yansır.
+            // Şeffaf piksel alanları gölgede de şeffaf kalır → gölge binanın silueti şeklinde görünür.
+            uvs[0] = new Vector2(uvMin.x, uvMin.y); // near-bottom = sprite bottom-left
+            uvs[1] = new Vector2(uvMax.x, uvMin.y); // near-top    = sprite bottom-right
+            uvs[2] = new Vector2(uvMax.x, uvMax.y); // far-top     = sprite top-right
+            uvs[3] = new Vector2(uvMin.x, uvMax.y); // far-bottom  = sprite top-left
+        }
+        else
+        {
+            // Flat UV: sprite trapez'e olduğu yönde basılır (sol→sağ).
+            uvs[0] = new Vector2(uvMin.x, uvMin.y);
+            uvs[1] = new Vector2(uvMin.x, uvMax.y);
+            uvs[2] = new Vector2(uvMax.x, uvMax.y);
+            uvs[3] = new Vector2(uvMax.x, uvMin.y);
+        }
 
         int[] tris = new int[] { 0, 1, 2, 0, 2, 3 };
 
@@ -1222,13 +1321,14 @@ public class MapDecorPlacer : MonoBehaviour
 
         return new ShadowHandle
         {
-            transform  = containerGo.transform,
-            renderer   = mr,
-            mesh       = mesh,
-            material   = mat,
-            verts      = verts,
-            halfWidth  = halfWidth,
-            halfHeight = halfHeight,
+            transform   = containerGo.transform,
+            renderer    = mr,
+            mesh        = mesh,
+            material    = mat,
+            verts       = verts,
+            halfWidth   = halfWidth,
+            halfHeight  = halfHeight,
+            isIsometric = isIsometric,
         };
     }
 
