@@ -37,7 +37,7 @@ public class WarForOilEventEditor : Editor
             "hasPrecursorEvent", "precursorEventType", "precursorWarEvent", "precursorRandomEvent",
             "chainRole", "blocksSubChainBranching", "alsoBlockedBranchEvents",
             "minWarTime", "maxWarTime",
-            "conditionalDescriptions",
+            "hasConditionalText", "conditionalTexts",
             "useTypewriterEffect",
             "requiresBothProcessesActive"
         };
@@ -96,14 +96,36 @@ public class WarForOilEventEditor : Editor
             serializedObject.FindProperty("useTypewriterEffect"),
             new GUIContent("Yazı Makinesi Efekti", "Açıklama harf harf akar. Kapalıysa direkt paragraf gösterilir."));
 
-        //koşullu açıklamalar — hikaye bayrağına göre farklı açıklama
-        SerializedProperty condDescs = serializedObject.FindProperty("conditionalDescriptions");
-        EditorGUILayout.PropertyField(condDescs, new GUIContent("Koşullu Açıklamalar"), true);
-        if (condDescs.arraySize > 0)
+        //hikaye bayrağına göre değişken metin (event seviyesi)
+        SerializedProperty hasCondTextEvt = serializedObject.FindProperty("hasConditionalText");
+        EditorGUILayout.PropertyField(hasCondTextEvt, new GUIContent("Bayrağa Göre Değişken Metin",
+            "Tiklenirse bu event'in display name'i ve description'ı aktif hikaye bayrağına göre alternatif metinlerle değiştirilebilir. İlk eşleşen kazanır."));
+        if (hasCondTextEvt.boolValue)
         {
+            EditorGUI.indentLevel++;
+            SerializedProperty condTextsEvt = serializedObject.FindProperty("conditionalTexts");
+            int newSize = Mathf.Max(0, EditorGUILayout.IntField("Bayrak Sayısı", condTextsEvt.arraySize));
+            if (newSize != condTextsEvt.arraySize)
+                condTextsEvt.arraySize = newSize;
+
+            for (int i = 0; i < condTextsEvt.arraySize; i++)
+            {
+                SerializedProperty entry = condTextsEvt.GetArrayElementAtIndex(i);
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.PropertyField(entry.FindPropertyRelative("requiredFlag"),
+                    new GUIContent($"Bayrak {i}"));
+                EditorGUILayout.PropertyField(entry.FindPropertyRelative("alternativeDisplayName"),
+                    new GUIContent("Alternatif İsim"));
+                SerializedProperty altDesc = entry.FindPropertyRelative("alternativeDescription");
+                EditorGUILayout.LabelField("Alternatif Açıklama");
+                altDesc.stringValue = EditorGUILayout.TextArea(altDesc.stringValue,
+                    GUILayout.MinHeight(EditorGUIUtility.singleLineHeight * 3));
+                EditorGUILayout.EndVertical();
+            }
             EditorGUILayout.HelpBox(
-                "Hikaye bayrağı aktifse event açıklaması alternatif metinle değiştirilir. İlk eşleşen bayrak geçerli olur.",
+                "Boş alan default'a düşer (sadece açıklamayı veya sadece ismi değiştirebilirsin). İlk eşleşen bayrak kazanır.",
                 MessageType.Info);
+            EditorGUI.indentLevel--;
         }
 
         EditorGUILayout.Space();

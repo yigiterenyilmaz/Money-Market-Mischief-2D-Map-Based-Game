@@ -10,8 +10,9 @@ public class WarForOilEvent : ScriptableObject
     [TextArea(2, 8)] public string description;
     public bool useTypewriterEffect; //true ise açıklama harf harf akar, false ise direkt paragraf olarak gösterilir
 
-    [Header("Koşullu Açıklamalar")]
-    public List<ConditionalDescription> conditionalDescriptions; //hikaye bayrağına göre değişen açıklamalar
+    //hikaye bayrağına göre değişken metin (isim + açıklama)
+    public bool hasConditionalText; //true ise aşağıdaki listeye göre displayName/description override edilebilir
+    public List<ConditionalChoiceText> conditionalTexts; //her entry: flag + alt isim + alt açıklama. İlk eşleşen kazanır.
 
     [Header("Geliştirici Notu")]
     [TextArea(3, 10)] public string devNote; //sadece Inspector'da görünür, oyuna etkisi yok
@@ -65,20 +66,41 @@ public class WarForOilEvent : ScriptableObject
     public List<WarForOilEvent> alsoBlockedBranchEvents; //blocksSubChainBranching tetiklenince bu event'ler de dallanma hedefi olarak engellenir
 
     /// <summary>
-    /// Aktif hikaye bayraklarına göre uygun açıklamayı döner.
-    /// Koşullu açıklama varsa ve flag aktifse alternatif açıklama kullanılır (ilk eşleşen kazanır).
-    /// Yoksa default description döner.
+    /// Aktif hikaye bayrağına göre uygun displayName'i döner.
+    /// hasConditionalText kapalıysa veya eşleşen flag yoksa default displayName döner.
+    /// İlk eşleşen entry kazanır. Entry'nin alt ismi boşsa default'a düşer.
+    /// </summary>
+    public string GetDisplayName()
+    {
+        if (!hasConditionalText || conditionalTexts == null || conditionalTexts.Count == 0
+            || StoryFlagManager.Instance == null)
+            return displayName;
+
+        for (int i = 0; i < conditionalTexts.Count; i++)
+        {
+            var ct = conditionalTexts[i];
+            if (ct.requiredFlag != StoryFlag.None && StoryFlagManager.Instance.HasFlag(ct.requiredFlag))
+                return string.IsNullOrEmpty(ct.alternativeDisplayName) ? displayName : ct.alternativeDisplayName;
+        }
+        return displayName;
+    }
+
+    /// <summary>
+    /// Aktif hikaye bayrağına göre uygun description'ı döner.
+    /// hasConditionalText kapalıysa veya eşleşen flag yoksa default description döner.
+    /// İlk eşleşen entry kazanır. Entry'nin alt açıklaması boşsa default'a düşer.
     /// </summary>
     public string GetDescription()
     {
-        if (conditionalDescriptions != null && conditionalDescriptions.Count > 0 && StoryFlagManager.Instance != null)
+        if (!hasConditionalText || conditionalTexts == null || conditionalTexts.Count == 0
+            || StoryFlagManager.Instance == null)
+            return description;
+
+        for (int i = 0; i < conditionalTexts.Count; i++)
         {
-            for (int i = 0; i < conditionalDescriptions.Count; i++)
-            {
-                var cd = conditionalDescriptions[i];
-                if (cd.requiredFlag != StoryFlag.None && StoryFlagManager.Instance.HasFlag(cd.requiredFlag))
-                    return cd.alternativeDescription;
-            }
+            var ct = conditionalTexts[i];
+            if (ct.requiredFlag != StoryFlag.None && StoryFlagManager.Instance.HasFlag(ct.requiredFlag))
+                return string.IsNullOrEmpty(ct.alternativeDescription) ? description : ct.alternativeDescription;
         }
         return description;
     }
@@ -463,18 +485,9 @@ public class ImmediateEventEntry
 }
 
 /// <summary>
-/// Koşullu açıklama girişi. Hikaye bayrağı aktifse default açıklama yerine alternatif gösterilir.
-/// </summary>
-[System.Serializable]
-public class ConditionalDescription
-{
-    public StoryFlag requiredFlag; //bu bayrak aktifse alternatif açıklama kullanılır
-    [TextArea(2, 8)] public string alternativeDescription; //bayrak aktifken gösterilecek açıklama
-}
-
-/// <summary>
-/// Choice seviyesinde koşullu metin girişi. Hikaye bayrağı aktifse default isim ve/veya açıklama
-/// yerine alternatif gösterilir. Alt alanlardan biri boşsa o alan default'a düşer.
+/// Hikaye bayrağına göre koşullu metin girişi. Event ve choice seviyesinde aynı tip kullanılır.
+/// Bayrak aktifse default isim ve/veya açıklama yerine alternatif gösterilir.
+/// Alt alanlardan biri boşsa o alan default'a düşer.
 /// </summary>
 [System.Serializable]
 public class ConditionalChoiceText

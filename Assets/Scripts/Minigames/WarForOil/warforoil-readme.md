@@ -188,7 +188,8 @@ Savas sirasinda tetiklenen karar olaylari. Ayni event sinifi normal eventler, zi
 | `displayName` | Event basligi |
 | `description` | Event aciklamasi (TextArea) |
 | `devNote` | Sadece Inspector'da gorunen gelistirici notu (oyuna etkisi yok) |
-| `conditionalDescriptions` | Hikaye bayragi aktifse default aciklama yerine alternatif metin gosterilir. Ilk eslesen bayrak gecerli olur. |
+| `hasConditionalText` | true ise hikaye bayragina gore displayName ve description override edilebilir. Inspector'da bayrak listesi acilir. |
+| `conditionalTexts` | List<ConditionalChoiceText>: her entry `requiredFlag`, `alternativeDisplayName`, `alternativeDescription` icerir. Ilk eslesen kazanir. Bos alan default'a duser. Runtime'da `evt.GetDisplayName()` / `evt.GetDescription()` ile cekilir. |
 | `minWarTime` | Savas suresinin yuzdesi olarak en erken tetiklenme (0-1, orn. 0.2 = %20, 300sn savasta 60sn) |
 | `maxWarTime` | Savas suresinin yuzdesi olarak en gec tetiklenme (-1 = sinirsiz, 0-1 arasi yuzde) |
 | `decisionTime` | Karar suresi (varsayilan 10 sn) |
@@ -1234,7 +1235,8 @@ Oyun icinde gerceklesmis onemli olaylari takip eden bayrak sistemi. Bir kez akti
 - `WarForOilEventChoice.setsStoryFlags` — bu choice secildiginde listedeki bayraklar aktif olur
 - Inspector'da "Diger Sonuclar" foldout'unda "Hikaye Bayraklari" olarak gozukur
 
-**Aciklama degistirme (event tarafinda):**
-- `WarForOilEvent.conditionalDescriptions` — hikaye bayragi aktifse default aciklama yerine alternatif metin gosterilir
-- `GetDescription()` metodu ile alinir — ilk eslesen bayrak gecerli olur
-- Inspector'da "Kosullu Aciklamalar" olarak gozukur
+**Metin degistirme (event ve choice tarafinda — ortak pattern):**
+- `WarForOilEvent.hasConditionalText` + `conditionalTexts` (List<ConditionalChoiceText>) — event seviyesinde displayName ve description override
+- `WarForOilEventChoice.hasConditionalText` + `conditionalTexts` — choice seviyesinde displayName ve description override
+- Runtime'da `GetDisplayName()` ve `GetDescription()` metodlariyla alinir — ilk eslesen bayrak gecerli olur, bos alan default'a duser
+- Inspector'da "Bayraga Gore Degisken Metin" toggle olarak gozukur — tikli iken bayrak sayisi + her entry icin flag dropdown + alt isim + alt aciklama alanlari acilir
