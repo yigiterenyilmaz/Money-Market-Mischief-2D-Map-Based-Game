@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 using System.Collections.Generic;
 
 /// <summary>
-/// Mock mum grafigi - fragman icin bagimsiz fiyat simulasyonu.
+/// Mum grafigi komponenti. Fiyat simulasyonu ile mum cubuklarini cizer.
 /// InvestmentPanel > ChartArea > Content hiyerarsisine baglanir.
 /// </summary>
 public class CandlestickChart : MonoBehaviour
@@ -54,7 +54,7 @@ public class CandlestickChart : MonoBehaviour
     [Tooltip("Maksimum zoom (yakinlastirma siniri)")]
     public float maxZoom = 3f;
 
-    [Header("Mock Fiyat Ayarlari")]
+    [Header("Fiyat Simulasyonu")]
     [Tooltip("Baslangic fiyati")]
     public float startPrice = 100f;
 
@@ -64,7 +64,7 @@ public class CandlestickChart : MonoBehaviour
     [Tooltip("Trend degisim araligi (saniye)")]
     public float trendChangeInterval = 15f;
 
-    // Mock fiyat durumu
+    // Fiyat durumu
     float currentPrice;
     float candleOpenPrice;
     float candleHighPrice;
@@ -113,6 +113,8 @@ public class CandlestickChart : MonoBehaviour
 
     // Scroll referansi
     ScrollRect scrollRect;
+    RectTransform viewportRect;
+    Camera uiEventCamera;
 
     void Start()
     {
@@ -137,7 +139,14 @@ public class CandlestickChart : MonoBehaviour
 
         // Mouse tekerlegini scroll icin degil zoom icin kullanacagiz
         if (scrollRect != null)
+        {
             scrollRect.scrollSensitivity = 0f;
+
+            // Surukleme algilamasi icin viewport ve canvas camerasini cache'le
+            viewportRect = scrollRect.viewport != null ? scrollRect.viewport : scrollRect.GetComponent<RectTransform>();
+            Canvas canvas = scrollRect.GetComponentInParent<Canvas>();
+            uiEventCamera = (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay) ? canvas.worldCamera : null;
+        }
 
         // Panel kapaliysa kapali kalsin
         if (investmentPanel != null)
@@ -162,7 +171,7 @@ public class CandlestickChart : MonoBehaviour
         if (priceFrameCounter >= 2)
         {
             priceFrameCounter = 0;
-            UpdateMockPrice();
+            UpdatePrice();
         }
 
         candleFrameCounter++;
@@ -208,7 +217,7 @@ public class CandlestickChart : MonoBehaviour
         RedrawAllCandles();
     }
 
-    void UpdateMockPrice()
+    void UpdatePrice()
     {
         // Trend periyodik olarak yon degistirir
         trendTimer += Time.deltaTime;
@@ -427,8 +436,19 @@ public class CandlestickChart : MonoBehaviour
         UpdateContentSize();
     }
 
+    // Kullanici scroll viewport uzerinde sol tusla suruklerken auto-scroll devre disi
+    bool IsUserDragging()
+    {
+        if (Mouse.current == null || !Mouse.current.leftButton.isPressed) return false;
+        if (viewportRect == null) return false;
+        Vector2 screenPos = Mouse.current.position.ReadValue();
+        return RectTransformUtility.RectangleContainsScreenPoint(viewportRect, screenPos, uiEventCamera);
+    }
+
     void ScrollToRight()
     {
+        if (IsUserDragging()) return;
+
         Canvas.ForceUpdateCanvases();
 
         if (scrollRect != null)
@@ -438,6 +458,7 @@ public class CandlestickChart : MonoBehaviour
     void ScrollToCurrentPrice()
     {
         if (scrollRect == null) return;
+        if (IsUserDragging()) return;
 
         // Yatay: en saga
         scrollRect.horizontalNormalizedPosition = 1f;
