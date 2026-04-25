@@ -284,10 +284,12 @@ public class WarForOilManager : MonoBehaviour
         //ön koşulları sağlanmayan seçenek seçilemez
         if (!choice.IsAvailable()) return;
 
-        //modifier'ları biriktir
+        //stat modifier'lar — anlık uygula, sonuç ekranında göstermek için ayrıca biriktir
         accumulatedSuspicionModifier += choice.suspicionModifier;
+        if (choice.suspicionModifier != 0f && GameStatManager.Instance != null)
+            GameStatManager.Instance.AddSuspicion(choice.suspicionModifier);
 
-        //itibar — anlık uygula
+        accumulatedReputationModifier += choice.reputationModifier;
         if (choice.reputationModifier != 0f && GameStatManager.Instance != null)
         {
             if (choice.hasReputationFloor && choice.reputationModifier < 0f)
@@ -312,7 +314,12 @@ public class WarForOilManager : MonoBehaviour
                 GameStatManager.Instance.AddReputation(choice.reputationModifier);
             }
         }
+
         accumulatedPoliticalInfluenceModifier += choice.politicalInfluenceModifier;
+        if (choice.politicalInfluenceModifier != 0f && GameStatManager.Instance != null)
+            GameStatManager.Instance.AddPoliticalInfluence(choice.politicalInfluenceModifier);
+
+        //cost — savaş sonu reward hesabında kullanılacak, anlık etki yok
         accumulatedCostModifier += choice.costModifier;
 
         //anlık para değişimi
@@ -708,16 +715,20 @@ public class WarForOilManager : MonoBehaviour
         WarForOilResult result = pendingResult;
         pendingResult = null;
 
-        //stat'lara uygula
+        //stat'lara uygula — suspicion/reputation/PI ResolveEvent'te anlık uygulandı,
+        //burada sadece accumulator dışı kısımları (savaş sonu cezaları, ödül) uygula
         if (GameStatManager.Instance != null)
         {
             if (result.wealthChange != 0)
                 GameStatManager.Instance.AddWealth(result.wealthChange);
-            if (result.suspicionChange != 0)
-                GameStatManager.Instance.AddSuspicion(result.suspicionChange);
-            //reputation artık anlık uygulanıyor (ResolveEvent'te), burada tekrar uygulanmaz
-            if (result.politicalInfluenceChange != 0)
-                GameStatManager.Instance.AddPoliticalInfluence(result.politicalInfluenceChange);
+
+            float remainingSuspicion = result.suspicionChange - accumulatedSuspicionModifier;
+            if (remainingSuspicion != 0f)
+                GameStatManager.Instance.AddSuspicion(remainingSuspicion);
+
+            float remainingPoliticalInfluence = result.politicalInfluenceChange - accumulatedPoliticalInfluenceModifier;
+            if (remainingPoliticalInfluence != 0f)
+                GameStatManager.Instance.AddPoliticalInfluence(remainingPoliticalInfluence);
         }
 
         //savaş kaybedildiyse minigame kalıcı olarak devre dışı (ateşkes hariç)

@@ -236,10 +236,10 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `displayName` | Secenek adi |
 | `description` | Secenek aciklamasi (TextArea) |
 | `supportModifier` | Destek stat degisimi (+ = destek artar) |
-| `suspicionModifier` | Suphe degisimi |
-| `reputationModifier` | Itibar degisimi (+ = artar, - = duser) |
-| `politicalInfluenceModifier` | Politik nufuz degisimi (- = dusurur) |
-| `costModifier` | Maliyet degisimi (int, savas sonunda birikimli uygulanir) |
+| `suspicionModifier` | Suphe degisimi (anlik uygulanir, sonuc ekraninda gostermek icin ayrica biriktirilir) |
+| `reputationModifier` | Itibar degisimi (+ = artar, - = duser, anlik uygulanir, sonuc ekraninda gostermek icin ayrica biriktirilir) |
+| `politicalInfluenceModifier` | Politik nufuz degisimi (- = dusurur, anlik uygulanir, sonuc ekraninda gostermek icin ayrica biriktirilir) |
+| `costModifier` | Maliyet degisimi (int, savas sonunda birikimli uygulanir — odul/ceza hesabindan dusulur) |
 | `wealthModifier` | Anlik para degisimi (+ = kazan, - = kaybet, secildiginde hemen uygulanir) |
 | `cornerGrabModifier` | Kose kapma stat degisimi (+ = bizim lehimize, sadece yaris aktifken uygulanir) |
 | **Protest Etkisi** (foldout) | |
@@ -791,6 +791,7 @@ suspicionChange = warLossSuspicionIncrease + accumulatedSuspicionModifier
 politicalInfluenceChange = -warLossPoliticalPenalty + accumulatedPoliticalInfluenceModifier
 ```
 
+- `result.suspicionChange` ve `result.politicalInfluenceChange` sonuc ekraninda toplam degisimi gosterir. Choice modifier'lari zaten ResolveEvent'te anlik uygulanmistir; `DismissResultScreen` bu accumulator kismini cikarir, yalniz savas sonu cezalarini (warLossSuspicionIncrease, -warLossPoliticalPenalty) uygular. Cift uygulama yok.
 - Savas kaybedilirse **minigame kalici olarak kapanir** (bir daha oynamaz)
 
 ### Ateskes
@@ -931,7 +932,7 @@ Savas sirasinda event tetiklemeden once `EventCoordinator.CanShowEvent()` kontro
 - **ChainRole dropdown**: Sadece None/Head secenekleri. Dallanma choice seviyesinde tanimlanir.
 - **isRepeatable tiklenince** "Sinirsiz Tekrar" toggle + maxRepeatCount gosterilir (sinirsiz tikli degilse)
 - **Choice'lar foldout ile**: Her choice icinde 10 foldout grubu:
-  1. **Modifiers** — supportModifier, suspicionModifier, reputationModifier, politicalInfluenceModifier, costModifier (birikimli), wealthModifier (anlik), cornerGrabModifier
+  1. **Modifiers** — supportModifier, suspicionModifier (anlik), reputationModifier (anlik), politicalInfluenceModifier (anlik), costModifier (savas sonu birikimli — odul hesabindan dusulur), wealthModifier (anlik), cornerGrabModifier
   2. **Protest Etkisi** — protestModifier, protestTriggerChanceBonus, olasilikli tepki (hasProtestChance + alt alanlari)
   4. **Diger Sonuclar** — endsWar, reducesReward, endsWarWithDeal, blocksEvents, blocksCeasefire, blocksEventGroup, hasImmediateEvent, hasProbabilisticRewardReduction, hasProbabilisticWarEnd
   5. **Feed Sonuclari** — freezesFeed, slowsFeed, hasFeedOverride (alt kosullu alanlarla)
