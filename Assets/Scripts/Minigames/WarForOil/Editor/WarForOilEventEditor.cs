@@ -25,9 +25,60 @@ public class WarForOilEventEditor : Editor
     {
         serializedObject.Update();
 
-        //choices, repeat alanları, defaultChoiceIndex, narrative ve zincir alanları hariç tüm alanları çiz
+        //script referansı — Unity'nin standart konumu (en üst, read-only)
+        using (new EditorGUI.DisabledScope(true))
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("m_Script"));
+
+        //temel alanları manuel sırayla çiz: id → displayName → description → koşullu metin
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("id"));
+
         //yazı makinesi efekti açıksa displayName gizlenir (typewriter modunda başlık yok)
+        if (!serializedObject.FindProperty("useTypewriterEffect").boolValue)
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("displayName"));
+
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("description"));
+
+        //hikaye bayrağına göre değişken metin (event seviyesi) — description'ın hemen altında
+        SerializedProperty hasCondTextEvt = serializedObject.FindProperty("hasConditionalText");
+        EditorGUILayout.PropertyField(hasCondTextEvt, new GUIContent("Bayrağa Göre Değişken Metin",
+            "Tiklenirse bu event'in display name'i ve description'ı aktif hikaye bayrağına göre alternatif metinlerle değiştirilebilir. İlk eşleşen kazanır."));
+        if (hasCondTextEvt.boolValue)
+        {
+            EditorGUI.indentLevel++;
+            SerializedProperty condTextsEvt = serializedObject.FindProperty("conditionalTexts");
+            int newSize = Mathf.Max(0, EditorGUILayout.IntField("Bayrak Sayısı", condTextsEvt.arraySize));
+            if (newSize != condTextsEvt.arraySize)
+                condTextsEvt.arraySize = newSize;
+
+            bool typewriterOn = serializedObject.FindProperty("useTypewriterEffect").boolValue;
+
+            for (int i = 0; i < condTextsEvt.arraySize; i++)
+            {
+                SerializedProperty entry = condTextsEvt.GetArrayElementAtIndex(i);
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.PropertyField(entry.FindPropertyRelative("requiredFlag"),
+                    new GUIContent($"Bayrak {i}"));
+                if (!typewriterOn)
+                {
+                    EditorGUILayout.PropertyField(entry.FindPropertyRelative("alternativeDisplayName"),
+                        new GUIContent("Alternatif İsim"));
+                }
+                EditorGUILayout.PropertyField(entry.FindPropertyRelative("alternativeDescription"),
+                    new GUIContent("Alternatif Açıklama"));
+                EditorGUILayout.EndVertical();
+            }
+            EditorGUILayout.HelpBox(
+                typewriterOn
+                    ? "Yazı makinesi efekti açık olduğu için isim alanı gizlendi. Sadece açıklama override edilebilir. İlk eşleşen bayrak kazanır."
+                    : "Boş alan default'a düşer (sadece açıklamayı veya sadece ismi değiştirebilirsin). İlk eşleşen bayrak kazanır.",
+                MessageType.Info);
+            EditorGUI.indentLevel--;
+        }
+
+        //choices, repeat alanları, defaultChoiceIndex, narrative ve zincir alanları hariç kalan alanları çiz
         List<string> excludeList = new List<string> {
+            "m_Script",
+            "id", "displayName", "description",
             "choices", "isUnlimitedRepeat", "maxRepeatCount", "defaultChoiceIndex",
             "hasNarrative", "narrative",
             "isVandalismEvent", "vandalismLevelOnTrigger", "startsVandalism", "forcesVandalismStart",
@@ -38,11 +89,8 @@ public class WarForOilEventEditor : Editor
             "chainRole", "blocksSubChainBranching", "alsoBlockedBranchEvents",
             "minWarTime", "maxWarTime",
             "hasConditionalText", "conditionalTexts",
-            "useTypewriterEffect",
             "requiresBothProcessesActive"
         };
-        if (serializedObject.FindProperty("useTypewriterEffect").boolValue)
-            excludeList.Add("displayName");
         DrawPropertiesExcluding(serializedObject, excludeList.ToArray());
 
         //isRepeatable açıksa tekrar seçeneklerini göster
@@ -95,38 +143,6 @@ public class WarForOilEventEditor : Editor
         EditorGUILayout.PropertyField(
             serializedObject.FindProperty("useTypewriterEffect"),
             new GUIContent("Yazı Makinesi Efekti", "Açıklama harf harf akar. Kapalıysa direkt paragraf gösterilir."));
-
-        //hikaye bayrağına göre değişken metin (event seviyesi)
-        SerializedProperty hasCondTextEvt = serializedObject.FindProperty("hasConditionalText");
-        EditorGUILayout.PropertyField(hasCondTextEvt, new GUIContent("Bayrağa Göre Değişken Metin",
-            "Tiklenirse bu event'in display name'i ve description'ı aktif hikaye bayrağına göre alternatif metinlerle değiştirilebilir. İlk eşleşen kazanır."));
-        if (hasCondTextEvt.boolValue)
-        {
-            EditorGUI.indentLevel++;
-            SerializedProperty condTextsEvt = serializedObject.FindProperty("conditionalTexts");
-            int newSize = Mathf.Max(0, EditorGUILayout.IntField("Bayrak Sayısı", condTextsEvt.arraySize));
-            if (newSize != condTextsEvt.arraySize)
-                condTextsEvt.arraySize = newSize;
-
-            for (int i = 0; i < condTextsEvt.arraySize; i++)
-            {
-                SerializedProperty entry = condTextsEvt.GetArrayElementAtIndex(i);
-                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-                EditorGUILayout.PropertyField(entry.FindPropertyRelative("requiredFlag"),
-                    new GUIContent($"Bayrak {i}"));
-                EditorGUILayout.PropertyField(entry.FindPropertyRelative("alternativeDisplayName"),
-                    new GUIContent("Alternatif İsim"));
-                SerializedProperty altDesc = entry.FindPropertyRelative("alternativeDescription");
-                EditorGUILayout.LabelField("Alternatif Açıklama");
-                altDesc.stringValue = EditorGUILayout.TextArea(altDesc.stringValue,
-                    GUILayout.MinHeight(EditorGUIUtility.singleLineHeight * 3));
-                EditorGUILayout.EndVertical();
-            }
-            EditorGUILayout.HelpBox(
-                "Boş alan default'a düşer (sadece açıklamayı veya sadece ismi değiştirebilirsin). İlk eşleşen bayrak kazanır.",
-                MessageType.Info);
-            EditorGUI.indentLevel--;
-        }
 
         EditorGUILayout.Space();
 
@@ -333,10 +349,8 @@ public class WarForOilEventEditor : Editor
                     new GUIContent($"Bayrak {i}"));
                 EditorGUILayout.PropertyField(entry.FindPropertyRelative("alternativeDisplayName"),
                     new GUIContent("Alternatif İsim"));
-                SerializedProperty altDesc = entry.FindPropertyRelative("alternativeDescription");
-                EditorGUILayout.LabelField("Alternatif Açıklama");
-                altDesc.stringValue = EditorGUILayout.TextArea(altDesc.stringValue,
-                    GUILayout.MinHeight(EditorGUIUtility.singleLineHeight * 3));
+                EditorGUILayout.PropertyField(entry.FindPropertyRelative("alternativeDescription"),
+                    new GUIContent("Alternatif Açıklama"));
                 EditorGUILayout.EndVertical();
             }
             EditorGUILayout.HelpBox(

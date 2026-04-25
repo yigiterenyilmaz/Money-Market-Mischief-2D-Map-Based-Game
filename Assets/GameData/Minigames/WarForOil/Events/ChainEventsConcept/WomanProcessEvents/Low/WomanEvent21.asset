@@ -10,20 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
-  m_Name: WomanEvent43
+  m_Name: WomanEvent21
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
-  id: wfo_we_low_43
+  id: wfo_we_low_21
   displayName: 
-  description: You manipulative bastard! We worked with you for months, and this
-    is the result? You'll see the consequences. You'll see the consequences.
+  description: "The agents have launched the operation at the defense headquarters.
+    They\u2019ve successfully locked down the perimeter and drawn all the attention!
+    There is a massive crisis in the enemy country!"
   useTypewriterEffect: 1
-  hasConditionalText: 1
-  conditionalTexts:
-  - requiredFlag: 3
-    alternativeDisplayName: 
-    alternativeDescription: You manipulative bastard! We worked together for months,
-      I even put up with you so you could see your wife! Is this the result? You'll
-      see the result. You'll see the result.
+  hasConditionalText: 0
+  conditionalTexts: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -33,11 +29,11 @@ MonoBehaviour:
   isUnlimitedRepeat: 0
   maxRepeatCount: 1
   choices:
-  - displayName: There is nothing I could do.
+  - displayName: Continue to Operation
     description: 
     hasConditionalText: 0
     conditionalTexts: []
-    supportModifier: 3
+    supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
     hasReputationFloor: 0

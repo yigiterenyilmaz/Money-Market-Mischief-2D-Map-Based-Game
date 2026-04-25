@@ -58,6 +58,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -108,7 +112,7 @@ MonoBehaviour:
     mediaPursuitLevelDelta: 0
     startsWomanProcess: 0
     endsWomanProcess: 0
-    womanObsessionModifier: 0
+    womanObsessionModifier: 3
     hasObsessionFloor: 0
     obsessionFloor: 0
     redirectsWomanPool: 0
@@ -118,8 +122,9 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 1
-    immediateEventDelay: 10
+    immediateEventDelay: 0
     immediateEventIsTiered: 0
     immediateEventPool:
     - targetEvent: {fileID: 11400000, guid: 87fc84b110d46e44585367f4ee784be9, type: 2}
@@ -140,7 +145,7 @@ MonoBehaviour:
   isMediaPursuitEvent: 0
   mediaPursuitLevelOnTrigger: 0
   requiresBothProcessesActive: 0
-  isWomanProcessEvent: 0
+  isWomanProcessEvent: 1
   minObsession: 0
   maxObsession: 100
   blockedWomanProcessEvents: []
@@ -148,6 +153,7 @@ MonoBehaviour:
   precursorEventType: 0
   precursorWarEvent: {fileID: 0}
   precursorRandomEvent: {fileID: 0}
+  requiredStoryFlags: 
   chainRole: 0
   blocksSubChainBranching: 0
   alsoBlockedBranchEvents: []

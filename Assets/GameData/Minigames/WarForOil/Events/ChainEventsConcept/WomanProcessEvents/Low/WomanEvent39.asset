@@ -19,7 +19,8 @@ MonoBehaviour:
     There is a massive crisis in the enemy country! However, the agents are now sending
     you radio messages, pleading for support."
   useTypewriterEffect: 0
-  conditionalDescriptions: []
+  hasConditionalText: 0
+  conditionalTexts: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -31,6 +32,8 @@ MonoBehaviour:
   choices:
   - displayName: Stall
     description: Tell them the support will arrive soon and give them hope.
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
@@ -59,6 +62,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -89,7 +96,14 @@ MonoBehaviour:
     chainThreshold0: 20
     chainThreshold1: 50
     chainThreshold2: 75
-    chainBranches: []
+    chainBranches:
+    - targetEvent: {fileID: 11400000, guid: a02d3b762c98c194e8ee13d4acf7f933, type: 2}
+      weightRange0: 1
+      weightRange1: 0
+      weightRange2: 0
+      weightRange3: 0
+      triggersAsImmediateEvent: 0
+      immediateEventDelay: 0
     chainCanEnd: 0
     chainEndWeight: 1
     hasConditionalBranching: 0
@@ -119,6 +133,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
     immediateEventIsTiered: 0
@@ -132,6 +147,8 @@ MonoBehaviour:
   - displayName: Confess
     description: Confess that the support won't be arrived and they are here to die.
       Tell them it was an important plan and apologize for lying.
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
@@ -160,6 +177,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -220,14 +241,17 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
-    hasImmediateEvent: 0
+    statCeilingEffects: []
+    hasImmediateEvent: 1
     immediateEventDelay: 0
     immediateEventIsTiered: 0
-    immediateEventPool: []
+    immediateEventPool:
+    - targetEvent: {fileID: 11400000, guid: 865cbd5f18449e24087835665dec76c6, type: 2}
+      weight: 100
     immediateEventTier1: {fileID: 0}
     immediateEventTier2: {fileID: 0}
     immediateEventTier3: {fileID: 0}
-    setsStoryFlags: 
+    setsStoryFlags: 04000000
     requiredSkills: []
     statConditions: []
   defaultChoiceIndex: -1
@@ -248,6 +272,7 @@ MonoBehaviour:
   precursorEventType: 0
   precursorWarEvent: {fileID: 0}
   precursorRandomEvent: {fileID: 0}
+  requiredStoryFlags: 
   chainRole: 0
   blocksSubChainBranching: 0
   alsoBlockedBranchEvents: []

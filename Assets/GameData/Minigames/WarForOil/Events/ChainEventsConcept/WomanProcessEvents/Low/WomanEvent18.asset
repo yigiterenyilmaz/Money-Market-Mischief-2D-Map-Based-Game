@@ -18,7 +18,8 @@ MonoBehaviour:
     need to go and support her, but the responsibility you've undertaken in this
     war might hold you back from this moment."
   useTypewriterEffect: 1
-  conditionalDescriptions: []
+  hasConditionalText: 0
+  conditionalTexts: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -31,6 +32,8 @@ MonoBehaviour:
   - displayName: Go to Her
     description: Go to her and skip the military meeting. The war effort might falter,
       and you will suffer a severe loss of political power.
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: -6
     suspicionModifier: 0
     reputationModifier: -1
@@ -59,6 +62,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -119,6 +126,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
     immediateEventIsTiered: 0
@@ -133,6 +141,8 @@ MonoBehaviour:
     description: "Tell her that you cannot go to her side right now and that you
       have matters that must be settled. Your girlfriend\u2019s emotional loss will
       be intense, but this way, you can focus better on the operation"
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: 6
     suspicionModifier: 0
     reputationModifier: 0
@@ -161,6 +171,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -191,7 +205,14 @@ MonoBehaviour:
     chainThreshold0: 20
     chainThreshold1: 50
     chainThreshold2: 75
-    chainBranches: []
+    chainBranches:
+    - targetEvent: {fileID: 11400000, guid: 7b036f94c5792ea46a15d31a7a3e1050, type: 2}
+      weightRange0: 1
+      weightRange1: 0
+      weightRange2: 0
+      weightRange3: 0
+      triggersAsImmediateEvent: 0
+      immediateEventDelay: 0
     chainCanEnd: 0
     chainEndWeight: 1
     hasConditionalBranching: 0
@@ -221,6 +242,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
     immediateEventIsTiered: 0
@@ -235,6 +257,8 @@ MonoBehaviour:
     description: Try to manage both at the same time; if you succeed, your losses
       on both sides will be minimal. However, if you fail, you might end up making
       a complete mess of everything.
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: -3
     suspicionModifier: 0
     reputationModifier: 0
@@ -263,6 +287,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -330,6 +358,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
     immediateEventIsTiered: 0
@@ -358,6 +387,7 @@ MonoBehaviour:
   precursorEventType: 0
   precursorWarEvent: {fileID: 0}
   precursorRandomEvent: {fileID: 0}
+  requiredStoryFlags: 
   chainRole: 0
   blocksSubChainBranching: 0
   alsoBlockedBranchEvents: []

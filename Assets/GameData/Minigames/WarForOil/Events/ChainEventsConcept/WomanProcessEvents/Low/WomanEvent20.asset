@@ -22,7 +22,8 @@ MonoBehaviour:
     If the operation succeeds, the enemy will be struck at its core, and the war
     will most likely come to a victorious end.'
   useTypewriterEffect: 0
-  conditionalDescriptions: []
+  hasConditionalText: 0
+  conditionalTexts: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -34,6 +35,8 @@ MonoBehaviour:
   choices:
   - displayName: Accept
     description: 
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
@@ -62,6 +65,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -122,6 +129,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 1
     immediateEventDelay: 7
     immediateEventIsTiered: 0
@@ -136,6 +144,8 @@ MonoBehaviour:
     statConditions: []
   - displayName: Decline
     description: 
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: -5
     suspicionModifier: 0
     reputationModifier: -1
@@ -164,6 +174,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -231,6 +245,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 1
     immediateEventDelay: 10
     immediateEventIsTiered: 0
@@ -261,6 +276,7 @@ MonoBehaviour:
   precursorEventType: 0
   precursorWarEvent: {fileID: 0}
   precursorRandomEvent: {fileID: 0}
+  requiredStoryFlags: 
   chainRole: 0
   blocksSubChainBranching: 0
   alsoBlockedBranchEvents: []

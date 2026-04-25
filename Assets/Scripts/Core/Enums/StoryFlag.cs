@@ -8,4 +8,6 @@ public enum StoryFlag
     None = 0,
     BetrayedAgentsToTheirDeath = 1,
     ToldWomanAgentsWillHandleMe = 2,
+    RevealedIntentToAgentsThroughHaste = 3,
+    ConfessedOwnDeathToAgents = 4,
 }

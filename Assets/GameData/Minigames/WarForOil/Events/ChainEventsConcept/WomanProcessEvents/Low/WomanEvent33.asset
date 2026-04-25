@@ -18,7 +18,8 @@ MonoBehaviour:
     identify security vulnerabilities. Agents must conduct field reconnaissance during
     nighttime only.
   useTypewriterEffect: 0
-  conditionalDescriptions: []
+  hasConditionalText: 0
+  conditionalTexts: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -30,6 +31,8 @@ MonoBehaviour:
   choices:
   - displayName: Follow the Instructions
     description: 
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
@@ -58,6 +61,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -89,8 +96,8 @@ MonoBehaviour:
     chainThreshold1: 50
     chainThreshold2: 75
     chainBranches:
-    - targetEvent: {fileID: 0}
-      weightRange0: 0
+    - targetEvent: {fileID: 11400000, guid: 6f7f564af99fe6543ae5059fbb4fe1e2, type: 2}
+      weightRange0: 1
       weightRange1: 0
       weightRange2: 0
       weightRange3: 0
@@ -104,7 +111,7 @@ MonoBehaviour:
     branchCounterMax: 5
     conditionalChainBranches:
     - targetEvent: {fileID: 11400000, guid: 0e7e035760be9fd4f9e36918e483d6db, type: 2}
-      weightRange0: 0
+      weightRange0: 1
       weightRange1: 0
       weightRange2: 0
       weightRange3: 0
@@ -132,6 +139,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
     immediateEventIsTiered: 0
@@ -144,6 +152,8 @@ MonoBehaviour:
     statConditions: []
   - displayName: Two Shifts
     description: Assign agents for both day and night shifts.
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
@@ -172,6 +182,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -203,7 +217,7 @@ MonoBehaviour:
     chainThreshold1: 50
     chainThreshold2: 75
     chainBranches:
-    - targetEvent: {fileID: 0}
+    - targetEvent: {fileID: 11400000, guid: 6f7f564af99fe6543ae5059fbb4fe1e2, type: 2}
       weightRange0: 1
       weightRange1: 0
       weightRange2: 0
@@ -246,6 +260,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
     immediateEventIsTiered: 0
@@ -274,6 +289,7 @@ MonoBehaviour:
   precursorEventType: 0
   precursorWarEvent: {fileID: 0}
   precursorRandomEvent: {fileID: 0}
+  requiredStoryFlags: 
   chainRole: 0
   blocksSubChainBranching: 0
   alsoBlockedBranchEvents: []

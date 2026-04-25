@@ -20,7 +20,8 @@ MonoBehaviour:
     together from now on. By the way, since your work is so important, how were you
     able to leave it all behind and come here?"
   useTypewriterEffect: 1
-  conditionalDescriptions: []
+  hasConditionalText: 0
+  conditionalTexts: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -32,6 +33,8 @@ MonoBehaviour:
   choices:
   - displayName: Tell Her What Happened
     description: 
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
@@ -60,6 +63,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -117,7 +124,7 @@ MonoBehaviour:
     mediaPursuitLevelDelta: 0
     startsWomanProcess: 0
     endsWomanProcess: 0
-    womanObsessionModifier: 0
+    womanObsessionModifier: 2
     hasObsessionFloor: 0
     obsessionFloor: 0
     redirectsWomanPool: 0
@@ -127,6 +134,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
     immediateEventIsTiered: 0
@@ -134,11 +142,13 @@ MonoBehaviour:
     immediateEventTier1: {fileID: 0}
     immediateEventTier2: {fileID: 0}
     immediateEventTier3: {fileID: 0}
-    setsStoryFlags: 
+    setsStoryFlags: 02000000
     requiredSkills: []
     statConditions: []
   - displayName: Brush it Off
     description: 
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
@@ -167,6 +177,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -234,6 +248,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
     immediateEventIsTiered: 0
@@ -254,7 +269,7 @@ MonoBehaviour:
   isMediaPursuitEvent: 0
   mediaPursuitLevelOnTrigger: 0
   requiresBothProcessesActive: 0
-  isWomanProcessEvent: 0
+  isWomanProcessEvent: 1
   minObsession: 0
   maxObsession: 100
   blockedWomanProcessEvents: []
@@ -262,6 +277,7 @@ MonoBehaviour:
   precursorEventType: 0
   precursorWarEvent: {fileID: 0}
   precursorRandomEvent: {fileID: 0}
+  requiredStoryFlags: 
   chainRole: 0
   blocksSubChainBranching: 0
   alsoBlockedBranchEvents: []

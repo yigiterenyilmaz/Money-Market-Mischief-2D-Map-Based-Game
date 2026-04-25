@@ -10,20 +10,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
-  m_Name: WomanEvent43
+  m_Name: WomanEvent19
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
-  id: wfo_we_low_43
-  displayName: 
-  description: You manipulative bastard! We worked with you for months, and this
-    is the result? You'll see the consequences. You'll see the consequences.
-  useTypewriterEffect: 1
-  hasConditionalText: 1
-  conditionalTexts:
-  - requiredFlag: 3
-    alternativeDisplayName: 
-    alternativeDescription: You manipulative bastard! We worked together for months,
-      I even put up with you so you could see your wife! Is this the result? You'll
-      see the result. You'll see the result.
+  id: wfo_we_low_19
+  displayName: First Phase
+  description: The agents will first instigate a rebellion within the Ministry of
+    Defense to divert enemy forces elsewhere, and then we will launch an operation
+    on the presidential palace to kidnap the president. To do this, you need to fund
+    the agents.
+  useTypewriterEffect: 0
+  hasConditionalText: 0
+  conditionalTexts: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -33,11 +30,11 @@ MonoBehaviour:
   isUnlimitedRepeat: 0
   maxRepeatCount: 1
   choices:
-  - displayName: There is nothing I could do.
+  - displayName: OK.
     description: 
     hasConditionalText: 0
     conditionalTexts: []
-    supportModifier: 3
+    supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
     hasReputationFloor: 0
@@ -100,7 +97,7 @@ MonoBehaviour:
     chainThreshold1: 50
     chainThreshold2: 75
     chainBranches:
-    - targetEvent: {fileID: 11400000, guid: a02d3b762c98c194e8ee13d4acf7f933, type: 2}
+    - targetEvent: {fileID: 11400000, guid: 0f3e27aaf79e3e446bfe611a7dbd3692, type: 2}
       weightRange0: 1
       weightRange1: 0
       weightRange2: 0

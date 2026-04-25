@@ -20,7 +20,8 @@ MonoBehaviour:
     conditions, I will speak with the Intelligence Service. None of this was explained
     to us this way.
   useTypewriterEffect: 1
-  conditionalDescriptions: []
+  hasConditionalText: 0
+  conditionalTexts: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -33,6 +34,8 @@ MonoBehaviour:
   - displayName: Tell the Truth
     description: Tell the agent everything and threaten him that if the secret is
       exposed, their entire family will be at risk.
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
@@ -61,6 +64,10 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
@@ -121,6 +128,7 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 1
     immediateEventDelay: 0
     immediateEventIsTiered: 0
@@ -130,7 +138,7 @@ MonoBehaviour:
     immediateEventTier1: {fileID: 0}
     immediateEventTier2: {fileID: 0}
     immediateEventTier3: {fileID: 0}
-    setsStoryFlags: 
+    setsStoryFlags: 03000000
     requiredSkills: []
     statConditions: []
   defaultChoiceIndex: -1
@@ -151,6 +159,7 @@ MonoBehaviour:
   precursorEventType: 0
   precursorWarEvent: {fileID: 0}
   precursorRandomEvent: {fileID: 0}
+  requiredStoryFlags: 
   chainRole: 0
   blocksSubChainBranching: 0
   alsoBlockedBranchEvents: []
