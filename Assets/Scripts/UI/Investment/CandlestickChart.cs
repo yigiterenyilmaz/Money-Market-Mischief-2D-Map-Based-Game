@@ -61,8 +61,25 @@ public class CandlestickChart : MonoBehaviour
     [Tooltip("Tick basina max fiyat degisim yuzdesi")]
     public float volatility = 3f;
 
-    [Tooltip("Trend degisim araligi (saniye)")]
-    public float trendChangeInterval = 15f;
+    [Tooltip("Trend rastgele itme siddeti (her tick yon degisimi)")]
+    public float trendNoise = 2.5f;
+
+    [Tooltip("Trend ortalamaya donus hizi (yuksek = trend kisa surede sonumlenir)")]
+    public float trendDecay = 0.4f;
+
+    [Tooltip("Trend ust siniri (mutlak deger)")]
+    public float maxTrend = 2.5f;
+
+    [Header("Pattern Sistem")]
+    [Tooltip("Pattern hedef yuzdeleri bu carpan ile olceklenir (0.5=sakin, 2=sert)")]
+    [Range(0.5f, 2f)]
+    public float volatilityMultiplier = 1f;
+
+    [Tooltip("Pattern arasi minimum mum sayisi")]
+    public int patternCooldownMin = 5;
+
+    [Tooltip("Pattern arasi maksimum mum sayisi")]
+    public int patternCooldownMax = 15;
 
     // Fiyat durumu
     float currentPrice;
@@ -71,9 +88,12 @@ public class CandlestickChart : MonoBehaviour
     float candleLowPrice;
     float timer;
 
-    // Trend durumu
-    float currentTrend;
-    float trendTimer;
+    // Pattern sistemi
+    MarketState marketState;
+    PatternScheduler scheduler;
+    CandlePathPlayer pathPlayer;
+    NoiseDriver noiseDriver;
+    float currentCandleStartTime;
 
     // Frame sayaclari
     int priceFrameCounter;
@@ -155,6 +175,19 @@ public class CandlestickChart : MonoBehaviour
         // Debug acma butonu olustur
         CreateDebugButton();
 
+        // Pattern sistemi initialize
+        marketState = new MarketState(startPrice);
+        noiseDriver = new NoiseDriver(volatility, trendNoise, trendDecay, maxTrend, startPrice);
+        pathPlayer = new CandlePathPlayer();
+        scheduler = new PatternScheduler(patternCooldownMin, patternCooldownMax, volatilityMultiplier);
+        scheduler.RegisterAll(new ChartPattern[]
+        {
+            new PumpEvent(),
+            new DojiCandle(),
+            new AscendingTriangle(),
+            new HeadAndShoulders()
+        });
+
         // Ilk mumu baslat
         StartNewCandle();
     }
@@ -219,29 +252,13 @@ public class CandlestickChart : MonoBehaviour
 
     void UpdatePrice()
     {
-        // Trend periyodik olarak yon degistirir
-        trendTimer += Time.deltaTime;
-        if (trendTimer >= trendChangeInterval)
-        {
-            // -1 ile 1 arasi rastgele trend
-            currentTrend = Random.Range(-1.5f, 1.5f);
-            trendChangeInterval = Random.Range(8f, 25f);
-            trendTimer = 0f;
-        }
+        // Mum baslangicinda pathPlayer'a o mumun nihai OHLC'si yuklendi.
+        // Burada sadece o yolun mevcut zamandaki sample'ini okuyup currentPrice'i guncelliyoruz.
+        // Tum OU random walk mantigi NoiseDriver icine tasindi.
+        if (pathPlayer == null) return;
 
-        // Rastgele degisim + trend etkisi
-        float change = Random.Range(-volatility, volatility) * Time.deltaTime;
-        change += currentTrend * Time.deltaTime;
-
-        // Arada ani hareketler (hem yukari hem asagi)
-        if (Random.value < 0.003f)
-            change += Random.Range(-volatility * 4f, volatility * 4f) * Time.deltaTime * 10f;
-
-        // Fiyat cok duserse yukari cek, cok yükselirse asagi cek (ortalamaya donus)
-        float deviation = (currentPrice - startPrice) / startPrice;
-        change -= deviation * 0.5f * Time.deltaTime;
-
-        currentPrice += change;
+        float t = Time.time - currentCandleStartTime;
+        currentPrice = pathPlayer.GetPriceAt(t);
         currentPrice = Mathf.Max(currentPrice, 1f);
 
         if (currentPrice > candleHighPrice) candleHighPrice = currentPrice;
@@ -272,6 +289,20 @@ public class CandlestickChart : MonoBehaviour
 
     void StartNewCandle()
     {
+        // Bu mumun nihai OHLC'sini pattern (aktifse) veya noise driver'dan al.
+        // pathPlayer mum suresince currentPrice'i o yola sample'lar.
+        CandleOHLC nextOHLC;
+        if (scheduler != null && scheduler.HasActivePattern)
+            nextOHLC = scheduler.ActivePattern.GenerateNextCandle(currentPrice);
+        else if (noiseDriver != null)
+            nextOHLC = noiseDriver.GenerateNextCandle(currentPrice, candleInterval);
+        else
+            nextOHLC = new CandleOHLC(currentPrice, currentPrice, currentPrice, currentPrice);
+
+        pathPlayer?.LoadCandle(nextOHLC, candleInterval);
+        currentCandleStartTime = Time.time;
+
+        currentPrice = nextOHLC.open;
         candleOpenPrice = currentPrice;
         candleHighPrice = currentPrice;
         candleLowPrice = currentPrice;
@@ -357,6 +388,27 @@ public class CandlestickChart : MonoBehaviour
         data.close = currentPrice;
         data.isClosed = true;
         candles[activeCandleIndex] = data;
+
+        // Pattern sistemine bildir
+        if (marketState != null)
+        {
+            CandleOHLC ohlc = new CandleOHLC(data.open, data.high, data.low, data.close);
+            marketState.OnCandleClosed(ohlc);
+        }
+
+        if (scheduler != null)
+        {
+            if (scheduler.HasActivePattern)
+            {
+                scheduler.ActivePattern.OnCandleClosed();
+                if (scheduler.ActivePattern.IsDone())
+                    scheduler.MarkActiveDone();
+            }
+            else
+            {
+                scheduler.OnIdleCandle(marketState);
+            }
+        }
     }
 
     void RedrawAllCandles()
@@ -549,5 +601,35 @@ public class CandlestickChart : MonoBehaviour
 
         if (!isActive)
             timer = 0f;
+    }
+
+    // === Debug pattern tetikleyiciler (Inspector right-click) ===
+
+    [ContextMenu("Force Pattern: Pump (D1)")]
+    void DebugForcePump()
+    {
+        if (scheduler != null && marketState != null)
+            scheduler.TryForcePattern("D1_Pump", marketState);
+    }
+
+    [ContextMenu("Force Pattern: Doji (C5)")]
+    void DebugForceDoji()
+    {
+        if (scheduler != null && marketState != null)
+            scheduler.TryForcePattern("C5_Doji", marketState);
+    }
+
+    [ContextMenu("Force Pattern: Ascending Triangle (A6)")]
+    void DebugForceAscTri()
+    {
+        if (scheduler != null && marketState != null)
+            scheduler.TryForcePattern("A6_AscendingTriangle", marketState);
+    }
+
+    [ContextMenu("Force Pattern: Head and Shoulders (A1)")]
+    void DebugForceHnS()
+    {
+        if (scheduler != null && marketState != null)
+            scheduler.TryForcePattern("A1_HeadAndShoulders", marketState);
     }
 }
