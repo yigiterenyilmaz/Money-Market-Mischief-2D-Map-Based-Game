@@ -105,6 +105,11 @@ public class WarForOilEventChoice
 {
     public string displayName;
     [TextArea(2, 4)] public string description;
+
+    //hikaye bayrağına göre değişken metin (isim + açıklama)
+    public bool hasConditionalText; //true ise aşağıdaki listeye göre displayName/description override edilebilir
+    public List<ConditionalChoiceText> conditionalTexts; //her entry: flag + alt isim + alt açıklama. İlk eşleşen kazanır.
+
     public float supportModifier; //destek stat'ını etkiler (pozitif = ülkeyi destekle)
     public float suspicionModifier; //şüphe etkisi
     public float reputationModifier; //itibar etkisi (pozitif = artar, negatif = düşer)
@@ -267,6 +272,46 @@ public class WarForOilEventChoice
 
         return true;
     }
+
+    /// <summary>
+    /// Aktif hikaye bayrağına göre uygun displayName'i döner.
+    /// hasConditionalText kapalıysa veya eşleşen flag yoksa default displayName döner.
+    /// İlk eşleşen entry kazanır. Entry'nin alt ismi boşsa default'a düşer.
+    /// </summary>
+    public string GetDisplayName()
+    {
+        if (!hasConditionalText || conditionalTexts == null || conditionalTexts.Count == 0
+            || StoryFlagManager.Instance == null)
+            return displayName;
+
+        for (int i = 0; i < conditionalTexts.Count; i++)
+        {
+            var ct = conditionalTexts[i];
+            if (ct.requiredFlag != StoryFlag.None && StoryFlagManager.Instance.HasFlag(ct.requiredFlag))
+                return string.IsNullOrEmpty(ct.alternativeDisplayName) ? displayName : ct.alternativeDisplayName;
+        }
+        return displayName;
+    }
+
+    /// <summary>
+    /// Aktif hikaye bayrağına göre uygun description'ı döner.
+    /// hasConditionalText kapalıysa veya eşleşen flag yoksa default description döner.
+    /// İlk eşleşen entry kazanır. Entry'nin alt açıklaması boşsa default'a düşer.
+    /// </summary>
+    public string GetDescription()
+    {
+        if (!hasConditionalText || conditionalTexts == null || conditionalTexts.Count == 0
+            || StoryFlagManager.Instance == null)
+            return description;
+
+        for (int i = 0; i < conditionalTexts.Count; i++)
+        {
+            var ct = conditionalTexts[i];
+            if (ct.requiredFlag != StoryFlag.None && StoryFlagManager.Instance.HasFlag(ct.requiredFlag))
+                return string.IsNullOrEmpty(ct.alternativeDescription) ? description : ct.alternativeDescription;
+        }
+        return description;
+    }
 }
 
 public enum ChainRole
@@ -425,4 +470,16 @@ public class ConditionalDescription
 {
     public StoryFlag requiredFlag; //bu bayrak aktifse alternatif açıklama kullanılır
     [TextArea(2, 8)] public string alternativeDescription; //bayrak aktifken gösterilecek açıklama
+}
+
+/// <summary>
+/// Choice seviyesinde koşullu metin girişi. Hikaye bayrağı aktifse default isim ve/veya açıklama
+/// yerine alternatif gösterilir. Alt alanlardan biri boşsa o alan default'a düşer.
+/// </summary>
+[System.Serializable]
+public class ConditionalChoiceText
+{
+    public StoryFlag requiredFlag; //bu bayrak aktifse alternatif metin kullanılır
+    public string alternativeDisplayName; //bayrak aktifken gösterilecek isim (boşsa default)
+    [TextArea(2, 4)] public string alternativeDescription; //bayrak aktifken gösterilecek açıklama (boşsa default)
 }

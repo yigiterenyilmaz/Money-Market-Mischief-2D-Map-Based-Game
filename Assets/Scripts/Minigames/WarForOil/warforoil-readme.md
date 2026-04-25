@@ -235,6 +235,8 @@ Event icindeki tek bir secenek. Serializable sinif.
 | **Temel Alanlar** | |
 | `displayName` | Secenek adi |
 | `description` | Secenek aciklamasi (TextArea) |
+| `hasConditionalText` | true ise hikaye bayragina gore displayName ve description override edilebilir. Inspector'da bayrak listesi acilir. |
+| `conditionalTexts` | List<ConditionalChoiceText>: her entry `requiredFlag`, `alternativeDisplayName`, `alternativeDescription` icerir. Ilk eslesen kazanir. Bos alan default'a duser. Runtime'da `choice.GetDisplayName()` / `choice.GetDescription()` ile cekilir. |
 | `supportModifier` | Destek stat degisimi (+ = destek artar) |
 | `suspicionModifier` | Suphe degisimi (anlik uygulanir, sonuc ekraninda gostermek icin ayrica biriktirilir) |
 | `reputationModifier` | Itibar degisimi (+ = artar, - = duser, anlik uygulanir, sonuc ekraninda gostermek icin ayrica biriktirilir) |

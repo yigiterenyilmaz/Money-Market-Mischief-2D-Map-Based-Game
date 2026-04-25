@@ -291,6 +291,38 @@ public class WarForOilEventEditor : Editor
         dispName.stringValue = EditorGUILayout.TextArea(dispName.stringValue, GUILayout.MinHeight(EditorGUIUtility.singleLineHeight * 2));
         EditorGUILayout.PropertyField(choice.FindPropertyRelative("description"));
 
+        //hikaye bayrağına göre değişken metin
+        SerializedProperty hasCondText = choice.FindPropertyRelative("hasConditionalText");
+        EditorGUILayout.PropertyField(hasCondText, new GUIContent("Bayrağa Göre Değişken Metin",
+            "Tiklenirse bu choice'un display name'i ve description'ı aktif hikaye bayrağına göre alternatif metinlerle değiştirilebilir. İlk eşleşen kazanır."));
+        if (hasCondText.boolValue)
+        {
+            EditorGUI.indentLevel++;
+            SerializedProperty condTexts = choice.FindPropertyRelative("conditionalTexts");
+            int newSize = Mathf.Max(0, EditorGUILayout.IntField("Bayrak Sayısı", condTexts.arraySize));
+            if (newSize != condTexts.arraySize)
+                condTexts.arraySize = newSize;
+
+            for (int i = 0; i < condTexts.arraySize; i++)
+            {
+                SerializedProperty entry = condTexts.GetArrayElementAtIndex(i);
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.PropertyField(entry.FindPropertyRelative("requiredFlag"),
+                    new GUIContent($"Bayrak {i}"));
+                EditorGUILayout.PropertyField(entry.FindPropertyRelative("alternativeDisplayName"),
+                    new GUIContent("Alternatif İsim"));
+                SerializedProperty altDesc = entry.FindPropertyRelative("alternativeDescription");
+                EditorGUILayout.LabelField("Alternatif Açıklama");
+                altDesc.stringValue = EditorGUILayout.TextArea(altDesc.stringValue,
+                    GUILayout.MinHeight(EditorGUIUtility.singleLineHeight * 3));
+                EditorGUILayout.EndVertical();
+            }
+            EditorGUILayout.HelpBox(
+                "Boş alan default'a düşer (sadece açıklamayı veya sadece ismi değiştirebilirsin). İlk eşleşen bayrak kazanır.",
+                MessageType.Info);
+            EditorGUI.indentLevel--;
+        }
+
         EditorGUILayout.Space(2);
 
         //modifier'lar — foldout
@@ -1380,6 +1412,8 @@ public class WarForOilEventEditor : Editor
     {
         choice.FindPropertyRelative("displayName").stringValue = "";
         choice.FindPropertyRelative("description").stringValue = "";
+        choice.FindPropertyRelative("hasConditionalText").boolValue = false;
+        choice.FindPropertyRelative("conditionalTexts").arraySize = 0;
         choice.FindPropertyRelative("supportModifier").floatValue = 0f;
         choice.FindPropertyRelative("suspicionModifier").floatValue = 0f;
         choice.FindPropertyRelative("reputationModifier").floatValue = 0f;
