@@ -9,6 +9,7 @@ public class AscendingTriangle : PhasedPattern
 {
     public override string Id => "A6_AscendingTriangle";
     public override float Weight => 3f;
+    protected override float FailureChance => 0.15f;
 
     public override bool MatchesContext(MarketContext context)
     {
@@ -74,10 +75,24 @@ public class AscendingTriangle : PhasedPattern
                 targetOffsetPercent = 4f,
                 durationRange = new Vector2Int(2, 3),
                 character = CandleCharacter.Small
-            },
+            }
+        };
 
-            // Breakout
-            new PhaseDefinition
+        if (isFailedRun)
+        {
+            phases.Add(new PhaseDefinition
+            {
+                name = "FailedSelloff",
+                targetOffsetPercent = 0f,
+                durationRange = new Vector2Int(5, 10),
+                character = CandleCharacter.Medium,
+                hasOpeningOverride = true,
+                openingOverride = CandleProfiles.Get(CandleCharacter.Marubozu, ColorBias.Red)
+            });
+        }
+        else
+        {
+            phases.Add(new PhaseDefinition
             {
                 name = "Breakout",
                 targetOffsetPercent = 8f,
@@ -85,7 +100,7 @@ public class AscendingTriangle : PhasedPattern
                 character = CandleCharacter.Medium,
                 hasOpeningOverride = true,
                 openingOverride = breakoutOpening
-            }
-        };
+            });
+        }
     }
 }

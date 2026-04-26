@@ -52,6 +52,8 @@ public abstract class PhasedPattern : ChartPattern
         currentPhaseDuration = Random.Range(min, max + 1);
         currentPhaseTargetPrice = TargetPrice(phase.targetOffsetPercent);
         candleIndexInPhase = 0;
+
+        Debug.Log($"[Pattern] {Id} phase '{phase.name}' starting, target={currentPhaseTargetPrice:F2}, duration={currentPhaseDuration} mum");
     }
 
     public override CandleOHLC GenerateNextCandle(float prevClose)

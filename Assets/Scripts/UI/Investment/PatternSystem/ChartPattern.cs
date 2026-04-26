@@ -14,11 +14,18 @@ public abstract class ChartPattern
     protected float p0;
     protected float volatilityMultiplier = 1f;
 
+    // Failed pattern logic: pattern alt sinifi FailureChance override eder.
+    // Init'te zar atilir, true ise pattern'in BuildPhases'i isFailedRun'a bakip
+    // resolution phase'ini ters yonde kurar (orn. breakdown -> rally).
+    protected virtual float FailureChance => 0f;
+    protected bool isFailedRun;
+
     public virtual void Init(MarketState marketState, float p0, float volatilityMultiplier)
     {
         this.marketState = marketState;
         this.p0 = p0;
         this.volatilityMultiplier = volatilityMultiplier;
+        this.isFailedRun = Random.value < FailureChance;
     }
 
     public abstract bool MatchesContext(MarketContext context);

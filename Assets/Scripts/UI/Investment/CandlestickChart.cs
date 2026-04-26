@@ -81,6 +81,9 @@ public class CandlestickChart : MonoBehaviour
     [Tooltip("Pattern arasi maksimum mum sayisi")]
     public int patternCooldownMax = 15;
 
+    [Tooltip("Test icin tetiklenecek pattern Id (orn: C8_MorningStar). ContextMenu 'Force Pattern by Id' ile kullan.")]
+    public string forcePatternId;
+
     // Fiyat durumu
     float currentPrice;
     float candleOpenPrice;
@@ -182,10 +185,51 @@ public class CandlestickChart : MonoBehaviour
         scheduler = new PatternScheduler(patternCooldownMin, patternCooldownMax, volatilityMultiplier);
         scheduler.RegisterAll(new ChartPattern[]
         {
-            new PumpEvent(),
-            new DojiCandle(),
-            new AscendingTriangle(),
-            new HeadAndShoulders()
+            // A grubu — Klasik Formasyonlar
+            new HeadAndShoulders(),           // A1
+            new InverseHeadAndShoulders(),    // A2
+            new DoubleTop(),                  // A3
+            new DoubleBottom(),               // A4
+            new TripleTop(),                  // A5
+            new TripleBottom(),               // A5
+            new AscendingTriangle(),          // A6
+            new DescendingTriangle(),         // A7
+            new SymmetricalTriangle(),        // A8
+            new BullFlag(),                   // A9
+            new BearFlag(),                   // A10
+            new Pennant(),                    // A11
+            new RisingWedge(),                // A12
+            new FallingWedge(),               // A13
+            new CupAndHandle(),               // A14
+            new Rectangle(),                  // A15
+
+            // B grubu — Wyckoff
+            new WyckoffAccumulation(),        // B1
+            new WyckoffDistribution(),        // B2
+
+            // C grubu — Mum pattern'leri
+            new Hammer(),                     // C1
+            new InvertedHammer(),             // C2
+            new ShootingStar(),               // C3
+            new HangingMan(),                 // C4
+            new DojiCandle(),                 // C5
+            new BullishEngulfing(),           // C6
+            new BearishEngulfing(),           // C7
+            new MorningStar(),                // C8
+            new EveningStar(),                // C9
+            new ThreeWhiteSoldiers(),         // C10
+            new ThreeBlackCrows(),            // C11
+            new MarubozuPattern(),            // C12
+            new BullishHarami(),              // C13
+            new BearishHarami(),              // C14
+
+            // D grubu — Price Action
+            new PumpEvent(),                  // D1
+            new DumpEvent(),                  // D2
+            new LiquidityGrab(),              // D3
+            new Fakeout(),                    // D4
+            new Squeeze(),                    // D5
+            new ContinuationPullback()        // D6
         });
 
         // Ilk mumu baslat
@@ -604,6 +648,18 @@ public class CandlestickChart : MonoBehaviour
     }
 
     // === Debug pattern tetikleyiciler (Inspector right-click) ===
+
+    [ContextMenu("Force Pattern by Id")]
+    void DebugForceById()
+    {
+        if (scheduler == null || marketState == null) return;
+        if (string.IsNullOrEmpty(forcePatternId))
+        {
+            Debug.LogWarning("[Pattern] forcePatternId Inspector field'i bos. Ornek: C8_MorningStar");
+            return;
+        }
+        scheduler.TryForcePattern(forcePatternId, marketState);
+    }
 
     [ContextMenu("Force Pattern: Pump (D1)")]
     void DebugForcePump()
