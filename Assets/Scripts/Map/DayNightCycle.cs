@@ -75,6 +75,9 @@ public class DayNightCycle : MonoBehaviour
     private float cycleTimer;
     private float totalCycleLength;
 
+    /// <summary>Bir tam day/night cycle'in toplam saniye uzunlugu (day + dusk + night + dawn).</summary>
+    public float TotalCycleLength => totalCycleLength;
+
     private float dayEnd;
     private float duskEnd;
     private float nightEnd;

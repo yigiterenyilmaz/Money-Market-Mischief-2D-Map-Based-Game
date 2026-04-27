@@ -51,21 +51,20 @@ public class PeriodicChangeManager : MonoBehaviour
             drain.elapsed += Time.deltaTime;
 
             //her entry için tick kontrolü
-            if (drain.entryStates != null)
+            if (drain.entries != null)
             {
-                for (int e = 0; e < drain.entryStates.Count; e++)
+                for (int e = 0; e < drain.entries.Count; e++)
                 {
-                    EntryState state = drain.entryStates[e];
-                    PeriodicChangeEntry entry = drain.entries[e];
-                    if (entry.tickInterval <= 0f) continue;
+                    ActiveEntry entry = drain.entries[e];
+                    if (entry.tickIntervalSeconds <= 0f) continue;
 
-                    state.timer += Time.deltaTime;
-                    while (state.timer >= entry.tickInterval && drain.elapsed <= drain.duration + 0.0001f)
+                    entry.timer += Time.deltaTime;
+                    while (entry.timer >= entry.tickIntervalSeconds && drain.elapsed <= drain.duration + 0.0001f)
                     {
-                        state.timer -= entry.tickInterval;
+                        entry.timer -= entry.tickIntervalSeconds;
                         ApplyTick(entry);
                     }
-                    drain.entryStates[e] = state;
+                    drain.entries[e] = entry;
                 }
             }
 
@@ -79,6 +78,7 @@ public class PeriodicChangeManager : MonoBehaviour
 
     /// <summary>
     /// Choice'ta tanımlı periyodik değişikliği başlatır. Origin, çağrıyı yapan manager tarafından belirlenir.
+    /// Süre ve tick aralıkları DayNightCycle.TotalCycleLength üzerinden saniyeye çevrilir (Days birimi için).
     /// Aynı choice tekrar gelirse yeni drain instance olarak eklenir (üst üste biner).
     /// </summary>
     public void StartChange(WarForOilEventChoice choice, PeriodicChangeOrigin origin)
@@ -88,18 +88,56 @@ public class PeriodicChangeManager : MonoBehaviour
         if (choice.periodicChangesDuration <= 0f) return;
         if (choice.periodicChanges == null || choice.periodicChanges.Count == 0) return;
 
+        //dayLength'i bir kerelik fetch et — drain başlangıcında kilitlenir
+        float dayLength = DayNightCycle.Instance != null ? DayNightCycle.Instance.TotalCycleLength : 0f;
+        if (dayLength <= 0f)
+        {
+            //fallback: DayNightCycle yok veya henüz init olmamış
+            dayLength = 130f;
+            if (HasAnyDaysUnit(choice))
+                Debug.LogWarning("[PeriodicChangeManager] DayNightCycle aktif degil, Days birimi 130sn fallback ile cevriliyor.");
+        }
+
+        float durationSeconds = ToSeconds(choice.periodicChangesDuration, choice.periodicChangesDurationUnit, dayLength);
+
         ActiveDrain drain = new ActiveDrain
         {
             origin = origin,
-            duration = choice.periodicChangesDuration,
+            duration = durationSeconds,
             elapsed = 0f,
-            entries = new List<PeriodicChangeEntry>(choice.periodicChanges),
-            entryStates = new List<EntryState>(choice.periodicChanges.Count)
+            entries = new List<ActiveEntry>(choice.periodicChanges.Count)
         };
+
         for (int i = 0; i < choice.periodicChanges.Count; i++)
-            drain.entryStates.Add(new EntryState { timer = 0f });
+        {
+            PeriodicChangeEntry source = choice.periodicChanges[i];
+            drain.entries.Add(new ActiveEntry
+            {
+                stat = source.stat,
+                tickIntervalSeconds = ToSeconds(source.tickInterval, source.tickIntervalUnit, dayLength),
+                amountPerTick = source.amountPerTick,
+                action = source.action,
+                timer = 0f
+            });
+        }
 
         activeDrains.Add(drain);
+    }
+
+    private static float ToSeconds(float value, PeriodicTimeUnit unit, float dayLength)
+    {
+        return unit == PeriodicTimeUnit.Days ? value * dayLength : value;
+    }
+
+    private static bool HasAnyDaysUnit(WarForOilEventChoice choice)
+    {
+        if (choice.periodicChangesDurationUnit == PeriodicTimeUnit.Days) return true;
+        if (choice.periodicChanges != null)
+        {
+            for (int i = 0; i < choice.periodicChanges.Count; i++)
+                if (choice.periodicChanges[i].tickIntervalUnit == PeriodicTimeUnit.Days) return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -130,7 +168,7 @@ public class PeriodicChangeManager : MonoBehaviour
 
     // ==================== TICK UYGULAMA ====================
 
-    private void ApplyTick(PeriodicChangeEntry entry)
+    private void ApplyTick(ActiveEntry entry)
     {
         bool applied = false;
 
@@ -201,14 +239,18 @@ public class PeriodicChangeManager : MonoBehaviour
     private class ActiveDrain
     {
         public PeriodicChangeOrigin origin;
-        public float duration;
+        public float duration;       //saniye (hesaplanmış)
         public float elapsed;
-        public List<PeriodicChangeEntry> entries;
-        public List<EntryState> entryStates;
+        public List<ActiveEntry> entries;
     }
 
-    private struct EntryState
+    //timer değiştiği için struct, list içinde kopya-yaz pattern'i ile güncellenir
+    private struct ActiveEntry
     {
+        public PermanentMultiplierStatType stat;
+        public float tickIntervalSeconds;     //saniye (hesaplanmış)
+        public float amountPerTick;
+        public PeriodicChangeAction action;
         public float timer;
     }
 }

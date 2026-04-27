@@ -1423,7 +1423,7 @@ public class WarForOilEventEditor : Editor
     {
         SerializedProperty changes = choice.FindPropertyRelative("periodicChanges");
 
-        //her entry: stat + tickInterval + amountPerTick + action
+        //her entry: stat + tickIntervalUnit + tickInterval + amountPerTick + action
         for (int i = 0; i < changes.arraySize; i++)
         {
             SerializedProperty entry = changes.GetArrayElementAtIndex(i);
@@ -1443,8 +1443,26 @@ public class WarForOilEventEditor : Editor
 
             EditorGUILayout.PropertyField(entry.FindPropertyRelative("stat"),
                 new GUIContent("Stat"));
+
+            //tick aralığı birimi + değer
+            SerializedProperty tickUnit = entry.FindPropertyRelative("tickIntervalUnit");
+            EditorGUILayout.PropertyField(tickUnit, new GUIContent("Tick Aralığı Birimi"));
+
+            string tickLabel;
+            string tickTooltip;
+            if (tickUnit.enumValueIndex == (int)PeriodicTimeUnit.Days)
+            {
+                tickLabel = "Tick Aralığı (gün)";
+                tickTooltip = "Day/night cycle bazlı. Örnek: 1 = her gün, 7 = 7 günde bir, 0.333 = günde 3 defa.";
+            }
+            else
+            {
+                tickLabel = "Tick Aralığı (sn)";
+                tickTooltip = "Kaç saniyede bir değişim uygulanır.";
+            }
             EditorGUILayout.PropertyField(entry.FindPropertyRelative("tickInterval"),
-                new GUIContent("Tick Aralığı (sn)", "Kaç saniyede bir değişim uygulanır."));
+                new GUIContent(tickLabel, tickTooltip));
+
             EditorGUILayout.PropertyField(entry.FindPropertyRelative("amountPerTick"),
                 new GUIContent("Tick Başına Miktar", "Her tick'te uygulanacak miktar (negatif = azalt)."));
             EditorGUILayout.PropertyField(entry.FindPropertyRelative("action"),
@@ -1459,14 +1477,20 @@ public class WarForOilEventEditor : Editor
 
         EditorGUILayout.Space(4);
 
-        //toplam süre — listenin altında, ortak alan
+        //toplam süre — listenin altında, ortak alan (birim + değer)
+        SerializedProperty durationUnit = choice.FindPropertyRelative("periodicChangesDurationUnit");
+        EditorGUILayout.PropertyField(durationUnit, new GUIContent("Toplam Süre Birimi"));
+
         SerializedProperty duration = choice.FindPropertyRelative("periodicChangesDuration");
+        string durationLabel = durationUnit.enumValueIndex == (int)PeriodicTimeUnit.Days
+            ? "Toplam Süre (gün)"
+            : "Toplam Süre (sn)";
         EditorGUILayout.PropertyField(duration,
-            new GUIContent("Toplam Süre (sn)", "Bu süre boyunca tüm tick'ler işler. Süre dolunca durur."));
+            new GUIContent(durationLabel, "Bu süre boyunca tüm tick'ler işler. Süre dolunca durur."));
         if (duration.floatValue < 0f) duration.floatValue = 0f;
 
         EditorGUILayout.HelpBox(
-            "Drain'in origin'i seçimin yapıldığı sürece göre belirlenir (savaş veya kadın). Origin süreci süreden önce biterse drain iptal olur.",
+            "Drain'in origin'i seçimin yapıldığı sürece göre belirlenir (savaş veya kadın). Origin süreci süreden önce biterse drain iptal olur. Days birimi DayNightCycle.TotalCycleLength üzerinden saniyeye çevrilir.",
             MessageType.Info);
     }
 

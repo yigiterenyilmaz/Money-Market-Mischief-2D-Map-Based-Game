@@ -254,7 +254,8 @@ public class WarForOilEventChoice
 
     //periyodik değişiklikler — choice seçildiğinde belirli süre boyunca düzenli stat değişimi
     public bool hasPeriodicChanges; //true ise seçildiğinde periyodik stat değişimleri başlar
-    public float periodicChangesDuration; //toplam süre (saniye) — bu süre dolunca tüm tick'ler durur
+    public PeriodicTimeUnit periodicChangesDurationUnit = PeriodicTimeUnit.Seconds; //toplam süre birimi (saniye veya gün)
+    public float periodicChangesDuration; //toplam süre — birime göre yorumlanır (saniye veya gün)
     public List<PeriodicChangeEntry> periodicChanges = new List<PeriodicChangeEntry>(); //her giriş bir stat'ı kendi aralığıyla değiştirir
 
     //anında tetiklenen event — choice seçildiğinde havuzdan biri gösterilir
@@ -510,7 +511,18 @@ public class ConditionalChoiceText
 public class PeriodicChangeEntry
 {
     public PermanentMultiplierStatType stat; //etkilenecek stat (Wealth/Suspicion/Reputation/PoliticalInfluence/WarSupport/WomanObsession)
-    public float tickInterval = 1f; //tick aralığı (saniye)
+    public PeriodicTimeUnit tickIntervalUnit = PeriodicTimeUnit.Seconds; //tick aralığı birimi (saniye veya gün)
+    public float tickInterval = 1f; //tick aralığı — birime göre yorumlanır (saniye veya gün — gün birimde 0.333 = günde 3 defa)
     public float amountPerTick; //her tick'te uygulanacak miktar (negatif = azalt)
     public PeriodicChangeAction action = PeriodicChangeAction.None; //her tick'te fırlatılacak UI action ID'si
+}
+
+/// <summary>
+/// Periyodik değişiklik için zaman birimi.
+/// Days birimi DayNightCycle.TotalCycleLength üzerinden saniyeye çevrilir.
+/// </summary>
+public enum PeriodicTimeUnit
+{
+    Seconds,    //değer doğrudan saniye olarak yorumlanır
+    Days        //değer day/night cycle bazlı (1 = bir tam gün, 0.333 = günde 3 defa, 7 = 7 günde bir)
 }

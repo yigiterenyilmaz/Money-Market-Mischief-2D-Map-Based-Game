@@ -1262,9 +1262,27 @@ Bir choice secildiginde belirli sure boyunca duzenli olarak stat degistirme sist
 | Alan | Aciklama |
 |---|---|
 | `stat` | Etkilenecek stat (`PermanentMultiplierStatType` enum: Wealth/Suspicion/Reputation/PoliticalInfluence/WarSupport/WomanObsession) |
-| `tickInterval` | Kac saniyede bir uygulanir |
+| `tickIntervalUnit` | Tick araliginin birimi (`PeriodicTimeUnit`: Seconds / Days) |
+| `tickInterval` | Birim'e gore yorumlanir. Seconds: saniye. Days: gun (1=her gun, 7=7 gunde bir, 0.333=gunde 3 defa) |
 | `amountPerTick` | Tick basina degisim (negatif = azalt) |
 | `action` | Tick'te firlatilacak `PeriodicChangeAction` enum degeri (None ise firlatilmaz) |
+
+### Choice Alanlari (Toplam Sure)
+
+| Alan | Aciklama |
+|---|---|
+| `hasPeriodicChanges` | Bu choice secilince periyodik degisim baslatir |
+| `periodicChangesDurationUnit` | Toplam sure birimi (`PeriodicTimeUnit`: Seconds / Days) |
+| `periodicChangesDuration` | Toplam sure — birime gore saniye veya gun |
+| `periodicChanges` | `List<PeriodicChangeEntry>` — her entry kendi tick aralig + birimine sahip |
+
+### Birim Cevirimi (Days → Seconds)
+
+`Days` birimindeki tum degerler `StartChange` cagrilirken `DayNightCycle.Instance.TotalCycleLength` (= dayLength + duskLength + nightLength + dawnLength) ile carpilarak saniyeye cevrilir.
+
+**Onemli**: Cevrim drain baslangicinda **bir kerelik** yapilir. Drain calisirken `dayLength` degisirse drain etkilenmez — baslangictaki saniye degerine sadik kalir.
+
+**Fallback**: `DayNightCycle.Instance` yoksa veya `TotalCycleLength <= 0` ise 130sn fallback kullanilir ve warning loglanir (sadece Days birimi kullanan choice'larda).
 
 ### Origin (PeriodicChangeOrigin enum)
 
