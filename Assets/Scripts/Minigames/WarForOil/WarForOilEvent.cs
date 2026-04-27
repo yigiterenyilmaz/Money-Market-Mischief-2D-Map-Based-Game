@@ -252,6 +252,11 @@ public class WarForOilEventChoice
     //dinamik stat tavanı — choice seçildiğinde belirli stat'ların tavanını düşürür veya kaldırır
     public List<StatCeilingEntry> statCeilingEffects; //tavan koy veya kaldır
 
+    //periyodik değişiklikler — choice seçildiğinde belirli süre boyunca düzenli stat değişimi
+    public bool hasPeriodicChanges; //true ise seçildiğinde periyodik stat değişimleri başlar
+    public float periodicChangesDuration; //toplam süre (saniye) — bu süre dolunca tüm tick'ler durur
+    public List<PeriodicChangeEntry> periodicChanges = new List<PeriodicChangeEntry>(); //her giriş bir stat'ı kendi aralığıyla değiştirir
+
     //anında tetiklenen event — choice seçildiğinde havuzdan biri gösterilir
     public bool hasImmediateEvent; //true ise seçildiğinde bir event tetiklenir
     [Range(0f, 15f)] public float immediateEventDelay; //tetikleme gecikmesi (0 = anında, saniye cinsinden)
@@ -495,4 +500,17 @@ public class ConditionalChoiceText
     public StoryFlag requiredFlag; //bu bayrak aktifse alternatif metin kullanılır
     public string alternativeDisplayName; //bayrak aktifken gösterilecek isim (boşsa default)
     [TextArea(2, 4)] public string alternativeDescription; //bayrak aktifken gösterilecek açıklama (boşsa default)
+}
+
+/// <summary>
+/// Periyodik değişiklik girişi. Choice'ın toplam süresi boyunca belirli aralıklarla
+/// hedef stat'ı değiştirir ve action fırlatır. Her entry kendi tick aralığına sahiptir.
+/// </summary>
+[System.Serializable]
+public class PeriodicChangeEntry
+{
+    public PermanentMultiplierStatType stat; //etkilenecek stat (Wealth/Suspicion/Reputation/PoliticalInfluence/WarSupport/WomanObsession)
+    public float tickInterval = 1f; //tick aralığı (saniye)
+    public float amountPerTick; //her tick'te uygulanacak miktar (negatif = azalt)
+    public PeriodicChangeAction action = PeriodicChangeAction.None; //her tick'te fırlatılacak UI action ID'si
 }

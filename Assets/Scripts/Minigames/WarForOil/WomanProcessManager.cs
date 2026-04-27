@@ -444,6 +444,10 @@ public class WomanProcessManager : MonoBehaviour
             dropLimitPeakObsession = Mathf.Max(dropLimitPeakObsession, womanObsession);
         }
 
+        //periyodik değişiklikler — choice'ta tanımlıysa başlat (origin = WomanProcess)
+        if (choice.hasPeriodicChanges && PeriodicChangeManager.Instance != null)
+            PeriodicChangeManager.Instance.StartChange(choice, PeriodicChangeOrigin.WomanProcess);
+
         OnWomanEventResolved?.Invoke(choice);
 
         currentWomanEvent = null;
@@ -608,6 +612,24 @@ public class WomanProcessManager : MonoBehaviour
     public void ApplyPermanentObsessionMultiplier(float multiplier)
     {
         obsessionGainMultiplier *= multiplier;
+    }
+
+    /// <summary>
+    /// Obsesyona doğrudan miktar ekler/çıkarır. Kadın süreci aktif değilse hiçbir şey yapmaz.
+    /// Pozitif değer obsessionGainMultiplier ile çarpılır. Periyodik değişiklik tick'leri tarafından kullanılır.
+    /// 0-100 arası clamp edilir, 100'e ulaşırsa CheckEndConditions üzerinden game over tetiklenir.
+    /// </summary>
+    public void AddObsession(float amount)
+    {
+        if (currentState == WomanProcessState.Inactive) return;
+        if (amount == 0f) return;
+
+        if (amount > 0f)
+            amount *= obsessionGainMultiplier;
+
+        womanObsession = Mathf.Clamp(womanObsession + amount, 0f, 100f);
+        OnObsessionChanged?.Invoke(womanObsession);
+        CheckEndConditions();
     }
 
     /// <summary>
@@ -1204,6 +1226,10 @@ public class WomanProcessManager : MonoBehaviour
         //savaş-spesifik etkiler
         if (isInWar && WarForOilManager.Instance != null)
             WarForOilManager.Instance.ApplyExternalWarEffects(choice);
+
+        //periyodik değişiklikler — choice'ta tanımlıysa başlat (origin = WomanProcess, precursor de kadın sürecinin parçası)
+        if (choice.hasPeriodicChanges && PeriodicChangeManager.Instance != null)
+            PeriodicChangeManager.Instance.StartChange(choice, PeriodicChangeOrigin.WomanProcess);
 
         currentPrecursorWarEvent = null;
         OnPrecursorEventResolved?.Invoke();

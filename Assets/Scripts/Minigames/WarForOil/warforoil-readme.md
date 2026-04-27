@@ -1208,15 +1208,18 @@ Kadin eventleri `WarForOilEvent` altyapisini kullanir ama WomanProcessManager ke
 ```
 Assets/Scripts/Minigames/WarForOil/
 ├── WarForOilCountry.cs         — ulke verisi (ScriptableObject)
-├── WarForOilEvent.cs           — event + choice + ChainRole + ChainBranch
+├── WarForOilEvent.cs           — event + choice + ChainRole + ChainBranch + PeriodicChangeEntry
 ├── WarForOilDatabase.cs        — ayarlar + event havuzlari (ScriptableObject)
 ├── WarForOilManager.cs         — ana mantik + state machine + rotasyon (MonoBehaviour)
 ├── WomanProcessDatabase.cs     — kadin sureci ayarlari (ScriptableObject)
 ├── WomanProcessManager.cs      — kadin sureci mantigi (MonoBehaviour, Singleton)
+├── PeriodicChangeManager.cs    — choice'lardan tetiklenen sureli stat degisikligi (MonoBehaviour, Singleton)
 ├── Editor/
 │   └── WarForOilEventEditor.cs — Inspector custom editor
 └── warforoil-readme.md         — bu dosya
 ```
+
+`Assets/Scripts/Core/Enums/PeriodicChangeAction.cs` — UI'in dinleyebilecegi tick action ID enum'u
 
 ---
 
@@ -1240,3 +1243,61 @@ Oyun icinde gerceklesmis onemli olaylari takip eden bayrak sistemi. Bir kez akti
 - `WarForOilEventChoice.hasConditionalText` + `conditionalTexts` — choice seviyesinde displayName ve description override
 - Runtime'da `GetDisplayName()` ve `GetDescription()` metodlariyla alinir — ilk eslesen bayrak gecerli olur, bos alan default'a duser
 - Inspector'da "Bayraga Gore Degisken Metin" toggle olarak gozukur — tikli iken bayrak sayisi + her entry icin flag dropdown + alt isim + alt aciklama alanlari acilir
+
+---
+
+## Periyodik Degisiklik Sistemi (PeriodicChange)
+
+Bir choice secildiginde belirli sure boyunca duzenli olarak stat degistirme sistemi.
+
+### Akis
+
+1. Choice'ta `hasPeriodicChanges = true` ve `periodicChangesDuration` (toplam sn) + `periodicChanges` listesi tanimli
+2. Choice resolve edilirken (savas veya kadin manager icinde) `PeriodicChangeManager.StartChange(choice, origin)` cagirilir — origin cagri yapan manager'a gore hardcoded
+3. Manager Update'inde her aktif drain icin tick'leri ilerletir, sure dolunca drain biter
+4. Origin sureci (savas / kadin) sure dolmadan biterse drain otomatik iptal olur (event-based: `OnWarFinished` / `OnWomanProcessEnded` / `OnWomanProcessGameOver` dinleniyor)
+
+### PeriodicChangeEntry Alanlari
+
+| Alan | Aciklama |
+|---|---|
+| `stat` | Etkilenecek stat (`PermanentMultiplierStatType` enum: Wealth/Suspicion/Reputation/PoliticalInfluence/WarSupport/WomanObsession) |
+| `tickInterval` | Kac saniyede bir uygulanir |
+| `amountPerTick` | Tick basina degisim (negatif = azalt) |
+| `action` | Tick'te firlatilacak `PeriodicChangeAction` enum degeri (None ise firlatilmaz) |
+
+### Origin (PeriodicChangeOrigin enum)
+
+- `War` — `WarForOilManager.ResolveEvent` icinden baslatildi → savas bitince iptal
+- `WomanProcess` — `WomanProcessManager.ResolveEvent` veya `ResolvePrecursorWarEvent` icinden baslatildi → kadin sureci bitince iptal
+
+Origin choice asset'inden gelmiyor, **cagiriyi yapan manager'in hardcoded gondermesinden** geliyor. Ayni asset hem savas hem kadin havuzunda olsa bile her secim olayinda kim resolve ediyorsa o origin atanir.
+
+### Stat Tick Davranisi
+
+| Stat | Davranis |
+|---|---|
+| Wealth | `GameStatManager.AddWealth` |
+| Suspicion | Pozitif → `AddSuspicion` (itibar carpani uygulanir), Negatif → `AddSuspicionRaw` |
+| Reputation | `AddReputation` |
+| PoliticalInfluence | `AddPoliticalInfluence` |
+| WarSupport | Sadece savas aktifken `WarForOilManager.AddSupportRaw` (kalici carpan uygulanmaz). Savas yoksa o tick atlanir, action firlatilmaz |
+| WomanObsession | Sadece kadin sureci aktifken `WomanProcessManager.AddObsession` (obsessionGainMultiplier uygulanir, 100'e ulasirsa game over). Kadin yoksa o tick atlanir, action firlatilmaz |
+
+### Manager API
+
+**`PeriodicChangeManager.cs` (Singleton):**
+- `StartChange(WarForOilEventChoice choice, PeriodicChangeOrigin origin)` — yeni drain ekler. Ayni choice tekrar gelirse uzerine biner.
+- `GetActiveDrainCount()` — aktif drain sayisi
+- `static event Action<PeriodicChangeAction> OnPeriodicChangeTick` — UI bunu dinleyerek action'lari yakalar (action `None` degilse her basarili tick'te firlatilir)
+
+### Inspector
+
+Choice altindaki "Diger Sonuclar" foldout'unda "Duzenli Degisiklik" toggle'i acildiginda:
+- Stat listesi (her entry: stat dropdown, tick araligi, tick basina miktar, action dropdown)
+- En altta toplam sure (sn) ortak alan
+- "+ Stat Ekle" / "-" butonlari ile entry yonetimi
+
+### Pause Davranisi
+
+`Time.deltaTime` kullaniliyor — event acildiginda (oyun pause) drain'ler de durur, secim yapilip oyun resume olunca devam eder.

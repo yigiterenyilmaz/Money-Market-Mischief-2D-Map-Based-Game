@@ -776,6 +776,17 @@ public class WarForOilEventEditor : Editor
                 choice.FindPropertyRelative("setsStoryFlags"),
                 new GUIContent("Hikaye Bayrakları"), true);
 
+            //periyodik değişiklikler — choice seçildiğinde belirli süre boyunca düzenli stat değişimi
+            SerializedProperty hasPeriodic = choice.FindPropertyRelative("hasPeriodicChanges");
+            EditorGUILayout.PropertyField(hasPeriodic, new GUIContent("Düzenli Değişiklik",
+                "Tiklenirse seçildiğinde belirli bir süre boyunca tanımlı stat'lar düzenli olarak değişir. Süre dolduğunda durur. Origin sürecinin (savaş/kadın) bitmesi de drain'i iptal eder."));
+            if (hasPeriodic.boolValue)
+            {
+                EditorGUI.indentLevel++;
+                DrawPeriodicChanges(choice);
+                EditorGUI.indentLevel--;
+            }
+
             EditorGUI.indentLevel--;
         }
 
@@ -1406,6 +1417,57 @@ public class WarForOilEventEditor : Editor
 
         EditorGUI.indentLevel--;
         return false;
+    }
+
+    private void DrawPeriodicChanges(SerializedProperty choice)
+    {
+        SerializedProperty changes = choice.FindPropertyRelative("periodicChanges");
+
+        //her entry: stat + tickInterval + amountPerTick + action
+        for (int i = 0; i < changes.arraySize; i++)
+        {
+            SerializedProperty entry = changes.GetArrayElementAtIndex(i);
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField($"Stat {i + 1}", EditorStyles.boldLabel);
+            if (GUILayout.Button("-", EditorStyles.miniButtonRight, GUILayout.Width(22)))
+            {
+                changes.DeleteArrayElementAtIndex(i);
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndVertical();
+                break;
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.PropertyField(entry.FindPropertyRelative("stat"),
+                new GUIContent("Stat"));
+            EditorGUILayout.PropertyField(entry.FindPropertyRelative("tickInterval"),
+                new GUIContent("Tick Aralığı (sn)", "Kaç saniyede bir değişim uygulanır."));
+            EditorGUILayout.PropertyField(entry.FindPropertyRelative("amountPerTick"),
+                new GUIContent("Tick Başına Miktar", "Her tick'te uygulanacak miktar (negatif = azalt)."));
+            EditorGUILayout.PropertyField(entry.FindPropertyRelative("action"),
+                new GUIContent("Tick Action'ı", "Her başarılı tick'te UI'ya fırlatılacak action ID'si."));
+
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(2);
+        }
+
+        if (GUILayout.Button("+ Stat Ekle"))
+            changes.InsertArrayElementAtIndex(changes.arraySize);
+
+        EditorGUILayout.Space(4);
+
+        //toplam süre — listenin altında, ortak alan
+        SerializedProperty duration = choice.FindPropertyRelative("periodicChangesDuration");
+        EditorGUILayout.PropertyField(duration,
+            new GUIContent("Toplam Süre (sn)", "Bu süre boyunca tüm tick'ler işler. Süre dolunca durur."));
+        if (duration.floatValue < 0f) duration.floatValue = 0f;
+
+        EditorGUILayout.HelpBox(
+            "Drain'in origin'i seçimin yapıldığı sürece göre belirlenir (savaş veya kadın). Origin süreci süreden önce biterse drain iptal olur.",
+            MessageType.Info);
     }
 
     private void DrawImmediateEventPool(SerializedProperty pool)

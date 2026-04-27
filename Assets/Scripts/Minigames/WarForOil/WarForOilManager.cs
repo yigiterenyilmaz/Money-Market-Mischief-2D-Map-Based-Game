@@ -452,6 +452,10 @@ public class WarForOilManager : MonoBehaviour
         if (choice.startsWomanProcess && WomanProcessManager.Instance != null)
             WomanProcessManager.Instance.StartProcess();
 
+        //periyodik değişiklikler — choice'ta tanımlıysa başlat (origin = War)
+        if (choice.hasPeriodicChanges && PeriodicChangeManager.Instance != null)
+            PeriodicChangeManager.Instance.StartChange(choice, PeriodicChangeOrigin.War);
+
         WarForOilEvent resolvedEvent = currentEvent;
         OnWarEventResolved?.Invoke(choice);
 
@@ -2742,6 +2746,18 @@ public class WarForOilManager : MonoBehaviour
     public void ApplyPermanentSupportMultiplier(float multiplier)
     {
         supportGainMultiplier *= multiplier;
+    }
+
+    /// <summary>
+    /// supportStat'a doğrudan miktar ekler/çıkarır. Sadece savaş aktifken anlamlıdır.
+    /// Kalıcı çarpan UYGULANMAZ — periyodik değişiklik tick'leri ham değer ekler.
+    /// 0-100 arası clamp edilir.
+    /// </summary>
+    public void AddSupportRaw(float amount)
+    {
+        if (currentState != WarForOilState.WarProcess && currentState != WarForOilState.EventPhase) return;
+        if (amount == 0f) return;
+        supportStat = Mathf.Clamp(supportStat + amount, 0f, 100f);
     }
 
     // ==================== GETTER'LAR ====================
