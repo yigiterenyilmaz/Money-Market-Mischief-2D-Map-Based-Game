@@ -1272,6 +1272,7 @@ Bir choice secildiginde belirli sure boyunca duzenli olarak stat degistirme sist
 | `tickInterval` | Birim'e gore yorumlanir. Seconds: saniye. Days: gun (1=her gun, 7=7 gunde bir, 0.333=gunde 3 defa) |
 | `amountPerTick` | Tick basina degisim (negatif = azalt) |
 | `action` | Tick'te firlatilacak `PeriodicChangeAction` enum degeri (None ise firlatilmaz) |
+| `dayPhasePreference` | Tick'in gunun hangi bolumunde atesleneceği (`DayPhasePreference`: Either / Day / Night). Sadece `tickIntervalUnit == Days && tickInterval >= 1` iken inspector'da gozukur, diger durumlarda Either'a kilitlenir |
 
 ### Choice Alanlari (Toplam Sure)
 
@@ -1321,6 +1322,21 @@ Choice altindaki "Diger Sonuclar" foldout'unda "Duzenli Degisiklik" toggle'i aci
 - Stat listesi (her entry: stat dropdown, tick araligi, tick basina miktar, action dropdown)
 - En altta toplam sure (sn) ortak alan
 - "+ Stat Ekle" / "-" butonlari ile entry yonetimi
+- "Gun Bolumu" dropdown'i sadece tick birimi `Days` ve tick araligi `>= 1` iken gozukur. Diger durumlarda alan otomatik `Either`'a kilitlenir.
+
+### Gun Bolumu Tercihi (DayPhasePreference)
+
+Tick birimi `Days` ve aralik `>= 1` iken her entry kendi gun bolumu tercihine sahip olur:
+
+- `Either` — fark etmez, tick due oldugunda hemen atesleniyor (varsayilan)
+- `Day` — sadece `DayNightCycle.Phase.Day` iken ateslenir
+- `Night` — sadece `DayNightCycle.Phase.Night` iken ateslenir
+
+**Mantik**: Tick zamani geldiginde (`timer >= interval`) hemen ateslenmez, `pendingTicks` sayacina eklenir. Her frame uygun faz mevcutsa pending'lerden bir tanesi tuketilir (frame basina 1, faz icinde ardarda gelirler). `Dusk`/`Dawn` gecisleri Day veya Night sayilmaz — pending bekler.
+
+**Sure dolduktan sonra**: Pending kalmissa drain hemen kapanmaz, en fazla 1 cycle uzunlugu kadar grace period verilir (uygun faz hala gelmediyse pending'ler dusurulur ve drain sonlanir). Boylece `duration=10 gun, interval=1 gun, Night` kombinasyonunda 10. tick gece denk gelmezse bir sonraki gecede yetisir.
+
+**Ornek**: `tickInterval=1 gun, dayPhasePreference=Night, duration=10 gun` → her gun bir tick due olur ve o gunun gece fazinda ateslenir; toplam ~10 gece tick'i.
 
 ### Pause Davranisi
 

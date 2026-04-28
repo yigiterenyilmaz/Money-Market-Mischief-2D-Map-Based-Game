@@ -1481,8 +1481,25 @@ public class WarForOilEventEditor : Editor
                 tickLabel = "Tick Aralığı (sn)";
                 tickTooltip = "Kaç saniyede bir değişim uygulanır.";
             }
-            EditorGUILayout.PropertyField(entry.FindPropertyRelative("tickInterval"),
+            SerializedProperty tickIntervalProp = entry.FindPropertyRelative("tickInterval");
+            EditorGUILayout.PropertyField(tickIntervalProp,
                 new GUIContent(tickLabel, tickTooltip));
+
+            //gün bölümü tercihi — sadece Days birimi + interval >= 1 iken anlamlı.
+            //Aksi halde değer Either'a kilitlenir (gizli alan eski değer taşımasın diye).
+            SerializedProperty dayPhasePref = entry.FindPropertyRelative("dayPhasePreference");
+            bool dayPhaseEligible = tickUnit.enumValueIndex == (int)PeriodicTimeUnit.Days
+                && tickIntervalProp.floatValue >= 1f;
+            if (dayPhaseEligible)
+            {
+                EditorGUILayout.PropertyField(dayPhasePref,
+                    new GUIContent("Gün Bölümü",
+                        "Tick'in günün hangi bölümünde ateşleneceği. Either = fark etmez, Day = sadece gündüz, Night = sadece gece. Dusk/Dawn geçişleri uygun faz değildir; pending tick gelene kadar bekler."));
+            }
+            else if (dayPhasePref.enumValueIndex != (int)DayPhasePreference.Either)
+            {
+                dayPhasePref.enumValueIndex = (int)DayPhasePreference.Either;
+            }
 
             EditorGUILayout.PropertyField(entry.FindPropertyRelative("amountPerTick"),
                 new GUIContent("Tick Başına Miktar", "Her tick'te uygulanacak miktar (negatif = azalt)."));

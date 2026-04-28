@@ -50,30 +50,71 @@ public class PeriodicChangeManager : MonoBehaviour
             ActiveDrain drain = activeDrains[i];
             drain.elapsed += Time.deltaTime;
 
-            //her entry için tick kontrolü
+            bool durationActive = drain.elapsed <= drain.duration + 0.0001f;
+            bool anyPending = false;
+
+            //her entry için tick biriktirme + tüketme
             if (drain.entries != null)
             {
                 for (int e = 0; e < drain.entries.Count; e++)
                 {
                     ActiveEntry entry = drain.entries[e];
-                    if (entry.tickIntervalSeconds <= 0f) continue;
 
-                    entry.timer += Time.deltaTime;
-                    while (entry.timer >= entry.tickIntervalSeconds && drain.elapsed <= drain.duration + 0.0001f)
+                    if (entry.tickIntervalSeconds <= 0f)
                     {
-                        entry.timer -= entry.tickIntervalSeconds;
+                        if (entry.pendingTicks > 0) anyPending = true;
+                        continue;
+                    }
+
+                    //tick due'larını biriktir — sadece duration aktif iken
+                    if (durationActive)
+                    {
+                        entry.timer += Time.deltaTime;
+                        while (entry.timer >= entry.tickIntervalSeconds)
+                        {
+                            entry.timer -= entry.tickIntervalSeconds;
+                            entry.pendingTicks++;
+                        }
+                    }
+
+                    //pending tick'leri uygun fazda tüket — frame başına 1
+                    //Dusk/Dawn geçişlerinde bekler, fazına geçince ateşler
+                    if (entry.pendingTicks > 0 && PhaseMatches(entry.dayPhasePreference))
+                    {
+                        entry.pendingTicks--;
                         ApplyTick(entry);
                     }
+
+                    if (entry.pendingTicks > 0) anyPending = true;
                     drain.entries[e] = entry;
                 }
             }
 
-            //süre dolduysa drain'i bitir
-            if (drain.elapsed >= drain.duration)
+            //süre dolduktan sonra pending tick'lerin tükenmesini bekle.
+            //Faz hiç gelmezse hard cutoff: 1 cycle uzunluğu kadar grace, sonra drain biter.
+            if (!durationActive)
             {
-                activeDrains.RemoveAt(i);
+                bool graceExpired = drain.elapsed >= drain.duration + drain.dayLengthSeconds;
+                if (!anyPending || graceExpired)
+                    activeDrains.RemoveAt(i);
             }
         }
+    }
+
+    /// <summary>
+    /// Verilen tercih, mevcut day/night cycle fazı için uygun mu?
+    /// Either → her zaman uygun. DayNightCycle yoksa kısıtlama yok (Either gibi davranır).
+    /// Dusk/Dawn geçişleri Day veya Night sayılmaz.
+    /// </summary>
+    private static bool PhaseMatches(DayPhasePreference preference)
+    {
+        if (preference == DayPhasePreference.Either) return true;
+        if (DayNightCycle.Instance == null) return true;
+
+        DayNightCycle.Phase current = DayNightCycle.Instance.CurrentPhase;
+        if (preference == DayPhasePreference.Day) return current == DayNightCycle.Phase.Day;
+        if (preference == DayPhasePreference.Night) return current == DayNightCycle.Phase.Night;
+        return true;
     }
 
     /// <summary>
@@ -105,6 +146,7 @@ public class PeriodicChangeManager : MonoBehaviour
             origin = origin,
             duration = durationSeconds,
             elapsed = 0f,
+            dayLengthSeconds = dayLength,
             entries = new List<ActiveEntry>(choice.periodicChanges.Count)
         };
 
@@ -117,7 +159,9 @@ public class PeriodicChangeManager : MonoBehaviour
                 tickIntervalSeconds = ToSeconds(source.tickInterval, source.tickIntervalUnit, dayLength),
                 amountPerTick = source.amountPerTick,
                 action = source.action,
-                timer = 0f
+                dayPhasePreference = source.dayPhasePreference,
+                timer = 0f,
+                pendingTicks = 0
             });
         }
 
@@ -239,8 +283,9 @@ public class PeriodicChangeManager : MonoBehaviour
     private class ActiveDrain
     {
         public PeriodicChangeOrigin origin;
-        public float duration;       //saniye (hesaplanmış)
+        public float duration;            //saniye (hesaplanmış)
         public float elapsed;
+        public float dayLengthSeconds;    //drain başlangıcında kilitlenir — pending tick grace period'ı için
         public List<ActiveEntry> entries;
     }
 
@@ -248,10 +293,12 @@ public class PeriodicChangeManager : MonoBehaviour
     private struct ActiveEntry
     {
         public PermanentMultiplierStatType stat;
-        public float tickIntervalSeconds;     //saniye (hesaplanmış)
+        public float tickIntervalSeconds;        //saniye (hesaplanmış)
         public float amountPerTick;
         public PeriodicChangeAction action;
+        public DayPhasePreference dayPhasePreference;
         public float timer;
+        public int pendingTicks;                 //due olmuş ama henüz uygun fazda ateşlenmemiş tick sayısı
     }
 }
 

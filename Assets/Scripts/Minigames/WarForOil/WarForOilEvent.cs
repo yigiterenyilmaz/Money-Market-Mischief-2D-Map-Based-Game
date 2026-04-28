@@ -520,6 +520,7 @@ public class PeriodicChangeEntry
     public float tickInterval = 1f; //tick aralığı — birime göre yorumlanır (saniye veya gün — gün birimde 0.333 = günde 3 defa)
     public float amountPerTick; //her tick'te uygulanacak miktar (negatif = azalt)
     public PeriodicChangeAction action = PeriodicChangeAction.None; //her tick'te fırlatılacak UI action ID'si
+    public DayPhasePreference dayPhasePreference = DayPhasePreference.Either; //tick fazı tercihi — sadece Days birimi + interval>=1 iken anlamlı (editör diğer durumlarda Either'a sabitler)
 }
 
 /// <summary>
@@ -530,4 +531,17 @@ public enum PeriodicTimeUnit
 {
     Seconds,    //değer doğrudan saniye olarak yorumlanır
     Days        //değer day/night cycle bazlı (1 = bir tam gün, 0.333 = günde 3 defa, 7 = 7 günde bir)
+}
+
+/// <summary>
+/// Tick'in günün hangi bölümünde uygulanacağını belirler.
+/// Sadece tick aralığı Days birimi ve >= 1 gün olduğunda editörde gösterilir.
+/// Day = sadece Phase.Day, Night = sadece Phase.Night, Either = kısıtlama yok.
+/// Dusk/Dawn geçişleri Day veya Night sayılmaz — pending tick uygun fazı bekler.
+/// </summary>
+public enum DayPhasePreference
+{
+    Either, //fark etmez — tick due olduğunda hemen ateşlenir
+    Day,    //sadece gündüz fazında ateşlenir
+    Night   //sadece gece fazında ateşlenir
 }
