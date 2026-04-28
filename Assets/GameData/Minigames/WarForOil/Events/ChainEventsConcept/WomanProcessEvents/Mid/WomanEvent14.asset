@@ -10,15 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
-  m_Name: WomanEvent01
+  m_Name: WomanEvent14
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
-  id: wfo_we_mid_01
-  displayName: 
-  description: Sometimes I think that perhaps the true meaning of life isn't money
-    and power. Perhaps true happiness lies in love. Have you ever considered leaving
-    all this stress behind and spending a peaceful life with your loved ones, with
-    the one you love?
-  useTypewriterEffect: 1
+  id: wfo_we_mid_14
+  displayName: Gift Choices
+  description: You can buy a gift from the choices.
+  useTypewriterEffect: 0
   hasConditionalText: 0
   conditionalTexts: []
   devNote: 
@@ -30,13 +27,13 @@ MonoBehaviour:
   isUnlimitedRepeat: 0
   maxRepeatCount: 1
   choices:
-  - displayName: Money is the power.
-    description: In this world, you are only as powerful as the amount of money you
-      have. If you lack power, neither love nor respect disappears.
-    isDirectResponse: 1
+  - displayName: A Sentimental Gift
+    description: Create an album of your moments together and your conversations
+      and give it to her as a gift.
+    isDirectResponse: 0
     hasConditionalText: 0
     conditionalTexts: []
-    supportModifier: 2
+    supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
     hasReputationFloor: 0
@@ -94,6 +91,8 @@ MonoBehaviour:
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
+    hasChainDelay: 0
+    chainDelayCycles: 0
     chainInfluenceStat: 0
     chainThreshold0: 20
     chainThreshold1: 50
@@ -118,7 +117,7 @@ MonoBehaviour:
     mediaPursuitLevelDelta: 0
     startsWomanProcess: 0
     endsWomanProcess: 0
-    womanObsessionModifier: -6
+    womanObsessionModifier: 0
     hasObsessionFloor: 0
     obsessionFloor: 0
     redirectsWomanPool: 0
@@ -133,24 +132,26 @@ MonoBehaviour:
     periodicChangesDurationUnit: 0
     periodicChangesDuration: 0
     periodicChanges: []
-    hasImmediateEvent: 0
+    hasImmediateEvent: 1
     immediateEventDelay: 0
     immediateEventIsTiered: 0
-    immediateEventPool: []
+    immediateEventPool:
+    - targetEvent: {fileID: 11400000, guid: 7f5852daae7b9dc419180041c662cf96, type: 2}
+      weight: 80
+    - targetEvent: {fileID: 11400000, guid: 2a08f42255c517046b979330f770782b, type: 2}
+      weight: 20
     immediateEventTier1: {fileID: 0}
     immediateEventTier2: {fileID: 0}
     immediateEventTier3: {fileID: 0}
     setsStoryFlags: 
     requiredSkills: []
     statConditions: []
-  - displayName: Feelings matter most.
-    description: People can get consumed by lust for power and forget their feelings.
-      I hope one day I will have the courage to put everything aside and live a peaceful
-      life with my loved ones, with you.
-    isDirectResponse: 1
+  - displayName: A Material Gift
+    description: Buy her a luxury car and show your power to her.
+    isDirectResponse: 0
     hasConditionalText: 0
     conditionalTexts: []
-    supportModifier: -3
+    supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
     hasReputationFloor: 0
@@ -208,6 +209,8 @@ MonoBehaviour:
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
+    hasChainDelay: 0
+    chainDelayCycles: 0
     chainInfluenceStat: 0
     chainThreshold0: 20
     chainThreshold1: 50
@@ -232,7 +235,7 @@ MonoBehaviour:
     mediaPursuitLevelDelta: 0
     startsWomanProcess: 0
     endsWomanProcess: 0
-    womanObsessionModifier: 5
+    womanObsessionModifier: 0
     hasObsessionFloor: 0
     obsessionFloor: 0
     redirectsWomanPool: 0
@@ -247,10 +250,12 @@ MonoBehaviour:
     periodicChangesDurationUnit: 0
     periodicChangesDuration: 0
     periodicChanges: []
-    hasImmediateEvent: 0
-    immediateEventDelay: 0
+    hasImmediateEvent: 1
+    immediateEventDelay: 15
     immediateEventIsTiered: 0
-    immediateEventPool: []
+    immediateEventPool:
+    - targetEvent: {fileID: 11400000, guid: 9e6d74cef30b0ba4ea12aed95f251380, type: 2}
+      weight: 100
     immediateEventTier1: {fileID: 0}
     immediateEventTier2: {fileID: 0}
     immediateEventTier3: {fileID: 0}
@@ -267,7 +272,7 @@ MonoBehaviour:
   isMediaPursuitEvent: 0
   mediaPursuitLevelOnTrigger: 0
   requiresBothProcessesActive: 0
-  isWomanProcessEvent: 1
+  isWomanProcessEvent: 0
   minObsession: 0
   maxObsession: 100
   blockedWomanProcessEvents: []

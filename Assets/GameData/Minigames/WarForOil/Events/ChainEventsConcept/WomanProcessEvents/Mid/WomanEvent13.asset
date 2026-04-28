@@ -10,15 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
-  m_Name: WomanEvent01
+  m_Name: WomanEvent13
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
-  id: wfo_we_mid_01
-  displayName: 
-  description: Sometimes I think that perhaps the true meaning of life isn't money
-    and power. Perhaps true happiness lies in love. Have you ever considered leaving
-    all this stress behind and spending a peaceful life with your loved ones, with
-    the one you love?
-  useTypewriterEffect: 1
+  id: wfo_we_mid_13
+  displayName: A gift from the heart
+  description: You can surprise your girlfriend by buying her a gift. Such gifts
+    can strengthen the bond of love between you.
+  useTypewriterEffect: 0
   hasConditionalText: 0
   conditionalTexts: []
   devNote: 
@@ -30,13 +28,12 @@ MonoBehaviour:
   isUnlimitedRepeat: 0
   maxRepeatCount: 1
   choices:
-  - displayName: Money is the power.
-    description: In this world, you are only as powerful as the amount of money you
-      have. If you lack power, neither love nor respect disappears.
-    isDirectResponse: 1
+  - displayName: Buy a Gift
+    description: 
+    isDirectResponse: 0
     hasConditionalText: 0
     conditionalTexts: []
-    supportModifier: 2
+    supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
     hasReputationFloor: 0
@@ -94,11 +91,20 @@ MonoBehaviour:
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
+    hasChainDelay: 0
+    chainDelayCycles: 0
     chainInfluenceStat: 0
     chainThreshold0: 20
     chainThreshold1: 50
     chainThreshold2: 75
-    chainBranches: []
+    chainBranches:
+    - targetEvent: {fileID: 11400000, guid: a1dbd65f803882f4995bb859ccf6d518, type: 2}
+      weightRange0: 1
+      weightRange1: 0
+      weightRange2: 0
+      weightRange3: 0
+      triggersAsImmediateEvent: 0
+      immediateEventDelay: 0
     chainCanEnd: 0
     chainEndWeight: 1
     hasConditionalBranching: 0
@@ -118,7 +124,7 @@ MonoBehaviour:
     mediaPursuitLevelDelta: 0
     startsWomanProcess: 0
     endsWomanProcess: 0
-    womanObsessionModifier: -6
+    womanObsessionModifier: 0
     hasObsessionFloor: 0
     obsessionFloor: 0
     redirectsWomanPool: 0
@@ -143,19 +149,17 @@ MonoBehaviour:
     setsStoryFlags: 
     requiredSkills: []
     statConditions: []
-  - displayName: Feelings matter most.
-    description: People can get consumed by lust for power and forget their feelings.
-      I hope one day I will have the courage to put everything aside and live a peaceful
-      life with my loved ones, with you.
-    isDirectResponse: 1
+  - displayName: Don't Buy a Gift
+    description: 
+    isDirectResponse: 0
     hasConditionalText: 0
     conditionalTexts: []
-    supportModifier: -3
+    supportModifier: 0.3
     suspicionModifier: 0
     reputationModifier: 0
     hasReputationFloor: 0
     reputationFloor: 0
-    politicalInfluenceModifier: 0
+    politicalInfluenceModifier: 0.2
     costModifier: 0
     wealthModifier: 0
     cornerGrabModifier: 0
@@ -208,6 +212,8 @@ MonoBehaviour:
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
+    hasChainDelay: 0
+    chainDelayCycles: 0
     chainInfluenceStat: 0
     chainThreshold0: 20
     chainThreshold1: 50
@@ -232,7 +238,7 @@ MonoBehaviour:
     mediaPursuitLevelDelta: 0
     startsWomanProcess: 0
     endsWomanProcess: 0
-    womanObsessionModifier: 5
+    womanObsessionModifier: -2
     hasObsessionFloor: 0
     obsessionFloor: 0
     redirectsWomanPool: 0
@@ -276,6 +282,6 @@ MonoBehaviour:
   precursorWarEvent: {fileID: 0}
   precursorRandomEvent: {fileID: 0}
   requiredStoryFlags: 
-  chainRole: 0
+  chainRole: 1
   blocksSubChainBranching: 0
   alsoBlockedBranchEvents: []

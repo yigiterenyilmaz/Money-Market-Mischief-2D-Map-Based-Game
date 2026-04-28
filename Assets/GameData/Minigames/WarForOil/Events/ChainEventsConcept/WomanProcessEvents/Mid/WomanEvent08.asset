@@ -10,14 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
-  m_Name: WomanEvent01
+  m_Name: WomanEvent08
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
-  id: wfo_we_mid_01
+  id: wfo_we_mid_08
   displayName: 
-  description: Sometimes I think that perhaps the true meaning of life isn't money
-    and power. Perhaps true happiness lies in love. Have you ever considered leaving
-    all this stress behind and spending a peaceful life with your loved ones, with
-    the one you love?
+  description: I'm ashamed to be with such a crude and boorish person like you.
   useTypewriterEffect: 1
   hasConditionalText: 0
   conditionalTexts: []
@@ -30,13 +27,12 @@ MonoBehaviour:
   isUnlimitedRepeat: 0
   maxRepeatCount: 1
   choices:
-  - displayName: Money is the power.
-    description: In this world, you are only as powerful as the amount of money you
-      have. If you lack power, neither love nor respect disappears.
+  - displayName: I'm Right. You'll understand
+    description: 
     isDirectResponse: 1
     hasConditionalText: 0
     conditionalTexts: []
-    supportModifier: 2
+    supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
     hasReputationFloor: 0
@@ -94,6 +90,8 @@ MonoBehaviour:
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
+    hasChainDelay: 0
+    chainDelayCycles: 0
     chainInfluenceStat: 0
     chainThreshold0: 20
     chainThreshold1: 50
@@ -118,7 +116,7 @@ MonoBehaviour:
     mediaPursuitLevelDelta: 0
     startsWomanProcess: 0
     endsWomanProcess: 0
-    womanObsessionModifier: -6
+    womanObsessionModifier: 0
     hasObsessionFloor: 0
     obsessionFloor: 0
     redirectsWomanPool: 0
@@ -143,14 +141,12 @@ MonoBehaviour:
     setsStoryFlags: 
     requiredSkills: []
     statConditions: []
-  - displayName: Feelings matter most.
-    description: People can get consumed by lust for power and forget their feelings.
-      I hope one day I will have the courage to put everything aside and live a peaceful
-      life with my loved ones, with you.
+  - displayName: Then go f*ck yourself
+    description: 
     isDirectResponse: 1
     hasConditionalText: 0
     conditionalTexts: []
-    supportModifier: -3
+    supportModifier: 0
     suspicionModifier: 0
     reputationModifier: 0
     hasReputationFloor: 0
@@ -208,6 +204,8 @@ MonoBehaviour:
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
+    hasChainDelay: 0
+    chainDelayCycles: 0
     chainInfluenceStat: 0
     chainThreshold0: 20
     chainThreshold1: 50
@@ -232,7 +230,7 @@ MonoBehaviour:
     mediaPursuitLevelDelta: 0
     startsWomanProcess: 0
     endsWomanProcess: 0
-    womanObsessionModifier: 5
+    womanObsessionModifier: -5.7
     hasObsessionFloor: 0
     obsessionFloor: 0
     redirectsWomanPool: 0
