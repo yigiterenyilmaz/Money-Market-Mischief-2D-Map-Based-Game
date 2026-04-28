@@ -127,6 +127,7 @@ public class WarForOilEventChoice
 {
     public string displayName;
     [TextArea(2, 4)] public string description;
+    public bool isDirectResponse; //true ise UI bu seçeneği "direkt cevap" olarak işler — backend mantığını etkilemez, sadece UI bayrağı
 
     //hikaye bayrağına göre değişken metin (isim + açıklama)
     public bool hasConditionalText; //true ise aşağıdaki listeye göre displayName/description override edilebilir
@@ -202,6 +203,10 @@ public class WarForOilEventChoice
     public bool hasChainTickEffect; //true ise dallanma sonrası her event tick'inde stat etkisi uygulanır
     public ChainTickStatType chainTickStat; //etkilenecek stat
     public float chainTickAmount; //her tick'te uygulanacak miktar (pozitif = artır, negatif = azalt)
+
+    //zincir dallanmasında gecikme — sıradaki chain event N event dönemi sonra tetiklensin (bu süre boyunca random eventler gelmeye devam eder)
+    public bool hasChainDelay; //true ise zincir devam etmeden önce chainDelayCycles kadar event dönemi beklenir
+    [Range(1, 10)] public int chainDelayCycles = 1; //kaç event dönemi gecikme (sadece hasChainDelay true ise etkili)
 
     //zincir dallanması — choice seçilince sıradaki chain event'in hangi havuzdan geleceğini belirler
     public ChainInfluenceStat chainInfluenceStat = ChainInfluenceStat.JustLuck; //dallanma seçimini etkileyen stat (JustLuck = stat yok)

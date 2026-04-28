@@ -389,6 +389,12 @@ Bir choice secildiginde siradaki chain event'in olasi hedeflerinden birini tanim
 - `branchCounterMin`: Minimum sayac degeri (dahil)
 - `branchCounterMax`: Maksimum sayac degeri (-1 = sinirsiz)
 
+**Zincir gecikmesi (choice seviyesinde):**
+- `hasChainDelay`: true ise siradaki chain event N event donemi gec tetiklenir
+- `chainDelayCycles`: Gecikme miktari (1-10 event donemi)
+- Gecikme suresince zincir aktif kalir, ama chain slotunda `TryTriggerWarEvent` cagrilir — yani **random eventler gelmeye devam eder**. Sayac 0'a inince normal chain slot mantigi devam eder.
+- Inspector'da "Zincir Dallanmasi" foldout'unun en ustunde "Delay Var Mi" toggle olarak gozukur.
+
 Kosul saglanirsa `conditionalChainBranches` listesinden, saglanmazsa `chainBranches` listesinden secim yapilir. Iki havuzun agirliklari bagimsizdir.
 
 **Secim mantigi:**

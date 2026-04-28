@@ -48,6 +48,7 @@ public class WarForOilManager : MonoBehaviour
 
     //zincir sistemi
     private bool isInChain; //şu an bir event zincirinde miyiz
+    private int pendingChainDelayCycles; //chain devam etmeden önce kaç event dönemi beklenecek (0 = beklemeden chain slot, >0 = chain slot atlanır random gelir)
     private WarForOilEvent chainStartEvent; //zincirin baş event'i (Head referansı)
     private List<ChainBranch> pendingChainBranches; //koşulsuz dallanma seçenekleri
     private List<ChainBranch> pendingConditionalChainBranches; //koşullu dallanma seçenekleri
@@ -510,6 +511,9 @@ public class WarForOilManager : MonoBehaviour
                 pendingBranchCounterMin = choice.branchCounterMin;
                 pendingBranchCounterMax = choice.branchCounterMax;
 
+                //zincir gecikmesi — N event dönemi boyunca chain slot atlanır, random eventler gelmeye devam eder
+                pendingChainDelayCycles = (choice.hasChainDelay && choice.chainDelayCycles > 0) ? choice.chainDelayCycles : 0;
+
                 //zincir arası tick etkisi
                 if (choice.hasChainTickEffect)
                 {
@@ -966,8 +970,14 @@ public class WarForOilManager : MonoBehaviour
 
             if (isInChain)
             {
+                //zincir gecikmesi varsa bu dönem chain slot atlanır, random event gelir
+                if (pendingChainDelayCycles > 0)
+                {
+                    pendingChainDelayCycles--;
+                    TryTriggerWarEvent();
+                }
                 //zincir aktif — sadece chain eventleri gelir
-                if (pendingChainBranches != null && pendingChainBranches.Count > 0)
+                else if (pendingChainBranches != null && pendingChainBranches.Count > 0)
                     TryTriggerChainSlotEvent();
                 else
                     EndChain();
@@ -1067,6 +1077,7 @@ public class WarForOilManager : MonoBehaviour
         pendingChainThreshold0 = 0f;
         pendingChainThreshold1 = 0f;
         pendingChainThreshold2 = 0f;
+        pendingChainDelayCycles = 0;
         chainCounters.Clear();
         eventCheckTimer = 0f; //zincir interval'ı hemen başlasın
 
@@ -1087,6 +1098,7 @@ public class WarForOilManager : MonoBehaviour
         pendingChainThreshold0 = 0f;
         pendingChainThreshold1 = 0f;
         pendingChainThreshold2 = 0f;
+        pendingChainDelayCycles = 0;
         currentEventIsChainEvent = false;
         pendingChainEndWeight = 0f;
         pendingConditionalBranching = false;

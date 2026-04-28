@@ -14,10 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
   id: wfo_we_low_13
   displayName: 
-  description: "I fail to realize it's you. I want to keep going, but I just don\u2019t
-    have the strength to endure anymore. I want to give us one last chance, but I
-    can\u2019t handle feeling worthless anymore. This relationship will only move
-    forward if you\u2019re willing to take my hand and lift me up... or let me go."
+  description: "I want to keep going, but I just don\u2019t have the strength to
+    endure anymore. I want to give us one last chance, but I can\u2019t handle feeling
+    worthless anymore. This relationship will only move forward if you\u2019re willing
+    to take my hand and lift me up... or let me go."
+  useTypewriterEffect: 1
+  hasConditionalText: 0
+  conditionalTexts: []
   devNote: 
   eventNote: 
   minWarTime: 0
@@ -30,6 +33,8 @@ MonoBehaviour:
   - displayName: Make her trust you
     description: We will be okay. I will do everything for this relationship. No
       more sorrow.
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: -2
     suspicionModifier: 0
     reputationModifier: -1
@@ -58,11 +63,16 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
     blocksEvents: 0
     eventBlockCycles: 0
+    globalEventBlockCycles: 0
     blocksCeasefire: 0
     blocksEventGroup: 0
     blockedGroup: {fileID: 0}
@@ -74,6 +84,12 @@ MonoBehaviour:
     probWarEndChance: 0
     probDismissChance: 0
     probWarEndDelay: 0
+    incrementsChainCounter: 0
+    chainCounterKey: 
+    chainCounterIncrement: 1
+    hasEarlyChainTrigger: 0
+    earlyTriggerThreshold: 0
+    earlyTriggerEvent: {fileID: 0}
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
@@ -84,6 +100,11 @@ MonoBehaviour:
     chainBranches: []
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -106,14 +127,22 @@ MonoBehaviour:
     hasObsessionDropLimit: 1
     obsessionDropLimit: 3
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
+    immediateEventIsTiered: 0
     immediateEventPool: []
+    immediateEventTier1: {fileID: 0}
+    immediateEventTier2: {fileID: 0}
+    immediateEventTier3: {fileID: 0}
+    setsStoryFlags: 
     requiredSkills: []
     statConditions: []
   - displayName: Bitter truth
     description: "I am who I am. I can\u2019t change. We might go on like this for
       a week or two, but then, I\u2019ll start hurting you again."
+    hasConditionalText: 0
+    conditionalTexts: []
     supportModifier: 1
     suspicionModifier: 0
     reputationModifier: 0.3
@@ -142,11 +171,16 @@ MonoBehaviour:
     warEndDelay: 0
     reducesReward: 0
     baseRewardReduction: 0
+    winsWar: 0
+    winWarDelay: 0
+    winWarCustomReward: 0
+    winWarRewardRatio: 1
     endsWarWithDeal: 0
     dealDelay: 0
     dealRewardRatio: 0
     blocksEvents: 0
     eventBlockCycles: 0
+    globalEventBlockCycles: 0
     blocksCeasefire: 0
     blocksEventGroup: 0
     blockedGroup: {fileID: 0}
@@ -158,6 +192,12 @@ MonoBehaviour:
     probWarEndChance: 0
     probDismissChance: 0
     probWarEndDelay: 0
+    incrementsChainCounter: 0
+    chainCounterKey: 
+    chainCounterIncrement: 1
+    hasEarlyChainTrigger: 0
+    earlyTriggerThreshold: 0
+    earlyTriggerEvent: {fileID: 0}
     hasChainTickEffect: 0
     chainTickStat: 0
     chainTickAmount: 0
@@ -168,6 +208,11 @@ MonoBehaviour:
     chainBranches: []
     chainCanEnd: 0
     chainEndWeight: 1
+    hasConditionalBranching: 0
+    branchCounterKey: 
+    branchCounterMin: 0
+    branchCounterMax: -1
+    conditionalChainBranches: []
     acceptsRivalDeal: 0
     rejectsRivalDeal: 0
     affectsVandalism: 0
@@ -190,9 +235,15 @@ MonoBehaviour:
     hasObsessionDropLimit: 0
     obsessionDropLimit: 0
     permanentMultipliers: []
+    statCeilingEffects: []
     hasImmediateEvent: 0
     immediateEventDelay: 0
+    immediateEventIsTiered: 0
     immediateEventPool: []
+    immediateEventTier1: {fileID: 0}
+    immediateEventTier2: {fileID: 0}
+    immediateEventTier3: {fileID: 0}
+    setsStoryFlags: 
     requiredSkills: []
     statConditions: []
   defaultChoiceIndex: -1
@@ -204,15 +255,16 @@ MonoBehaviour:
   forcesVandalismStart: 0
   isMediaPursuitEvent: 0
   mediaPursuitLevelOnTrigger: 0
+  requiresBothProcessesActive: 0
   isWomanProcessEvent: 1
   minObsession: 0
   maxObsession: 100
   blockedWomanProcessEvents: []
-  useTypewriterEffect: 1
   hasPrecursorEvent: 0
   precursorEventType: 0
   precursorWarEvent: {fileID: 0}
   precursorRandomEvent: {fileID: 0}
+  requiredStoryFlags: 
   chainRole: 0
   blocksSubChainBranching: 0
   alsoBlockedBranchEvents: []

@@ -329,6 +329,11 @@ public class WarForOilEventEditor : Editor
         dispName.stringValue = EditorGUILayout.TextArea(dispName.stringValue, GUILayout.MinHeight(EditorGUIUtility.singleLineHeight * 2));
         EditorGUILayout.PropertyField(choice.FindPropertyRelative("description"));
 
+        //direkt cevap mı — sadece UI tarafının okuyup davranışını değiştirmesi için bayrak (backend mantığı değişmez)
+        EditorGUILayout.PropertyField(choice.FindPropertyRelative("isDirectResponse"),
+            new GUIContent("Direkt Cevap Mı",
+                "Sadece UI bayrağı. Tikli olduğunda UI bu seçeneği 'direkt cevap' olarak gösterir/işler. Backend mantığını etkilemez."));
+
         //hikaye bayrağına göre değişken metin
         SerializedProperty hasCondText = choice.FindPropertyRelative("hasConditionalText");
         EditorGUILayout.PropertyField(hasCondText, new GUIContent("Bayrağa Göre Değişken Metin",
@@ -856,6 +861,22 @@ public class WarForOilEventEditor : Editor
         if (chainChoiceFoldouts[index])
         {
             EditorGUI.indentLevel++;
+
+            //zincir gecikmesi — sıradaki chain event N event dönemi sonra gelsin (bu süre boyunca random eventler tetiklenmeye devam eder)
+            SerializedProperty hasChainDelay = choice.FindPropertyRelative("hasChainDelay");
+            EditorGUILayout.PropertyField(hasChainDelay, new GUIContent("Delay Var Mı",
+                "Tikli ise sıradaki chain event N event dönemi geç tetiklenir. Bu süre boyunca random eventler gelmeye devam eder."));
+            if (hasChainDelay.boolValue)
+            {
+                EditorGUI.indentLevel++;
+                SerializedProperty chainDelayCycles = choice.FindPropertyRelative("chainDelayCycles");
+                EditorGUILayout.PropertyField(chainDelayCycles, new GUIContent("Gecikme (event dönemi)",
+                    "Sıradaki chain event tetiklenmeden önce kaç event dönemi geçecek (1-10)."));
+                if (chainDelayCycles.intValue < 1) chainDelayCycles.intValue = 1;
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.Space(4);
 
             //etkileyen stat seçimi (choice seviyesinde — tüm branch'ler paylaşır)
             SerializedProperty chainInfluenceStat = choice.FindPropertyRelative("chainInfluenceStat");
