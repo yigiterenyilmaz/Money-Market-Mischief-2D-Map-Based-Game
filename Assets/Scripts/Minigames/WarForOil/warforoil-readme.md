@@ -261,7 +261,8 @@ Event icindeki tek bir secenek. Serializable sinif.
 | `dealDelay` | Anlasma kac saniye sonra savasi bitirir |
 | `dealRewardRatio` | Normal kazanimin bu orani garanti verilir (0.8 = %80) |
 | `blocksEvents` | Secilirse savas sonuna kadar yeni event gelmez |
-| `eventBlockCycles` | Gecici event engeli — bu kadar event donemi boyunca event gelmez (0-10, 0=etkisiz) |
+| `eventBlockCycles` | Gecici WFO event engeli — bu kadar WFO event donemi boyunca savas eventi gelmez (0-10, 0=etkisiz). globalEventBlockCycles ile **paralel** tuketilir |
+| `globalEventBlockCycles` | Gecici global event engeli — kadin eventleri HARIC tum eventleri (WFO + random) bu kadar donem durdurur (0-10). eventBlockCycles ile paralel calisir, ayrica RandomEventManager her tetik denemesinde bu sayaci dusurur |
 | `blocksCeasefire` | Secilirse savas sonuna kadar oyuncunun ateskes butonu engellenir |
 | `blocksEventGroup` | Secilirse bu event'in ait oldugu gruptaki (OFPC/WTETWC) tum eventler bir daha tetiklenmez |
 | `setsStoryFlags` | Bu choice secildiginde aktif edilen hikaye bayraklari (List&lt;StoryFlag&gt;). Kalici — bir kez aktif edildikten sonra oyun boyunca gecerli. |
@@ -428,7 +429,7 @@ Chain aktifken normal event dongusu 3'lu cycle'lara bolunur:
    - Random < olasilik → **chain slotu** (pendingChainBranches'tan agirlikli secim)
    - Degilse → **random slotu** (normal TryTriggerWarEvent, Head eventler haric)
 3. Counter 3'e ulasinca sifirla, yeni dongu baslat
-4. `eventBlockCycles` sadece random slotlari etkiler, chain slotlarini etkilemez
+4. `eventBlockCycles` ve `globalEventBlockCycles` sadece random slotlari etkiler, chain slotlarini etkilemez. Iki sayac paralel tuketilir (sequential degil) — her slot tick'inde >0 olan tum sayaclar 1 azalir, hicbiri >0 degilse WFO event tetiklenir
 
 ### Zincir Akisi
 

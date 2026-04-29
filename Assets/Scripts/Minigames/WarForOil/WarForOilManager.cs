@@ -754,6 +754,10 @@ public class WarForOilManager : MonoBehaviour
         //durumu sıfırla
         ResetState();
 
+        //savaş aktif story flag'ini kapat
+        if (StoryFlagManager.Instance != null)
+            StoryFlagManager.Instance.ClearFlag(StoryFlag.SavasAktif);
+
         OnWarFinished?.Invoke(result);
     }
 
@@ -984,19 +988,20 @@ public class WarForOilManager : MonoBehaviour
             }
             else
             {
-                //zincir dışı normal akış
+                //zincir dışı normal akış — iki sayaç da paralel tüketilir
+                bool blocked = false;
                 if (remainingGlobalBlockCycles > 0)
                 {
                     remainingGlobalBlockCycles--;
+                    blocked = true;
                 }
-                else if (remainingBlockCycles > 0)
+                if (remainingBlockCycles > 0)
                 {
                     remainingBlockCycles--;
+                    blocked = true;
                 }
-                else
-                {
+                if (!blocked)
                     TryTriggerWarEvent();
-                }
             }
 
             //event tetiklendiyse bu frame'de savaş sonucu hesaplama
@@ -2265,6 +2270,10 @@ public class WarForOilManager : MonoBehaviour
         forcedNextEvent = null;
         dismissedEventIds.Clear();
         blockedBranchEventIds.Clear();
+
+        //savaş aktif story flag'i — runtime, sistem yönetimli
+        if (StoryFlagManager.Instance != null)
+            StoryFlagManager.Instance.SetFlag(StoryFlag.SavasAktif);
 
         OnWarStarted?.Invoke(selectedCountry, database.warDuration);
     }

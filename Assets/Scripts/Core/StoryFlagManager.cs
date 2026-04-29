@@ -13,6 +13,7 @@ public class StoryFlagManager : MonoBehaviour
     private HashSet<StoryFlag> activeFlags = new HashSet<StoryFlag>();
 
     public static event Action<StoryFlag> OnStoryFlagSet;
+    public static event Action<StoryFlag> OnStoryFlagCleared;
 
     private void Awake()
     {
@@ -45,6 +46,20 @@ public class StoryFlagManager : MonoBehaviour
         for (int i = 0; i < flags.Count; i++)
         {
             SetFlag(flags[i]);
+        }
+    }
+
+    /// <summary>
+    /// Bir hikaye bayrağını deaktif eder. Aktif değilse bir şey yapmaz.
+    /// Sadece sistem-yönetimli bayraklar (örn. SavasAktif) için kullanılır;
+    /// choice ile set edilen bayraklar kalıcıdır, bunları temizlememeli.
+    /// </summary>
+    public void ClearFlag(StoryFlag flag)
+    {
+        if (flag == StoryFlag.None) return;
+        if (activeFlags.Remove(flag))
+        {
+            OnStoryFlagCleared?.Invoke(flag);
         }
     }
 

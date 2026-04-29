@@ -8,4 +8,5 @@ public enum PeriodicChangeAction
     None = 0,
     KadinaHediyeAlindi = 1,
     KadinaIyiGecelerMesajiAtildi = 2,
+    KadinlaTanismaAydonumuKutlandi = 3,
 }
