@@ -10,6 +10,9 @@ public class WarForOilEvent : ScriptableObject
     [TextArea(2, 8)] public string description;
     public bool useTypewriterEffect; //true ise açıklama harf harf akar, false ise direkt paragraf olarak gösterilir
 
+    //ardışık konuşmalar — boşsa eski tek-description davranışı, doluysa UI sırayla bu listeyi gösterir
+    public List<DialogueLine> dialogueLines = new List<DialogueLine>();
+
     //hikaye bayrağına göre değişken metin (isim + açıklama)
     public bool hasConditionalText; //true ise aşağıdaki listeye göre displayName/description override edilebilir
     public List<ConditionalChoiceText> conditionalTexts; //her entry: flag + alt isim + alt açıklama. İlk eşleşen kazanır.
@@ -106,6 +109,14 @@ public class WarForOilEvent : ScriptableObject
                 return string.IsNullOrEmpty(ct.alternativeDescription) ? description : ct.alternativeDescription;
         }
         return description;
+    }
+
+    /// <summary>
+    /// Ardışık konuşma listesi dolu mu — UI bunu çağırarak tek-description mi yoksa sıralı diyalog mu göstereceğine karar verir.
+    /// </summary>
+    public bool HasSequentialDialogue()
+    {
+        return dialogueLines != null && dialogueLines.Count > 0;
     }
 
     /// <summary>
@@ -493,6 +504,17 @@ public class StatCeilingEntry
     public StatCeilingMode mode; //işlem tipi
     public float ceilingValue; //tavan değeri (Set modunda kullanılır)
     [Range(0f, 1f)] public float ceilingMultiplier = 1f; //çarpan (Multiply modunda kullanılır)
+}
+
+/// <summary>
+/// Ardışık konuşma satırı — bir event'in description'ı yerine sıralı diyalog gösterilmesi için kullanılır.
+/// UI tek seferde bir satır gösterir, OK ile sonraki satıra geçilir.
+/// </summary>
+[System.Serializable]
+public class DialogueLine
+{
+    [TextArea(2, 6)] public string text;
+    public bool isFromPlayer; //true = oyuncu konuşuyor, false = karşı taraf konuşuyor
 }
 
 /// <summary>
