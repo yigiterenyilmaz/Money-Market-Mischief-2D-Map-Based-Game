@@ -187,7 +187,7 @@ Savas sirasinda tetiklenen karar olaylari. Ayni event sinifi normal eventler, zi
 | `id` | Benzersiz kimlik |
 | `displayName` | Event basligi |
 | `description` | Event aciklamasi (TextArea). dialogueLines bossa UI bunu gosterir. |
-| `dialogueLines` | List<DialogueLine>: ardisik konusmalar. Her entry `text` (TextArea) + `isFromPlayer` (true=oyuncu, false=karsi taraf) icerir. Doluysa UI tek-description yerine sirayla bu listeyi gosterir; OK tusu ile siradaki satira gecilir. Bossa eski tek-description davranisi. Runtime'da `evt.HasSequentialDialogue()` ile kontrol edilir. |
+| `dialogueLines` | List<DialogueLine>: ardisik konusmalar. Her entry `text` (TextArea) + `isFromPlayer` (true=oyuncu, false=karsi taraf) + `speakerName` (sadece isFromPlayer false iken Inspector'da gorunur, karsi tarafin ismi) icerir. Doluysa UI tek-description yerine sirayla bu listeyi gosterir; OK tusu ile siradaki satira gecilir. Bossa eski tek-description davranisi. Runtime'da `evt.HasSequentialDialogue()` ile kontrol edilir. |
 | `devNote` | Sadece Inspector'da gorunen gelistirici notu (oyuna etkisi yok) |
 | `hasConditionalText` | true ise hikaye bayragina gore displayName ve description override edilebilir. Inspector'da bayrak listesi acilir. |
 | `conditionalTexts` | List<ConditionalChoiceText>: her entry `requiredFlag`, `alternativeDisplayName`, `alternativeDescription` icerir. Ilk eslesen kazanir. Bos alan default'a duser. Runtime'da `evt.GetDisplayName()` / `evt.GetDescription()` ile cekilir. |

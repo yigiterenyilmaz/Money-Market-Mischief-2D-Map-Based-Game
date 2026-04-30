@@ -515,6 +515,7 @@ public class DialogueLine
 {
     [TextArea(2, 6)] public string text;
     public bool isFromPlayer; //true = oyuncu konuşuyor, false = karşı taraf konuşuyor
+    public string speakerName; //sadece isFromPlayer false iken kullanılır — karşı tarafın ismi (Inspector'da koşullu görünür)
 }
 
 /// <summary>
