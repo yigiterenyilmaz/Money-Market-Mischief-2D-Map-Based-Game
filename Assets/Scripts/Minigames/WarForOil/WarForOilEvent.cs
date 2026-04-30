@@ -51,11 +51,14 @@ public class WarForOilEvent : ScriptableObject
     public float maxObsession = 100f; //bu event sadece obsesyon bu değerin altındayken gelir (100 = sınırsız)
     public List<WarForOilEvent> blockedWomanProcessEvents; //bu event tetiklenince havuzdan/zincirlerden çıkarılacak eventler
 
-    //öncü event — kadın eventi tetiklenmeden önce bu event gösterilir, 4 saniye sonra asıl kadın eventi gelir
-    public bool hasPrecursorEvent; //true ise bu kadın eventinin bir öncü eventi var
+    //öncü event — bu event tetiklenmeden önce gösterilir, 4 saniye sonra asıl event gelir
+    //hem kadın eventleri hem savaş (WFO) eventleri için geçerli
+    public bool hasPrecursorEvent; //true ise bu eventin bir öncü eventi var
     public PrecursorEventType precursorEventType; //öncü eventin tipi
     public WarForOilEvent precursorWarEvent; //öncü war for oil eventi
     public Event precursorRandomEvent; //öncü random event
+    public bool precursorRequiresStoryFlag; //true ise öncü sadece belirli bayrak aktifken gelir, kapalıysa eski davranış (her zaman gelir)
+    public StoryFlag precursorRequiredFlag = StoryFlag.None; //öncüyü tetikleyecek hikaye bayrağı (None ise koşul yok sayılır)
 
     [Header("Hikaye Bayrak Koşulları")]
     public List<StoryFlag> requiredStoryFlags; //bu event sadece bu bayraklar aktifken tetiklenebilir (hepsi gerekli)
@@ -103,6 +106,20 @@ public class WarForOilEvent : ScriptableObject
                 return string.IsNullOrEmpty(ct.alternativeDescription) ? description : ct.alternativeDescription;
         }
         return description;
+    }
+
+    /// <summary>
+    /// Bu event tetiklenmeden önce öncü event gösterilmeli mi.
+    /// hasPrecursorEvent kapalıysa false. Açıksa precursorRequiresStoryFlag false ise her zaman true.
+    /// Açıksa ve precursorRequiresStoryFlag true ise ilgili bayrak aktifse true, değilse false.
+    /// </summary>
+    public bool ShouldShowPrecursor()
+    {
+        if (!hasPrecursorEvent) return false;
+        if (!precursorRequiresStoryFlag) return true;
+        if (precursorRequiredFlag == StoryFlag.None) return true; //None seçili ise koşul yok say
+        if (StoryFlagManager.Instance == null) return false;
+        return StoryFlagManager.Instance.HasFlag(precursorRequiredFlag);
     }
 
     /// <summary>
@@ -217,9 +234,11 @@ public class WarForOilEventChoice
     public bool chainCanEnd; //true ise dallanma seçiminde chain'in bitme ihtimali de eklenir
     public float chainEndWeight = 1f; //chain bitme ağırlığı (dallanma ağırlıklarıyla yarışır)
     public bool hasConditionalBranching; //true ise koşullu dallanma aktif
-    public string branchCounterKey; //koşullu dallanma sayaç adı
-    public int branchCounterMin; //koşullu dallanma minimum sayaç değeri (dahil)
-    public int branchCounterMax = -1; //koşullu dallanma maksimum sayaç değeri (-1 = sınırsız)
+    public BranchConditionType branchConditionMode = BranchConditionType.Counter; //koşulun tipi (counter veya hikaye bayrağı)
+    public string branchCounterKey; //counter modu: sayaç adı
+    public int branchCounterMin; //counter modu: minimum sayaç değeri (dahil)
+    public int branchCounterMax = -1; //counter modu: maksimum sayaç değeri (-1 = sınırsız)
+    public StoryFlag branchRequiredStoryFlag = StoryFlag.None; //story flag modu: bayrak aktifse koşullu havuz seçilir
     public List<ChainBranch> conditionalChainBranches; //koşullu dallar — koşul sağlanırsa buradan seçilir
 
     //rakip işgal flagleri (Editor tarafından foldout içinde çizilir)
@@ -477,12 +496,23 @@ public class StatCeilingEntry
 }
 
 /// <summary>
-/// Kadın süreci eventlerinin öncü event tipi.
+/// Öncü event tipi (hem kadın hem savaş eventleri için kullanılır).
 /// </summary>
 public enum PrecursorEventType
 {
     WarForOil,      //öncü event bir war for oil eventi (savaş yoksa ikisi de tetiklenmez)
     RandomEvent     //öncü event bir random event
+}
+
+/// <summary>
+/// Choice'taki koşullu dallanmanın koşul tipi.
+/// Counter: chainCounters dict'inden sayaç okuyarak min/max kontrolü.
+/// StoryFlag: belirli bir hikaye bayrağı aktif mi kontrolü.
+/// </summary>
+public enum BranchConditionType
+{
+    Counter,        //counter bazlı (mevcut sistem)
+    StoryFlag       //hikaye bayrağı bazlı
 }
 
 /// <summary>

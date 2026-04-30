@@ -86,6 +86,7 @@ public class WarForOilEventEditor : Editor
             "isWomanProcessEvent", "minObsession", "maxObsession", "blockedWomanProcessEvents",
             "useTypewriterEffect",
             "hasPrecursorEvent", "precursorEventType", "precursorWarEvent", "precursorRandomEvent",
+            "precursorRequiresStoryFlag", "precursorRequiredFlag",
             "chainRole", "blocksSubChainBranching", "alsoBlockedBranchEvents",
             "minWarTime", "maxWarTime",
             "hasConditionalText", "conditionalTexts",
@@ -235,37 +236,58 @@ public class WarForOilEventEditor : Editor
                 serializedObject.FindProperty("blockedWomanProcessEvents"),
                 new GUIContent("Yasaklanan Eventler"), true);
 
-            //öncü event
-            EditorGUILayout.Space(4);
-            SerializedProperty hasPrecursor = serializedObject.FindProperty("hasPrecursorEvent");
-            EditorGUILayout.PropertyField(hasPrecursor, new GUIContent("Öncü Event Var"));
-            if (hasPrecursor.boolValue)
-            {
-                EditorGUI.indentLevel++;
-                SerializedProperty precursorType = serializedObject.FindProperty("precursorEventType");
-                EditorGUILayout.PropertyField(precursorType, new GUIContent("Öncü Tip"));
+            EditorGUILayout.HelpBox(
+                "Obsesyon aralığı: Event sadece obsesyon bu aralıktayken havuzdan seçilebilir (0-100 = sınırsız).\nYasaklanan eventler: Bu event tetiklenince listedeki eventler havuzdan ve zincirlerden çıkarılır.",
+                MessageType.Info);
+            EditorGUI.indentLevel--;
+        }
 
-                if ((PrecursorEventType)precursorType.enumValueIndex == PrecursorEventType.WarForOil)
-                {
-                    EditorGUILayout.PropertyField(
-                        serializedObject.FindProperty("precursorWarEvent"),
-                        new GUIContent("War For Oil Event"));
-                    EditorGUILayout.HelpBox(
-                        "Savaş yoksa bu kadın eventi ve öncü event ikisi de tetiklenmez.",
-                        MessageType.Warning);
-                }
-                else
-                {
-                    EditorGUILayout.PropertyField(
-                        serializedObject.FindProperty("precursorRandomEvent"),
-                        new GUIContent("Random Event"));
-                }
-                EditorGUI.indentLevel--;
+        EditorGUILayout.Space();
+
+        //öncü event — hem kadın hem savaş eventleri için geçerli
+        SerializedProperty hasPrecursor = serializedObject.FindProperty("hasPrecursorEvent");
+        EditorGUILayout.PropertyField(hasPrecursor, new GUIContent("Öncü Event Var"));
+        if (hasPrecursor.boolValue)
+        {
+            EditorGUI.indentLevel++;
+            SerializedProperty precursorType = serializedObject.FindProperty("precursorEventType");
+            EditorGUILayout.PropertyField(precursorType, new GUIContent("Öncü Tip"));
+
+            if ((PrecursorEventType)precursorType.enumValueIndex == PrecursorEventType.WarForOil)
+            {
+                EditorGUILayout.PropertyField(
+                    serializedObject.FindProperty("precursorWarEvent"),
+                    new GUIContent("War For Oil Event"));
+                EditorGUILayout.HelpBox(
+                    "Savaş yoksa kadın eventleri için bu event ve öncü ikisi de tetiklenmez. Savaş eventleri için zaten savaş içinde olunduğu için kontrol uygulanmaz.",
+                    MessageType.Info);
+            }
+            else
+            {
+                EditorGUILayout.PropertyField(
+                    serializedObject.FindProperty("precursorRandomEvent"),
+                    new GUIContent("Random Event"));
+                EditorGUILayout.HelpBox(
+                    "Random öncü şu an sadece kadın eventleri tarafından desteklenir. Savaş eventlerinde random öncü tetiklenmez.",
+                    MessageType.Warning);
             }
 
-            EditorGUILayout.HelpBox(
-                "Obsesyon aralığı: Event sadece obsesyon bu aralıktayken havuzdan seçilebilir (0-100 = sınırsız).\nYasaklanan eventler: Bu event tetiklenince listedeki eventler havuzdan ve zincirlerden çıkarılır.\nÖncü event: Kadın eventi gelmeden önce bağlı event tetiklenir, 4sn sonra kadın eventi gelir.",
-                MessageType.Info);
+            //öncüyü hikaye bayrağına bağla — kapalıysa eski davranış (her zaman gelir)
+            SerializedProperty requiresFlag = serializedObject.FindProperty("precursorRequiresStoryFlag");
+            EditorGUILayout.PropertyField(requiresFlag,
+                new GUIContent("Bayrak Koşulu",
+                "Açıksa öncü sadece belirli bir hikaye bayrağı aktifken gelir. Kapalıysa her zaman gelir."));
+            if (requiresFlag.boolValue)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(
+                    serializedObject.FindProperty("precursorRequiredFlag"),
+                    new GUIContent("Aranan Bayrak"));
+                EditorGUILayout.HelpBox(
+                    "Bayrak aktifse: önce öncü, sonra asıl event.\nBayrak aktif değilse: direkt asıl event (öncü atlanır).",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
+            }
             EditorGUI.indentLevel--;
         }
 
@@ -1004,17 +1026,34 @@ public class WarForOilEventEditor : Editor
                 if (hasCondBranch.boolValue)
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(
-                        choice.FindPropertyRelative("branchCounterKey"),
-                        new GUIContent("Sayaç Adı"));
-                    EditorGUILayout.PropertyField(
-                        choice.FindPropertyRelative("branchCounterMin"),
-                        new GUIContent("Min Değer"));
-                    SerializedProperty maxVal = choice.FindPropertyRelative("branchCounterMax");
-                    EditorGUILayout.PropertyField(maxVal, new GUIContent("Max Değer (-1 = sınırsız)"));
-                    EditorGUILayout.HelpBox(
-                        "Sayaç bu aralıktaysa koşullu dallardan, değilse yukarıdaki normal dallardan seçilir.",
-                        MessageType.Info);
+
+                    //koşul tipi — counter veya story flag
+                    SerializedProperty condMode = choice.FindPropertyRelative("branchConditionMode");
+                    EditorGUILayout.PropertyField(condMode, new GUIContent("Koşul Tipi"));
+
+                    if ((BranchConditionType)condMode.enumValueIndex == BranchConditionType.Counter)
+                    {
+                        EditorGUILayout.PropertyField(
+                            choice.FindPropertyRelative("branchCounterKey"),
+                            new GUIContent("Sayaç Adı"));
+                        EditorGUILayout.PropertyField(
+                            choice.FindPropertyRelative("branchCounterMin"),
+                            new GUIContent("Min Değer"));
+                        SerializedProperty maxVal = choice.FindPropertyRelative("branchCounterMax");
+                        EditorGUILayout.PropertyField(maxVal, new GUIContent("Max Değer (-1 = sınırsız)"));
+                        EditorGUILayout.HelpBox(
+                            "Sayaç bu aralıktaysa koşullu dallardan, değilse yukarıdaki normal dallardan seçilir.",
+                            MessageType.Info);
+                    }
+                    else
+                    {
+                        EditorGUILayout.PropertyField(
+                            choice.FindPropertyRelative("branchRequiredStoryFlag"),
+                            new GUIContent("Aranan Bayrak"));
+                        EditorGUILayout.HelpBox(
+                            "Bayrak aktifse koşullu dallardan, değilse yukarıdaki normal dallardan seçilir.",
+                            MessageType.Info);
+                    }
 
                     //koşullu dallar listesi
                     EditorGUILayout.Space(4);
@@ -1632,9 +1671,11 @@ public class WarForOilEventEditor : Editor
         choice.FindPropertyRelative("chainCanEnd").boolValue = false;
         choice.FindPropertyRelative("chainEndWeight").floatValue = 1f;
         choice.FindPropertyRelative("hasConditionalBranching").boolValue = false;
+        choice.FindPropertyRelative("branchConditionMode").enumValueIndex = 0;
         choice.FindPropertyRelative("branchCounterKey").stringValue = "";
         choice.FindPropertyRelative("branchCounterMin").intValue = 0;
         choice.FindPropertyRelative("branchCounterMax").intValue = -1;
+        choice.FindPropertyRelative("branchRequiredStoryFlag").enumValueIndex = 0;
         choice.FindPropertyRelative("incrementsChainCounter").boolValue = false;
         choice.FindPropertyRelative("chainCounterKey").stringValue = "";
         choice.FindPropertyRelative("chainCounterIncrement").intValue = 1;

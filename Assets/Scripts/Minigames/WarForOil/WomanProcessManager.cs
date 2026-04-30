@@ -69,9 +69,11 @@ public class WomanProcessManager : MonoBehaviour
     private bool pendingWomanChainCanEnd;
     private float pendingWomanChainEndWeight;
     private bool pendingWomanConditionalBranching;
+    private BranchConditionType pendingWomanBranchConditionMode;
     private string pendingWomanBranchCounterKey;
     private int pendingWomanBranchCounterMin;
     private int pendingWomanBranchCounterMax = -1;
+    private StoryFlag pendingWomanBranchRequiredFlag = StoryFlag.None;
     private Dictionary<string, int> womanChainCounters = new Dictionary<string, int>();
 
     //events — UI dinleyecek
@@ -551,9 +553,11 @@ public class WomanProcessManager : MonoBehaviour
                 pendingWomanChainCanEnd = choice.chainCanEnd;
                 pendingWomanChainEndWeight = choice.chainCanEnd ? choice.chainEndWeight : 0f;
                 pendingWomanConditionalBranching = choice.hasConditionalBranching;
+                pendingWomanBranchConditionMode = choice.branchConditionMode;
                 pendingWomanBranchCounterKey = choice.branchCounterKey;
                 pendingWomanBranchCounterMin = choice.branchCounterMin;
                 pendingWomanBranchCounterMax = choice.branchCounterMax;
+                pendingWomanBranchRequiredFlag = choice.branchRequiredStoryFlag;
             }
             else if (isInWomanChain)
             {
@@ -789,8 +793,8 @@ public class WomanProcessManager : MonoBehaviour
         if (remainingWomanEventsInCycle > 0)
             remainingWomanEventsInCycle--;
 
-        //öncü event kontrolü
-        if (evt.hasPrecursorEvent)
+        //öncü event kontrolü — koşul (varsa flag) sağlanıyorsa öncü gösterilir, sağlanmıyorsa direkt asıl event
+        if (evt.ShouldShowPrecursor())
         {
             //war for oil öncüsü ve savaşta değilsek — bu eventi atla, havuzdan başka bir event seç
             if (evt.precursorEventType == PrecursorEventType.WarForOil && !isInWar)
@@ -941,16 +945,26 @@ public class WomanProcessManager : MonoBehaviour
             else rangeIndex = 0;
         }
 
-        //koşullu dallanma aktifse sayaç kontrolü yap
+        //koşullu dallanma aktifse mode'a göre koşul kontrolü yap
         bool conditionMet = false;
-        if (pendingWomanConditionalBranching && !string.IsNullOrEmpty(pendingWomanBranchCounterKey)
+        if (pendingWomanConditionalBranching
             && pendingWomanConditionalBranches != null && pendingWomanConditionalBranches.Count > 0)
         {
-            int counterVal = 0;
-            womanChainCounters.TryGetValue(pendingWomanBranchCounterKey, out counterVal);
-            bool meetsMin = counterVal >= pendingWomanBranchCounterMin;
-            bool meetsMax = pendingWomanBranchCounterMax < 0 || counterVal <= pendingWomanBranchCounterMax;
-            conditionMet = meetsMin && meetsMax;
+            if (pendingWomanBranchConditionMode == BranchConditionType.Counter
+                && !string.IsNullOrEmpty(pendingWomanBranchCounterKey))
+            {
+                int counterVal = 0;
+                womanChainCounters.TryGetValue(pendingWomanBranchCounterKey, out counterVal);
+                bool meetsMin = counterVal >= pendingWomanBranchCounterMin;
+                bool meetsMax = pendingWomanBranchCounterMax < 0 || counterVal <= pendingWomanBranchCounterMax;
+                conditionMet = meetsMin && meetsMax;
+            }
+            else if (pendingWomanBranchConditionMode == BranchConditionType.StoryFlag
+                && pendingWomanBranchRequiredFlag != StoryFlag.None)
+            {
+                conditionMet = StoryFlagManager.Instance != null
+                    && StoryFlagManager.Instance.HasFlag(pendingWomanBranchRequiredFlag);
+            }
         }
 
         List<ChainBranch> activePool = conditionMet ? pendingWomanConditionalBranches : pendingWomanChainBranches;
@@ -1066,9 +1080,11 @@ public class WomanProcessManager : MonoBehaviour
         pendingWomanChainBranches = null;
         pendingWomanConditionalBranches = null;
         pendingWomanConditionalBranching = false;
+        pendingWomanBranchConditionMode = BranchConditionType.Counter;
         pendingWomanBranchCounterKey = null;
         pendingWomanBranchCounterMin = 0;
         pendingWomanBranchCounterMax = -1;
+        pendingWomanBranchRequiredFlag = StoryFlag.None;
         womanChainCounters.Clear();
     }
 
@@ -1096,8 +1112,9 @@ public class WomanProcessManager : MonoBehaviour
             //hikaye bayrak kontrolü — tüm gerekli bayraklar aktif olmalı
             if (!IsStoryFlagsSatisfied(evt)) continue;
 
-            //öncü event kontrolü — war for oil öncüsü varsa ve savaşta değilsek atla
-            if (evt.hasPrecursorEvent && evt.precursorEventType == PrecursorEventType.WarForOil && !isInWar)
+            //öncü event kontrolü — war for oil öncüsü varsa, savaşta değilsek VE öncü koşulu sağlanıyorsa atla
+            //(precursorRequiresStoryFlag açık ve flag aktif değilse zaten precursor gelmeyecek, eventi atlama)
+            if (evt.ShouldShowPrecursor() && evt.precursorEventType == PrecursorEventType.WarForOil && !isInWar)
                 continue;
 
             //obsesyon aralığı kontrolü — tier ile kesişim

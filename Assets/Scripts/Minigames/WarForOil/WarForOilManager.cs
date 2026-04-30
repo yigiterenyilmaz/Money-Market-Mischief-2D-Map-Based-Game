@@ -59,9 +59,11 @@ public class WarForOilManager : MonoBehaviour
     private bool currentEventIsChainEvent; //şu anki event chain slotundan mı geldi (random slot eventleri chain'i bitirmesin)
     private float pendingChainEndWeight; //dallanma seçiminde chain bitme ağırlığı (0 = bitme yok)
     private bool pendingConditionalBranching; //koşullu dallanma aktif mi
-    private string pendingBranchCounterKey; //koşullu dallanma sayaç adı
-    private int pendingBranchCounterMin; //koşullu dallanma min değer
-    private int pendingBranchCounterMax; //koşullu dallanma max değer (-1 = sınırsız)
+    private BranchConditionType pendingBranchConditionMode; //koşulun tipi (counter veya story flag)
+    private string pendingBranchCounterKey; //counter modu: sayaç adı
+    private int pendingBranchCounterMin; //counter modu: min değer
+    private int pendingBranchCounterMax; //counter modu: max değer (-1 = sınırsız)
+    private StoryFlag pendingBranchRequiredFlag = StoryFlag.None; //story flag modu: aranan bayrak
     private Dictionary<string, int> chainCounters = new Dictionary<string, int>(); //zincir sayaçları
     private bool hasActiveChainTickEffect; //chain arası tick etkisi aktif mi
     private ChainTickStatType activeChainTickStat; //tick etkisinin hedef stat'ı
@@ -101,6 +103,10 @@ public class WarForOilManager : MonoBehaviour
     //olasılıklı savaş bitirme sistemi
     private WarForOilEvent forcedNextEvent; //tekrar tetiklenecek event (sonraki cycle'da)
     private HashSet<string> dismissedEventIds = new HashSet<string>(); //bu savaşta kalıcı yok sayılan event id'leri
+
+    //öncü event sistemi — savaş eventleri için
+    private WarForOilEvent pendingWarEventAfterPrecursor; //öncü resolve olunca tetiklenecek asıl event
+    private bool currentEventIsPrecursor; //şu anki currentEvent bir öncü mü (chain branch işleme atlanır)
 
     //alt zincir dallanma engeli — tetiklenen event'lerin id'leri (blocksSubChainBranching açıksa)
     private HashSet<string> blockedBranchEventIds = new HashSet<string>();
@@ -284,6 +290,15 @@ public class WarForOilManager : MonoBehaviour
 
         //ön koşulları sağlanmayan seçenek seçilemez
         if (!choice.IsAvailable()) return;
+
+        //öncü event mi — flag'i hemen yakala ve sıfırla, asıl event sonra forced olarak gelecek
+        bool isPrecursorResolve = currentEventIsPrecursor;
+        WarForOilEvent eventAfterPrecursor = pendingWarEventAfterPrecursor;
+        if (isPrecursorResolve)
+        {
+            currentEventIsPrecursor = false;
+            pendingWarEventAfterPrecursor = null;
+        }
 
         //stat modifier'lar — anlık uygula, sonuç ekranında göstermek için ayrıca biriktir
         accumulatedSuspicionModifier += choice.suspicionModifier;
@@ -492,7 +507,8 @@ public class WarForOilManager : MonoBehaviour
 
         //zincir dallanması — sadece chain'e ait eventlerde kontrol et (Head veya chain slotundan gelen)
         //random slotta gelen normal eventler chain'i etkilemez
-        if (isInChain && (resolvedEvent.chainRole == ChainRole.Head || currentEventIsChainEvent))
+        //öncü eventin choice'undaki dallanmalar yok sayılır (kullanıcı kısıtı)
+        if (!isPrecursorResolve && isInChain && (resolvedEvent.chainRole == ChainRole.Head || currentEventIsChainEvent))
         {
             currentEventIsChainEvent = false;
             bool hasAnyBranches = (choice.chainBranches != null && choice.chainBranches.Count > 0)
@@ -507,9 +523,11 @@ public class WarForOilManager : MonoBehaviour
                 pendingChainThreshold2 = choice.chainThreshold2;
                 pendingChainEndWeight = choice.chainCanEnd ? choice.chainEndWeight : 0f;
                 pendingConditionalBranching = choice.hasConditionalBranching;
+                pendingBranchConditionMode = choice.branchConditionMode;
                 pendingBranchCounterKey = choice.branchCounterKey;
                 pendingBranchCounterMin = choice.branchCounterMin;
                 pendingBranchCounterMax = choice.branchCounterMax;
+                pendingBranchRequiredFlag = choice.branchRequiredStoryFlag;
 
                 //zincir gecikmesi — N event dönemi boyunca chain slot atlanır, random eventler gelmeye devam eder
                 pendingChainDelayCycles = (choice.hasChainDelay && choice.chainDelayCycles > 0) ? choice.chainDelayCycles : 0;
@@ -659,6 +677,11 @@ public class WarForOilManager : MonoBehaviour
                 }
             }
         }
+
+        //öncü resolve olunduysa asıl eventi forced olarak sıraya al (savaş hâlâ devam ediyorsa)
+        //precursor'un choice'u savaşı bitirdiyse eventsBlocked true olur, forcedNextEvent zaten tetiklenmez
+        if (isPrecursorResolve && eventAfterPrecursor != null && !eventsBlocked)
+            forcedNextEvent = eventAfterPrecursor;
 
         //savaş sürecine geri dön
         currentState = WarForOilState.WarProcess;
@@ -1107,9 +1130,11 @@ public class WarForOilManager : MonoBehaviour
         currentEventIsChainEvent = false;
         pendingChainEndWeight = 0f;
         pendingConditionalBranching = false;
+        pendingBranchConditionMode = BranchConditionType.Counter;
         pendingBranchCounterKey = null;
         pendingBranchCounterMin = 0;
         pendingBranchCounterMax = -1;
+        pendingBranchRequiredFlag = StoryFlag.None;
         hasActiveChainTickEffect = false;
         chainCounters.Clear();
         eventCheckTimer = 0f; //normal interval'a geri dön
@@ -1152,16 +1177,26 @@ public class WarForOilManager : MonoBehaviour
             else rangeIndex = 0;
         }
 
-        //koşullu dallanma aktifse sayaç kontrolü yap — geçerse koşullu listeyi, geçmezse koşulsuz listeyi kullan
+        //koşullu dallanma aktifse mode'a göre koşul kontrolü yap — geçerse koşullu listeyi, geçmezse koşulsuz listeyi kullan
         bool conditionMet = false;
-        if (pendingConditionalBranching && !string.IsNullOrEmpty(pendingBranchCounterKey)
+        if (pendingConditionalBranching
             && pendingConditionalChainBranches != null && pendingConditionalChainBranches.Count > 0)
         {
-            int counterVal = 0;
-            chainCounters.TryGetValue(pendingBranchCounterKey, out counterVal);
-            bool meetsMin = counterVal >= pendingBranchCounterMin;
-            bool meetsMax = pendingBranchCounterMax < 0 || counterVal <= pendingBranchCounterMax;
-            conditionMet = meetsMin && meetsMax;
+            if (pendingBranchConditionMode == BranchConditionType.Counter
+                && !string.IsNullOrEmpty(pendingBranchCounterKey))
+            {
+                int counterVal = 0;
+                chainCounters.TryGetValue(pendingBranchCounterKey, out counterVal);
+                bool meetsMin = counterVal >= pendingBranchCounterMin;
+                bool meetsMax = pendingBranchCounterMax < 0 || counterVal <= pendingBranchCounterMax;
+                conditionMet = meetsMin && meetsMax;
+            }
+            else if (pendingBranchConditionMode == BranchConditionType.StoryFlag
+                && pendingBranchRequiredFlag != StoryFlag.None)
+            {
+                conditionMet = StoryFlagManager.Instance != null
+                    && StoryFlagManager.Instance.HasFlag(pendingBranchRequiredFlag);
+            }
         }
 
         List<ChainBranch> activePool = conditionMet ? pendingConditionalChainBranches : pendingChainBranches;
@@ -2270,6 +2305,8 @@ public class WarForOilManager : MonoBehaviour
         forcedNextEvent = null;
         dismissedEventIds.Clear();
         blockedBranchEventIds.Clear();
+        pendingWarEventAfterPrecursor = null;
+        currentEventIsPrecursor = false;
 
         //savaş aktif story flag'i — runtime, sistem yönetimli
         if (StoryFlagManager.Instance != null)
@@ -2484,9 +2521,24 @@ public class WarForOilManager : MonoBehaviour
             cumulative += GetEventWeight(available[i]);
             if (roll <= cumulative) { selectedIdx = i; break; }
         }
-        currentEvent = available[selectedIdx];
-        eventTriggerCounts.TryGetValue(currentEvent, out int currentCount);
-        eventTriggerCounts[currentEvent] = currentCount + 1;
+        WarForOilEvent selectedEvent = available[selectedIdx];
+
+        //öncü event kontrolü — koşul sağlanıyorsa önce precursor gösterilir, asıl event forced olarak sıraya alınır
+        if (selectedEvent.ShouldShowPrecursor()
+            && selectedEvent.precursorEventType == PrecursorEventType.WarForOil
+            && selectedEvent.precursorWarEvent != null)
+        {
+            pendingWarEventAfterPrecursor = selectedEvent;
+            currentEventIsPrecursor = true;
+            currentEvent = selectedEvent.precursorWarEvent;
+            //asıl event henüz tetiklenmedi — eventTriggerCounts'a ekleme yok (forced path zaten saymıyor)
+        }
+        else
+        {
+            currentEvent = selectedEvent;
+            eventTriggerCounts.TryGetValue(currentEvent, out int currentCount);
+            eventTriggerCounts[currentEvent] = currentCount + 1;
+        }
 
         EventCoordinator.MarkEventShown();
 
@@ -2686,6 +2738,8 @@ public class WarForOilManager : MonoBehaviour
         selectedCountry = null;
         currentState = WarForOilState.Idle;
         pressureCooldownTimer = 0f;
+        pendingWarEventAfterPrecursor = null;
+        currentEventIsPrecursor = false;
     }
 
     // ==================== KADIN SÜRECİ ENTEGRASYONU ====================

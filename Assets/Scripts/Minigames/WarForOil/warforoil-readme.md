@@ -213,10 +213,12 @@ Savas sirasinda tetiklenen karar olaylari. Ayni event sinifi normal eventler, zi
 | `minObsession` / `maxObsession` | Eventin havuzdan secilebilecegi obsesyon araligi. Tier araligini daraltabilir ama genisletemez (kesisim alinir). Kesisim yoksa ozel aralik gecersiz sayilir, tier araligi kullanilir. Sadece havuzdan rastgele secimde gecerli — zincir dallanmasi eventlerinde bu filtre uygulanmaz. |
 | `blockedWomanProcessEvents` | Bu event tetiklenince listedeki eventler havuzdan ve zincirlerden cikarilir. Head ise zinciri hic baslamaz, dal ise agirligi digerlerine kayar. |
 | **Oncu Event** | |
-| `hasPrecursorEvent` | true ise bu kadin eventinin bir oncu eventi vardir. Kadin eventi gelmeden once oncu event tetiklenir, 4 saniye sonra asil kadin eventi gelir. |
-| `precursorEventType` | Oncu eventin tipi: `WarForOil` veya `RandomEvent`. WarForOil secilirse savas yokken bu kadin eventi ve oncusu ikisi de tetiklenmez. |
+| `hasPrecursorEvent` | true ise bu eventin bir oncu eventi vardir. Asil event gelmeden once oncu event tetiklenir, 4sn sonra asil event gelir. **Hem kadin hem savas (WFO) eventlerinde calisir.** |
+| `precursorEventType` | Oncu eventin tipi: `WarForOil` veya `RandomEvent`. Kadin eventlerinde WarForOil secilirse savas yokken bu kadin eventi ve oncusu ikisi de tetiklenmez. Savas eventlerinde RandomEvent oncu desteklenmez (sadece WarForOil oncu). |
 | `precursorWarEvent` | Oncu war for oil eventi (precursorEventType=WarForOil ise). |
-| `precursorRandomEvent` | Oncu random event (precursorEventType=RandomEvent ise). |
+| `precursorRandomEvent` | Oncu random event (precursorEventType=RandomEvent ise — sadece kadin eventleri). |
+| `precursorRequiresStoryFlag` | true ise oncu sadece belirli bir hikaye bayragi aktifken gelir; kapaliysa eski davranis (her zaman gelir). |
+| `precursorRequiredFlag` | Oncuyu tetikleyecek bayrak (precursorRequiresStoryFlag true ise). Bayrak aktif degilse oncu atlanir, asil event direkt gelir. |
 
 #### ChainRole Enum
 
@@ -385,10 +387,14 @@ Bir choice secildiginde siradaki chain event'in olasi hedeflerinden birini tanim
 | `immediateEventDelay` | Aninda event gecikmesi (0-10 saniye). triggersAsImmediateEvent aktifken gorunur. 0 = aninda, N = N saniye sonra tetiklenir. |
 
 **Kosullu dallanma (choice seviyesinde):**
-- `hasConditionalBranching`: true ise kosullu dallanma aktif
-- `branchCounterKey`: Sayac adi
-- `branchCounterMin`: Minimum sayac degeri (dahil)
-- `branchCounterMax`: Maksimum sayac degeri (-1 = sinirsiz)
+- `hasConditionalBranching`: true ise kosullu dallanma aktif. Kosul saglanirsa `conditionalChainBranches`'tan, saglanmazsa `chainBranches`'tan secim yapilir.
+- `branchConditionMode`: Kosul tipi — `Counter` (sayac bazli) veya `StoryFlag` (hikaye bayragi bazli)
+- **Counter modu:**
+  - `branchCounterKey`: Sayac adi
+  - `branchCounterMin`: Minimum sayac degeri (dahil)
+  - `branchCounterMax`: Maksimum sayac degeri (-1 = sinirsiz)
+- **StoryFlag modu:**
+  - `branchRequiredStoryFlag`: Aranan hikaye bayragi. Bayrak aktifse kosullu havuz, degilse normal havuz.
 
 **Zincir gecikmesi (choice seviyesinde):**
 - `hasChainDelay`: true ise siradaki chain event N event donemi gec tetiklenir
