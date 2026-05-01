@@ -1155,6 +1155,14 @@ public class MapDecorPlacer : MonoBehaviour
         var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
             special.daySprite, special.nightSprite, wx, wy, scale, baseA, sortOrder, special.isIsometric);
 
+        // Animasyonlu bina ise day renderer'a SpriteSheetAnimator tak
+        if (special.isAnimated && special.animationFrames != null && special.animationFrames.Length > 1 && special.frameRate > 0f)
+        {
+            var animator = daySR.gameObject.AddComponent<SpriteSheetAnimator>();
+            animator.frames = special.animationFrames;
+            animator.frameRate = special.frameRate;
+        }
+
         decorObjects.Add(go);
         cityBuildings.Add(new BuildingData
         {

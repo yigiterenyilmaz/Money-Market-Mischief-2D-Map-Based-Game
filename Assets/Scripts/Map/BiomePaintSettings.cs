@@ -16,7 +16,7 @@ public struct CityBuildingEntry
 [System.Serializable]
 public struct SpecialCityBuilding
 {
-    [Tooltip("Özel bina sprite'ı (gündüz).")]
+    [Tooltip("Özel bina sprite'ı (gündüz). Animasyonlu modda ilk frame olarak kullanılır.")]
     public Sprite daySprite;
     [Tooltip("Özel bina sprite'ı (gece). Boş bırakılabilir.")]
     public Sprite nightSprite;
@@ -30,6 +30,12 @@ public struct SpecialCityBuilding
     [Range(0, 30)] public int clearingRadius;
     [Tooltip("İzometrik sprite ise işaretle. Gölge mekanizması binanın tabanından diyagonal çıkacak şekilde değişir.")]
     public bool isIsometric;
+    [Tooltip("İşaretlenirse bina animasyonlu olur. animationFrames sırayla döner.")]
+    public bool isAnimated;
+    [Tooltip("Animasyon frame'leri (sprite sheet'ten dilimlenmiş). Sırayla döner.")]
+    public Sprite[] animationFrames;
+    [Tooltip("Saniyedeki frame sayısı. 12-15 çoğu animasyon için yeterli.")]
+    public float frameRate;
 }
 
 [CreateAssetMenu(fileName = "BiomePaintSettings", menuName = "Map/BiomePaintSettings")]
