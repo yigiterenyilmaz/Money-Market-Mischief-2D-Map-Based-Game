@@ -63,9 +63,6 @@ public class MapDecorPlacer : MonoBehaviour
     [Tooltip("coreRadius..midRadius arası = mid. Ötesi = outer.")]
     [Range(10, 120)] public int midRadius = 55;
 
-    [Tooltip("Core bölge X-bölme dilimlerinde yabancı dilimin listesinden sprite seçilme olasılığı. Default 0.2 → kendi dilimi %80, karşı dilim %20.")]
-    [Range(0f, 0.5f)] public float coreZoneLeakWeight = 0.2f;
-
     [Header("Zone Densities")]
     [Tooltip("Core grid adımı (pixel). Küçük = daha sık.")]
     [Range(2, 20)] public int coreDensityStep = 4;
@@ -87,6 +84,16 @@ public class MapDecorPlacer : MonoBehaviour
     [Range(0.01f, 0.5f)] public float denseOverlapRadius = 0.04f;
     [Tooltip("Outer sparse bölge için overlap yarıçapı.")]
     [Range(0.05f, 2f)]   public float overlapRadius      = 0.3f;
+
+    [Header("Manhattan Grid — Sadece Core Bölge")]
+    [Tooltip("Avenue (uzun cadde) aralığı, tile cinsinden. Avenue'lar dikey N-S çizgileridir. Bina sprite çapından (~38 tile) en az iki kat büyük olmalı.")]
+    [Range(4, 150)] public int avenueSpacing = 60;
+    [Tooltip("Street (kısa sokak) aralığı, tile cinsinden. Street'ler yatay E-W çizgileridir.")]
+    [Range(2, 100)] public int streetSpacing = 35;
+    [Tooltip("Sokak şeritinin tile genişliği. Bu kadar tile sokak olarak boş bırakılır. Bina sprite'ları büyük olduğundan görünür sokak için yüksek değer (15-30) gerekebilir.")]
+    [Range(0, 60)] public int manhattanStreetWidth = 1;
+    [Tooltip("Core bölge bina yoğunluğu. 1.0 = tıka basa dolu, 0.5 = yarısı boş kalır, 0.3 = oldukça seyrek.")]
+    [Range(0.1f, 1.0f)] public float coreFillDensity = 1.0f;
 
     [Header("Broken Building Sprites")]
     [Tooltip("Sprites randomly picked when a city building is cracked by an earthquake.")]
@@ -311,21 +318,24 @@ public class MapDecorPlacer : MonoBehaviour
         corePool.AddRange(coreHorizontalPool);
         corePool.AddRange(coreVerticalPool);
 
-        // 3) Özel binaları yerleştir
+        // 3) Port'ları yerleştir ve yola bağla — bina yerleşimi yeni port yollarini gormeli
+        PlacePorts(map, halfW, halfH);
+        if (RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated)
+        {
+            foreach (var port in ports)
+                RoadGenerator.Instance.ConnectPortToRoad(map, new Vector2Int(port.tileX, port.tileY));
+        }
+
+        // 4) Özel binaları yerleştir
         PlaceSpecialCityBuildings(map, settings, corePool, midPool, outerPool, halfW, halfH);
 
-        // 4) Core bölge — X şeklinde 2 dilim, karşı dilim coreZoneLeakWeight kadar sızar
-        FillZoneGrid(map,
-                     settings.citiesCoreHorizontalDecor, settings.citiesCoreVerticalDecor, null,
-                     coreZoneLeakWeight, coreHorizontalPool, coreDensityStep, coreSpriteScaleRange, halfW, halfH);
-        FillZoneGrid(map,
-                     settings.citiesCoreVerticalDecor, settings.citiesCoreHorizontalDecor, null,
-                     coreZoneLeakWeight, coreVerticalPool, coreDensityStep, coreSpriteScaleRange, halfW, halfH);
+        // 5) Core bölge — Manhattan ızgarası (avenue + street şeritleri boş, bloklar dolu)
+        FillCoreManhattan(map, settings, cityHallTile, corePool, halfW, halfH);
 
-        // 5) Mid bölge — grid tarama, orta yoğunluk
+        // 6) Mid bölge — grid tarama, orta yoğunluk
         FillZoneGrid(map, settings.citiesMidDecor, midPool, midDensityStep, midSpriteScaleRange, halfW, halfH);
 
-        // 6) Outer bölge — seyrek random
+        // 7) Outer bölge — seyrek random
         int sparseAttempts = (outerPool.Count / Mathf.Max(1, cellArea)) * outerSpawnRate;
         for (int attempt = 0; attempt < sparseAttempts; attempt++)
         {
@@ -346,16 +356,6 @@ public class MapDecorPlacer : MonoBehaviour
                 Vector2Int tile = pool[Random.Range(0, pool.Count)];
                 TryPlaceNatureDecor(map, settings, biome, tile.x, tile.y, halfW, halfH);
             }
-        }
-
-        // --- Port placement ---
-        PlacePorts(map, halfW, halfH);
-
-        // --- Connect ports to road network ---
-        if (RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated)
-        {
-            foreach (var port in ports)
-                RoadGenerator.Instance.ConnectPortToRoad(map, new Vector2Int(port.tileX, port.tileY));
         }
 
         // --- Build navigation grid for ships ---
@@ -965,9 +965,6 @@ public class MapDecorPlacer : MonoBehaviour
             if (!map.IsLand(jx, jy)) continue;
             if (map.GetBiome(jx, jy) != 2) continue;
             if (cityShoreBuffer > 0 && !HasShoreBuffer(map, jx, jy)) continue;
-            if (RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated
-                && RoadGenerator.Instance.GetDistanceToRoadEdge(jx, jy) < cityMinRoadDistance)
-                continue;
 
             // Leak weight ile şerit listesi seç: primary ağırlıklı, foreign'lar leakWeight kadar sızar
             List<CityBuildingEntry> chosenList;
@@ -994,8 +991,19 @@ public class MapDecorPlacer : MonoBehaviour
             if (daySprite == null) continue;
 
             float scale = Random.Range(scaleRange.x, scaleRange.y);
-            float spriteRadius = (daySprite.rect.width / daySprite.pixelsPerUnit) * scale * 0.45f;
 
+            // Yol kontrolu — sprite yola degmiyorsa olduğu yerde, deginiyorsa kaydirip dene
+            if (!TryFindRoadFreePosition(jx, jy, daySprite, scale, 8, cityMinRoadDistance, out int newJx, out int newJy))
+                continue;
+            if (newJx != jx || newJy != jy)
+            {
+                if (!map.IsLand(newJx, newJy)) continue;
+                if (map.GetBiome(newJx, newJy) != 2) continue;
+                if (cityShoreBuffer > 0 && !HasShoreBuffer(map, newJx, newJy)) continue;
+            }
+            jx = newJx; jy = newJy;
+
+            float spriteRadius = (daySprite.rect.width / daySprite.pixelsPerUnit) * scale * 0.45f;
             float wx = transform.position.x + (jx / pixelsPerUnit) - halfW;
             float wy = transform.position.y + (jy / pixelsPerUnit) - halfH;
 
@@ -1030,6 +1038,125 @@ public class MapDecorPlacer : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
+    // CORE MANHATTAN — Belediye'den referansla ortogonal cadde/sokak ızgarası
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Core bölge için Manhattan tarzı yerleşim. Belediye binası tile'ından başlayan
+    /// dikey avenue ve yatay street çizgileri "sokak" olarak boş bırakılır; aralarda
+    /// kalan blok tile'ları core sprite havuzu ile doldurulur. Mid/outer'a dokunmaz.
+    /// </summary>
+    void FillCoreManhattan(MapGenerator map, BiomePaintSettings settings,
+                           Vector2Int hallTile, List<Vector2Int> corePool,
+                           float halfW, float halfH)
+    {
+        // Belediye yoksa core bölge zaten boştur — hiçbir şey yapma
+        if (hallTile.x < 0) return;
+        if (corePool == null || corePool.Count == 0) return;
+
+        // Iki core listesini tek havuzda birlestir — tum spriteler esit olasilikla secilsin
+        var combinedPool = new List<CityBuildingEntry>();
+        if (settings.citiesCoreHorizontalDecor != null)
+            combinedPool.AddRange(settings.citiesCoreHorizontalDecor);
+        if (settings.citiesCoreVerticalDecor != null)
+            combinedPool.AddRange(settings.citiesCoreVerticalDecor);
+        if (combinedPool.Count == 0) return;
+
+        // Inspector değerlerini güvenli aralığa çek
+        int avenueGap = Mathf.Max(2, avenueSpacing);
+        int streetGap = Mathf.Max(2, streetSpacing);
+        // Strip width spacing'in yarisindan buyuk olamaz (yoksa hicbir tile gecmez)
+        int maxStripWidth = Mathf.Max(0, Mathf.Min(avenueGap, streetGap) / 2 - 1);
+        int stripWidth = Mathf.Clamp(manhattanStreetWidth, 0, maxStripWidth);
+
+        int placed = 0;
+        int streetSkipped = 0;
+
+        for (int i = 0; i < corePool.Count; i++)
+        {
+            Vector2Int t = corePool[i];
+            int tx = t.x, ty = t.y;
+
+            // Manhattan kontrolü: avenue (dikey) veya street (yatay) seridi mi?
+            // stripWidth kadar tile dogrudan skip edilir — sokak olarak bos kalir
+            int avMod = MathMod(tx - hallTile.x, avenueGap);
+            int stMod = MathMod(ty - hallTile.y, streetGap);
+            if (avMod < stripWidth || stMod < stripWidth)
+            {
+                streetSkipped++;
+                continue;
+            }
+
+            // Yogunluk kontrolu — coreFillDensity olasiligindan dusukse atla
+            if (coreFillDensity < 1.0f && Random.value > coreFillDensity) continue;
+
+            // Standart yerleştirme filtreleri
+            if (!map.IsLand(tx, ty)) continue;
+            if (map.GetBiome(tx, ty) != 2) continue;
+            if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) continue;
+
+            // Birlestirilmis havuzdan uniform sprite secimi — her sprite esit olasilik
+            int spriteIdx = Random.Range(0, combinedPool.Count);
+            var entry = combinedPool[spriteIdx];
+            Sprite daySprite = entry.daySprite;
+            if (daySprite == null) continue;
+
+            float scale = Random.Range(coreSpriteScaleRange.x, coreSpriteScaleRange.y);
+
+            // Yol kontrolu — sprite yola degmiyorsa olduğu yerde, deginiyorsa kaydirip dene
+            if (!TryFindRoadFreePosition(tx, ty, daySprite, scale, 8, cityMinRoadDistance, out int newTx, out int newTy))
+                continue;
+            if (newTx != tx || newTy != ty)
+            {
+                if (!map.IsLand(newTx, newTy)) continue;
+                if (map.GetBiome(newTx, newTy) != 2) continue;
+                if (cityShoreBuffer > 0 && !HasShoreBuffer(map, newTx, newTy)) continue;
+            }
+            tx = newTx; ty = newTy;
+
+            float spriteRadius = (daySprite.rect.width / daySprite.pixelsPerUnit) * scale * 0.45f;
+            float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
+            float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
+
+            if (IsDenseOverlapping(wx, wy, spriteRadius)) continue;
+            denseOccupied.Add(new Vector3(wx, wy, spriteRadius));
+
+            float baseA   = 1f;
+            int sortOrder = 10 + (int)(wy * -100f);
+
+            var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
+                daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder, entry.isIsometric);
+
+            decorObjects.Add(go);
+            cityBuildings.Add(new BuildingData
+            {
+                go            = go,
+                dayRenderer   = daySR,
+                nightRenderer = nightSR,
+                shadow        = shadow,
+                tileX         = tx,
+                tileY         = ty,
+                isBroken      = false,
+                isSpecial     = false,
+                spriteIndex   = spriteIdx,
+                brokenIndex   = -1,
+                baseAlpha     = baseA,
+            });
+            placed++;
+        }
+
+        Debug.Log($"MapDecorPlacer: core Manhattan — placed={placed}, streetSkipped={streetSkipped}, " +
+                  $"avenue={avenueGap}, street={streetGap}, stripWidth={stripWidth}");
+    }
+
+    // Negatif sayilarda C# % operatoru negatif sonuc verir — modulo'yu [0, m) araligina kilitle
+    static int MathMod(int a, int m)
+    {
+        int r = a % m;
+        return r < 0 ? r + m : r;
+    }
+
+    // -------------------------------------------------------------------------
     // OUTER BUILDING — Seyrek dış bölge
     // -------------------------------------------------------------------------
 
@@ -1039,21 +1166,27 @@ public class MapDecorPlacer : MonoBehaviour
         if (settings.citiesOuterDecor == null || settings.citiesOuterDecor.Count == 0) return;
         if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) return;
 
-        if (RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated
-            && RoadGenerator.Instance.GetDistanceToRoadEdge(tx, ty) < cityMinRoadDistance)
-            return;
-
         int spriteIdx = Random.Range(0, settings.citiesOuterDecor.Count);
         var entry = settings.citiesOuterDecor[spriteIdx];
         Sprite daySprite = entry.daySprite;
         if (daySprite == null) return;
 
+        float scale    = Random.Range(outerSpriteScaleRange.x, outerSpriteScaleRange.y);
+
+        // Yol kontrolu — sprite yola degmiyorsa olduğu yerde, deginiyorsa kaydirip dene
+        if (!TryFindRoadFreePosition(tx, ty, daySprite, scale, 8, cityMinRoadDistance, out int newTx, out int newTy))
+            return;
+        if (newTx != tx || newTy != ty)
+        {
+            if (!map.IsLand(newTx, newTy)) return;
+            if (cityShoreBuffer > 0 && !HasShoreBuffer(map, newTx, newTy)) return;
+        }
+        tx = newTx; ty = newTy;
+
         float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
         float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
         if (IsOverlapping(wx, wy)) return;
         occupiedCenters.Add(new Vector2(wx, wy));
-
-        float scale    = Random.Range(outerSpriteScaleRange.x, outerSpriteScaleRange.y);
         float baseA    = Random.Range(0.85f, 1f);
         int sortOrder  = 10 + (int)(wy * -100f);
 
@@ -1131,9 +1264,12 @@ public class MapDecorPlacer : MonoBehaviour
         if (!map.IsLand(tx, ty)) return false;
         if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) return false;
 
-        if (RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated
-            && RoadGenerator.Instance.GetDistanceToRoadEdge(tx, ty) < cityMinRoadDistance)
-            return false;
+        // Özel binalar mid-scale kullan
+        float scale    = Random.Range(midSpriteScaleRange.x, midSpriteScaleRange.y);
+
+        // Yol kontrolu — special icin kaydirma yok (yol konnektoru orijinal tile'a cekiliyor),
+        // sadece reject. Caller havuzdan baska bir tile dener.
+        if (SpriteOverlapsRoad(tx, ty, special.daySprite, scale, cityMinRoadDistance)) return false;
 
         float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
         float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
@@ -1147,8 +1283,6 @@ public class MapDecorPlacer : MonoBehaviour
             denseOccupied.Add(new Vector3(wx, wy, clearWorld));
         }
 
-        // Özel binalar mid-scale kullan
-        float scale    = Random.Range(midSpriteScaleRange.x, midSpriteScaleRange.y);
         float baseA    = Random.Range(0.85f, 1f);
         int sortOrder  = 10 + (int)(wy * -100f);
 
@@ -1358,6 +1492,101 @@ public class MapDecorPlacer : MonoBehaviour
             float dy = wy - other.y;
             if (dx * dx + dy * dy < minDist * minDist) return true;
         }
+        return false;
+    }
+
+    /// <summary>
+    /// Bina FOOTPRINT'inin (3D zemin) tile-space extentleri. Pivot'a duyarli + simetrik.
+    ///
+    /// Iso 2:1 projeksiyonda sprite ekranda 2s genis × s yuksek rhombus olarak gozukur,
+    /// AMA 3D dunyada gercek footprint s×s'lik bir karedir. Yol kontrolu icin 3D karesi
+    /// kullaniliyor → yatay ve dikey yollarda esit clearance.
+    ///
+    /// - X (yatay): sprite half-width (s) toplam → +-s/2 her yon
+    /// - Y (dikey): sprite half-width (s) toplam → sprite alt kenarindan s yukari
+    /// - Sprite'in pivot pozisyonu sprite alt kenarini bulmak icin kullanilir (pivot-aware)
+    /// </summary>
+    void GetSpriteTileExtents(Sprite sprite, float scale,
+                              out int xMin, out int xMax, out int yMin, out int yMax)
+    {
+        if (sprite == null) { xMin = xMax = yMin = yMax = 0; return; }
+
+        Vector2 pivotPx = sprite.pivot;
+        float spritePxToWorld = scale / sprite.pixelsPerUnit;
+
+        // Sprite half-width tile cinsinden (iso ground tile side = s)
+        int s = Mathf.CeilToInt(sprite.rect.width * 0.5f * spritePxToWorld * pixelsPerUnit);
+
+        // Sprite alt kenari (pivot'a göre, tile cinsinden, tile pozisyonuna relative)
+        int spriteBottomY = Mathf.FloorToInt(-pivotPx.y * spritePxToWorld * pixelsPerUnit);
+
+        // 3D kare footprint: s/2 her yatay yon, s yukari sprite alt kenarinden
+        int halfS = s / 2;
+        xMin = -halfS;
+        xMax = halfS;
+        yMin = spriteBottomY;
+        yMax = spriteBottomY + s;
+    }
+
+    /// <summary>
+    /// Bina sprite'i (verilen tile pozisyonunda) HERHANGI bir yol pikseline degiyor mu?
+    /// Bounding kutuyu extraBuffer kadar her yonden sisirir, kutu icindeki her tile'i
+    /// gercekten kontrol eder. Distance field ile hizli reject yapar.
+    /// </summary>
+    bool SpriteOverlapsRoad(int tx, int ty, Sprite sprite, float scale, int extraBuffer)
+    {
+        if (RoadGenerator.Instance == null || !RoadGenerator.Instance.IsGenerated) return false;
+        if (sprite == null) return false;
+
+        GetSpriteTileExtents(sprite, scale, out int xMin, out int xMax, out int yMin, out int yMax);
+
+        // Hizli reject — L1 distance field ile bounding kutu disinda mi kontrol et
+        int dist = RoadGenerator.Instance.GetDistanceToRoadEdge(tx, ty);
+        int maxL1 = Mathf.Max(-xMin, xMax) + Mathf.Max(-yMin, yMax) + 2 * extraBuffer;
+        if (dist > maxL1) return false;
+
+        // Tam bounding rect taramasi
+        int x0 = tx + xMin - extraBuffer;
+        int x1 = tx + xMax + extraBuffer;
+        int y0 = ty + yMin - extraBuffer;
+        int y1 = ty + yMax + extraBuffer;
+
+        for (int x = x0; x <= x1; x++)
+        for (int y = y0; y <= y1; y++)
+        {
+            if (RoadGenerator.Instance.GetDistanceToRoadEdge(x, y) == 0) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Verilen pozisyonda sprite yola degmiyorsa true doner. Degiyorsa cevreyi
+    /// spiral arar — maxShift tile'a kadar deniyor. Yola degmedigi ilk pozisyonu
+    /// outX/outY ile dondurur. Bulunamazsa false (binayi atla).
+    /// </summary>
+    bool TryFindRoadFreePosition(int origX, int origY, Sprite sprite, float scale,
+                                 int maxShift, int extraBuffer, out int outX, out int outY)
+    {
+        if (!SpriteOverlapsRoad(origX, origY, sprite, scale, extraBuffer))
+        {
+            outX = origX; outY = origY;
+            return true;
+        }
+        for (int r = 1; r <= maxShift; r++)
+        {
+            for (int dx = -r; dx <= r; dx++)
+            for (int dy = -r; dy <= r; dy++)
+            {
+                if (Mathf.Abs(dx) != r && Mathf.Abs(dy) != r) continue; // sadece dis halka
+                int nx = origX + dx, ny = origY + dy;
+                if (!SpriteOverlapsRoad(nx, ny, sprite, scale, extraBuffer))
+                {
+                    outX = nx; outY = ny;
+                    return true;
+                }
+            }
+        }
+        outX = origX; outY = origY;
         return false;
     }
 

@@ -10733,11 +10733,16 @@ MonoBehaviour:
   shadowHeightRatio: 1
   shadowMaxLength: 0.5
   shadowMidScale: 0.1
+  isoShadowAngleDegrees: 30
+  isoShadowPivotOffsetRatio: 0.1
+  isoShadowNearScale: 0.7
+  isoShadowHeightRatio: 1
+  isoShadowMaxLength: 2
+  isoShadowNoonDeadZone: 0.25
   cityHallScaleRange: {x: 1.5, y: 2}
   cityHallClearingRadius: 15
   coreRadius: 45
   midRadius: 120
-  coreZoneLeakWeight: 0.15
   coreDensityStep: 4
   midDensityStep: 7
   outerSpawnRate: 1
@@ -10746,6 +10751,9 @@ MonoBehaviour:
   outerSpriteScaleRange: {x: 0.25, y: 0.4}
   denseOverlapRadius: 0.08
   overlapRadius: 0.3
+  avenueSpacing: 15
+  streetSpacing: 10
+  manhattanStreetWidth: 8
   brokenBuildingSprites: []
   brokenBuildingTint: {r: 0.55, g: 0.45, b: 0.4, a: 1}
   brokenBuildingSpritesNight: []
@@ -11648,7 +11656,13 @@ MonoBehaviour:
   maxZoom: 3
   startPrice: 100
   volatility: 3
-  trendChangeInterval: 15
+  trendNoise: 2.5
+  trendDecay: 0.4
+  maxTrend: 2.5
+  volatilityMultiplier: 1
+  patternCooldownMin: 5
+  patternCooldownMax: 15
+  forcePatternId: 
 --- !u!114 &1943374665
 MonoBehaviour:
   m_ObjectHideFlags: 0

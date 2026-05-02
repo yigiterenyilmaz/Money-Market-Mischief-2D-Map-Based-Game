@@ -90,10 +90,10 @@ public class BiomePaintSettings : ScriptableObject
     [Header("City Hall — Belediye Binası (tek)")]
     public CityBuildingEntry cityHallEntry;
 
-    [Header("City Core — Belediye Etrafı (X şeklinde çapraz 4 dilim, 2 liste)")]
-    [Tooltip("Belediyenin doğu+batı (yatay) dilimlerinde ağırlıklı çıkacak binalar.")]
+    [Header("City Core — Belediye Etrafı (Manhattan Grid)")]
+    [Tooltip("Core bölgede kullanılacak bina spritleri. İki liste birleşip uniform olasılıkla seçilir.")]
     public List<CityBuildingEntry> citiesCoreHorizontalDecor = new List<CityBuildingEntry>();
-    [Tooltip("Belediyenin kuzey+güney (dikey) dilimlerinde ağırlıklı çıkacak binalar.")]
+    [Tooltip("Core bölgede kullanılacak bina spritleri. İki liste birleşip uniform olasılıkla seçilir.")]
     public List<CityBuildingEntry> citiesCoreVerticalDecor = new List<CityBuildingEntry>();
 
     [Header("City Mid — Orta Bölge")]
