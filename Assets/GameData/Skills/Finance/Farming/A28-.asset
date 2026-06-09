@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0aaa824f7832b94e9010f7cdb57d8aa, type: 3}
+  m_Name: A28-
+  m_EditorClassIdentifier: Assembly-CSharp::Skill
+  id: a28
+  displayName: 
+  description: "t\xFCketiciye sokma- stok\xE7uluk, sosyal medyada ak\u0131m yarat\u0131p
+    insanlara al\u0131\u015Fveri\u015F yapt\u0131rma, feede d\xFC\u015Fer "
+  icon: {fileID: 0}
+  cost: 0
+  prerequisites:
+  - {fileID: 11400000, guid: 6c3c198da1fc934478b6fc01e1e0dfd9, type: 2}
+  effects: []
+  otherPrerequisites: 0
+  blocksSkills: []
+  references:
+    version: 2
+    RefIds: []

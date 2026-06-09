@@ -1,7 +1,7 @@
-    public enum RegionType
-    {
-        Industrial,
-        Urban,
-        Agricultural,
-        Cities
-    }
+public enum RegionType
+{
+    Industrial,
+    Urban,
+    Agricultural,
+    Cities
+}

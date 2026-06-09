@@ -10740,10 +10740,10 @@ MonoBehaviour:
   isoShadowMaxLength: 2
   isoShadowNoonDeadZone: 0.25
   cityHallScaleRange: {x: 1.5, y: 2}
-  cityHallClearingRadius: 15
-  coreRadius: 45
-  midRadius: 120
-  coreDensityStep: 4
+  cityHallClearingRadius: 10
+  coreRadius: 29
+  midRadius: 94
+  coreDensityStep: 11
   midDensityStep: 7
   outerSpawnRate: 1
   coreSpriteScaleRange: {x: 0.55, y: 0.75}
@@ -10754,6 +10754,7 @@ MonoBehaviour:
   avenueSpacing: 15
   streetSpacing: 10
   manhattanStreetWidth: 8
+  coreFillDensity: 1
   brokenBuildingSprites: []
   brokenBuildingTint: {r: 0.55, g: 0.45, b: 0.4, a: 1}
   brokenBuildingSpritesNight: []
