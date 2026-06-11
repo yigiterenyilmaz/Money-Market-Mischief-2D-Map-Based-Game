@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0aaa824f7832b94e9010f7cdb57d8aa, type: 3}
+  m_Name: A6-Tourniquet
+  m_EditorClassIdentifier: Assembly-CSharp::Skill
+  id: a6
+  displayName: Tourniquet
+  description: Allows you to tap into active oil pipelines and siphon crude before
+    disappearing. High short-term profit potential, but significantly increases suspicion
+    if detected.
+  icon: {fileID: 0}
+  cost: 0
+  prerequisites:
+  - {fileID: 11400000, guid: c62e1d7b6ba07d44b82b69c1c73043c1, type: 2}
+  effects:
+  - rid: 2638473143635148869
+  otherPrerequisites: 0
+  blocksSkills: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 2638473143635148869
+      type: {class: UnlockMinigameEffect, ns: , asm: Assembly-CSharp}
+      data:
+        minigamesToBeUnlocked:
+        - {fileID: 11400000, guid: dda2b5d28c53d264591e90f95c9c4a8e, type: 2}

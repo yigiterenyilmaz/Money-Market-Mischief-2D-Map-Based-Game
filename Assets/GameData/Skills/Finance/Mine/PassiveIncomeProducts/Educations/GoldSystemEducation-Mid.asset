@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e181ea621e39a2c4788fb100aae19979, type: 3}
+  m_Name: GoldSystemEducation-Mid
+  m_EditorClassIdentifier: Assembly-CSharp::PassiveIncomeProduct
+  id: goldeducation02
+  displayName: Mid Level Gold Education
+  description: "Advanced Gold-Silver System Training is designed for learners with
+    a foundational understanding of gold markets who want to deepen their knowledge
+    of global pricing, monetary dynamics, and strategic positioning. The program
+    moves beyond basics and focuses on real-world mechanisms shaping the gold economy.
+    And even if you\u2019re starting from zero, we guarantee dedicated beginner-level
+    training paths to build you up step by step."
+  icon: {fileID: 0}
+  cost: 8200
+  isSellable: 0
+  sellRatio: 0.6
+  minIncomePerSecond: 80
+  maxIncomePerSecond: 100

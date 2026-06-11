@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0aaa824f7832b94e9010f7cdb57d8aa, type: 3}
+  m_Name: A2-YouCouldBeMine
+  m_EditorClassIdentifier: Assembly-CSharp::Skill
+  id: a2
+  displayName: You Could Be Mine
+  description: 'This skill is the first step toward specializing in managing precious
+    metals.
+
+    You begin performing various operations involving gold and other
+    valuable metals, learning how this field works.'
+  icon: {fileID: 0}
+  cost: 10000
+  prerequisites:
+  - {fileID: 11400000, guid: ddc981964cfe5874bab31b5d5bf98d06, type: 2}
+  effects:
+  - rid: 2638473098503127118
+  - rid: 2638473098503127119
+  otherPrerequisites: 0
+  blocksSkills: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 2638473098503127118
+      type: {class: DirectPassiveIncomeEffect, ns: , asm: Assembly-CSharp}
+      data:
+        incomePerSecond: 60
+        decayAt1Min: 60
+        decayAt2Min: 20
+        decayAt3Min: 0
+        decayAt4Min: 0
+        decayAt5Min: 0
+    - rid: 2638473098503127119
+      type: {class: PassiveIncomeEffect, ns: , asm: Assembly-CSharp}
+      data:
+        products:
+        - {fileID: 11400000, guid: 68c6f26521949ad42ba5d591aa4cf9ca, type: 2}
+        - {fileID: 11400000, guid: 6fd0ac184ffb34c4caf742701982c226, type: 2}
+        - {fileID: 11400000, guid: cecde47e6e9356c43b10f5226991d1eb, type: 2}

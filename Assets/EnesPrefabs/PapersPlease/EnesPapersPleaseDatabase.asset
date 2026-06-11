@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88d2e3e2d60d55d4e86b79df9a19b563, type: 3}
+  m_Name: EnesPapersPleaseDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::PleasePaperDatabase
+  offerEvents:
+  - {fileID: 11400000, guid: 88cb56268c6a3c24ca1e006246ba263e, type: 2}
+  - {fileID: 11400000, guid: c208e1ac0891beb44b150246de16488e, type: 2}
+  - {fileID: 11400000, guid: 543a309b8831ba7459f9ba153a8beee4, type: 2}
+  - {fileID: 11400000, guid: 799ef986d8378914da6bfed8cc62a628, type: 2}
+  processEvents:
+  - {fileID: 11400000, guid: f324c165e32222e4bb52897305e550ce, type: 2}
+  - {fileID: 11400000, guid: 580c440ce91a49742b95feced27f3c4c, type: 2}
+  - {fileID: 11400000, guid: 580c440ce91a49742b95feced27f3c4c, type: 2}

@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 461e6d77b97acd244925fc0b15893a48, type: 3}
+  m_Name: Pickaxe
+  m_EditorClassIdentifier: Assembly-CSharp::HuntTool
+  id: hunttool01
+  displayName: Pickaxe
+  description: A crude but reliable tool for cracking surface-level pipes. Slow and
+    inefficient, but quiet enough for low-risk operations.
+  icon: {fileID: 0}
+  cost: 0
+  durability: 4
+  damagePerHit: 3
+  stealth: 0.9

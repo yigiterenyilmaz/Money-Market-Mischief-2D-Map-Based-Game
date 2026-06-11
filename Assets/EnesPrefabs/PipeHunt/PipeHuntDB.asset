@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4fa730af78323040a46d734e1e84469, type: 3}
+  m_Name: PipeHuntDB
+  m_EditorClassIdentifier: Assembly-CSharp::PipeHuntDatabase
+  pipeTypes:
+  - {fileID: 11400000, guid: eafc7fc34c1d07f42b578fec4d20308c, type: 2}
+  - {fileID: 11400000, guid: dee06799fde0d4b40a1d6eb8b083c22e, type: 2}
+  - {fileID: 11400000, guid: 58d10e3f3979c4b47ba44ac89c10c17d, type: 2}
+  pipeCount: 8
+  tools:
+  - {fileID: 11400000, guid: 71d393057e8429b45b15a04ace530985, type: 2}
+  - {fileID: 11400000, guid: fd5f518bacfc32d4dba6f1e51429e578, type: 2}
+  - {fileID: 11400000, guid: b9341dc23299f034bb12ab58adecd322, type: 2}
+  minGameDuration: 15
+  maxGameDuration: 45
+  minPipeDistance: 0.12
+  suspicionBase: 50
+  suspicionExponent: 2

@@ -1,0 +1,79 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
+  m_Name: ProtestEvent02
+  m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
+  id: 
+  displayName: Attacks on Your Revenue Network
+  description: The protests have turned into vandalism, and demonstrators are now
+    targeting businesses that directly generate income for you. Your warehouses,
+    commercial nodes, and covert financial channels are taking damage. These attacks
+    not only cause financial loss but also weaken the perception of your control.
+    If left unchecked, your revenue flow could suffer severely.
+  devNote: "vandalizm ba\u015Flat\u0131r bizim pasif gelir miktar\u0131m\u0131z azal\u0131r"
+  minWarTime: 0
+  decisionTime: 10
+  isRepeatable: 0
+  maxRepeatCount: 1
+  choices:
+  - displayName: 
+    description: 
+    supportModifier: 0
+    suspicionModifier: 0
+    reputationModifier: 0
+    politicalInfluenceModifier: 0
+    costModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 1
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills: []
+    statConditions: []
+  defaultChoiceIndex: -1
+  isVandalismEvent: 1
+  vandalismLevelOnTrigger: 2
+  isMediaPursuitEvent: 0
+  mediaPursuitLevelOnTrigger: 0
+  chainRole: 0
+  nextChainEvent: {fileID: 0}
+  chainInterval: 5
+  skillsToLock: []
+  chainFine: 0
+  refusalThresholds: []

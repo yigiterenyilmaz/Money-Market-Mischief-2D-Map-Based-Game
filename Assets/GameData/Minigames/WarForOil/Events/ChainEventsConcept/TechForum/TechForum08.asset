@@ -1,0 +1,258 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
+  m_Name: TechForum08
+  m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
+  id: wfo_cec_tf_08
+  displayName: Caught Before Escape
+  description: You managed to catch the students before they escaped the country.
+    They were intercepted while trying to leave with the money
+  devNote: mafya eklenecek choice lara
+  eventNote: "\xD6\u011Frencileri \xFClkeden ka\xE7madan yakalad\u0131n. Parayla
+    birlikte \xFClkeden \xE7\u0131kmaya \xE7al\u0131\u015F\u0131rken ele ge\xE7irildiler."
+  minWarTime: 0
+  maxWarTime: -1
+  decisionTime: 10
+  isRepeatable: 0
+  isUnlimitedRepeat: 0
+  maxRepeatCount: 1
+  choices:
+  - displayName: Hand Them to Authorities
+    description: You handed the students over to the authorities, but you might not
+      recover all of your money.
+    supportModifier: 0.5
+    suspicionModifier: 0
+    reputationModifier: 2
+    politicalInfluenceModifier: 0
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideTopic: 0
+    feedOverrideRatio: 0
+    hasCounterFeedTopic: 0
+    counterFeedTopic: 0
+    counterFeedRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    eventBlockCycles: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    hasChainTickEffect: 0
+    chainTickStat: 0
+    chainTickAmount: 0
+    chainInfluenceStat: 0
+    chainThreshold0: 20
+    chainThreshold1: 50
+    chainThreshold2: 75
+    chainBranches:
+    - targetEvent: {fileID: 11400000, guid: fdc96709ae2f952418397a884955ff4e, type: 2}
+      weightRange0: 1
+      weightRange1: 0
+      weightRange2: 0
+      weightRange3: 0
+    chainCanEnd: 0
+    chainEndWeight: 1
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    startsWomanProcess: 0
+    womanObsessionModifier: 0
+    permanentMultipliers: []
+    requiredSkills: []
+    statConditions: []
+  - displayName: Intimidate Them
+    description: You intimidated the students with your mafia connections and forced
+      them to return your money.
+    supportModifier: 0
+    suspicionModifier: 0
+    reputationModifier: 0
+    politicalInfluenceModifier: 0
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideTopic: 0
+    feedOverrideRatio: 0
+    hasCounterFeedTopic: 0
+    counterFeedTopic: 0
+    counterFeedRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    eventBlockCycles: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    hasChainTickEffect: 0
+    chainTickStat: 0
+    chainTickAmount: 0
+    chainInfluenceStat: 0
+    chainThreshold0: 20
+    chainThreshold1: 50
+    chainThreshold2: 75
+    chainBranches: []
+    chainCanEnd: 0
+    chainEndWeight: 1
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    startsWomanProcess: 0
+    womanObsessionModifier: 0
+    permanentMultipliers: []
+    requiredSkills:
+    - {fileID: 0}
+    statConditions: []
+  - displayName: Execute them
+    description: You give up from money and execute the students to ensure that no
+      one else dares to scam you again.
+    supportModifier: 1
+    suspicionModifier: 5.9
+    reputationModifier: -1.7
+    politicalInfluenceModifier: -0.5
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideTopic: 0
+    feedOverrideRatio: 0
+    hasCounterFeedTopic: 0
+    counterFeedTopic: 0
+    counterFeedRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    eventBlockCycles: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    hasChainTickEffect: 0
+    chainTickStat: 0
+    chainTickAmount: 0
+    chainInfluenceStat: 0
+    chainThreshold0: 20
+    chainThreshold1: 50
+    chainThreshold2: 75
+    chainBranches: []
+    chainCanEnd: 0
+    chainEndWeight: 1
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    startsWomanProcess: 0
+    womanObsessionModifier: 0
+    permanentMultipliers: []
+    requiredSkills:
+    - {fileID: 0}
+    statConditions: []
+  defaultChoiceIndex: -1
+  hasNarrative: 0
+  narrative: 
+  isVandalismEvent: 0
+  vandalismLevelOnTrigger: 0
+  startsVandalism: 0
+  forcesVandalismStart: 0
+  isMediaPursuitEvent: 0
+  mediaPursuitLevelOnTrigger: 0
+  isWomanProcessEvent: 0
+  chainRole: 0
+  blocksSubChainBranching: 0
+  alsoBlockedBranchEvents: []

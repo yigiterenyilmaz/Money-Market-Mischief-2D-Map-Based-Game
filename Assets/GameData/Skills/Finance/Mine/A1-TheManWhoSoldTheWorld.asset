@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0aaa824f7832b94e9010f7cdb57d8aa, type: 3}
+  m_Name: A1-TheManWhoSoldTheWorld
+  m_EditorClassIdentifier: Assembly-CSharp::Skill
+  id: a1
+  displayName: The Man Who Sold The World
+  description: "This skill marks the starting point of the finance tree.\nYou take
+    your first step into the world\u2019s dirty financial markets, earning money
+    through small, low-risk moves."
+  icon: {fileID: 0}
+  cost: 0
+  prerequisites: []
+  effects:
+  - rid: 2638473098503127116
+  otherPrerequisites: 0
+  blocksSkills: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 2638473098503127116
+      type: {class: DirectPassiveIncomeEffect, ns: , asm: Assembly-CSharp}
+      data:
+        incomePerSecond: 60
+        decayAt1Min: 90
+        decayAt2Min: 80
+        decayAt3Min: 58
+        decayAt4Min: 27
+        decayAt5Min: 10

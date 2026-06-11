@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0f11fe59ff8ee746a4df1d81cad42ff, type: 3}
+  m_Name: WarForOilDB
+  m_EditorClassIdentifier: Assembly-CSharp::WarForOilDatabase
+  countries:
+  - {fileID: 11400000, guid: 6b634e44d414a8848abf6f5eccc7b64f, type: 2}
+  - {fileID: 11400000, guid: defb5485257de0d48abcbe6c6286c2e1, type: 2}
+  visibleCountryCount: 3
+  rotationInterval: 90
+  pressureCooldown: 1
+  politicalInfluenceMultiplier: 0.01
+  warDuration: 300
+  eventInterval: 15
+  initialSupportStat: 50
+  baseWinChance: 0.375
+  supportWinBonus: 0.625
+  minWinChance: 0.1
+  maxWinChance: 0.9
+  ceasefireMinSupport: 40
+  ceasefirePenalty: 100
+  ceasefireMaxReward: 200
+  baseWarReward: 500
+  warLossPenalty: 200
+  warLossPoliticalPenalty: 20
+  warLossSuspicionIncrease: 15

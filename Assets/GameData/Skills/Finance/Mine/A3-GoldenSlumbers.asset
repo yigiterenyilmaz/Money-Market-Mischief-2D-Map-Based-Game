@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0aaa824f7832b94e9010f7cdb57d8aa, type: 3}
+  m_Name: A3-GoldenSlumbers
+  m_EditorClassIdentifier: Assembly-CSharp::Skill
+  id: a3
+  displayName: Golden Slumbers
+  description: 'This skill allows you to trade gold within your current country.
+
+    You
+    start making profit by buying and selling gold in local markets.'
+  icon: {fileID: 0}
+  cost: 50000
+  prerequisites:
+  - {fileID: 11400000, guid: 5872be6773f4c634ab0419a09488dccb, type: 2}
+  effects:
+  - rid: 2638473124387225667
+  otherPrerequisites: 0
+  blocksSkills: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 2638473124387225667
+      type: {class: InvestmentEffect, ns: , asm: Assembly-CSharp}
+      data:
+        products:
+        - {fileID: 11400000, guid: d22b57d6340557d48b8abcf6a4ebc316, type: 2}
+        - {fileID: 11400000, guid: 9fafb66b1f18f6b4abccaa79e793657b, type: 2}
+        - {fileID: 11400000, guid: a60a7de92d6fb0c4389a08814fe9e16a, type: 2}
+        - {fileID: 11400000, guid: 49c4165d2624100438b48147b5d9fd55, type: 2}
+        - {fileID: 11400000, guid: f580a30ce4886b64c962aaf915fb0f55, type: 2}
+        - {fileID: 11400000, guid: 03fe9883a43f40b42a51b957e7112b0c, type: 2}
+        - {fileID: 11400000, guid: 97de85f2f44b08744a120143652ade57, type: 2}
+        - {fileID: 11400000, guid: 54dc99ddd458d3845b2c298360091309, type: 2}
+        - {fileID: 11400000, guid: cc0c39b224abfcc4ea0d8ce016f09ea7, type: 2}

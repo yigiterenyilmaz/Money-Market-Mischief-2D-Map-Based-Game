@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0aaa824f7832b94e9010f7cdb57d8aa, type: 3}
+  m_Name: A4-HighwayToHell
+  m_EditorClassIdentifier: Assembly-CSharp::Skill
+  id: a4
+  displayName: Highway To Hell
+  description: 'This skill allows you to smuggle gold across borders.
+
+    When activated,
+    it unlocks a minigame where you carry out gold smuggling operations. During the
+    operation, you face unexpected conditions and must manage them to succeed.'
+  icon: {fileID: 0}
+  cost: 150000
+  prerequisites:
+  - {fileID: 11400000, guid: 86eef0c34e9163a49a710dbf760e0688, type: 2}
+  effects:
+  - rid: 2638472920323326024
+  otherPrerequisites: 0
+  blocksSkills: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 2638472920323326024
+      type: {class: UnlockMinigameEffect, ns: , asm: Assembly-CSharp}
+      data:
+        minigamesToBeUnlocked:
+        - {fileID: 11400000, guid: 803f4bb37f923564fba9cf0743029712, type: 2}

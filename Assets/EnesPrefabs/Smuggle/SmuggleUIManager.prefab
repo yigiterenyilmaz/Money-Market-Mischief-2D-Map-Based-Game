@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &6625563196465746318
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 825647913704267827}
+  - component: {fileID: 7172757914628792012}
+  m_Layer: 0
+  m_Name: SmuggleUIManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &825647913704267827
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6625563196465746318}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7172757914628792012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6625563196465746318}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98907ebaccb2d1c45ac0a77cd0a6b3d9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SmuggleUI
+  selectionPanel: {fileID: 0}
+  baseRewardText: {fileID: 0}
+  routeContainer: {fileID: 0}
+  courierContainer: {fileID: 0}
+  routeCardPrefab: {fileID: 7284833231153133858, guid: 4585ee50fd45fdc4f913258d1168fdd1, type: 3}
+  courierCardPrefab: {fileID: 6567718330937992340, guid: 81b5b8c49c1e900479c00a69b5544e97, type: 3}
+  totalCostText: {fileID: 0}
+  confirmButton: {fileID: 0}
+  cancelButton: {fileID: 0}
+  resultPopup: {fileID: 0}
+  resultTitleText: {fileID: 0}
+  wealthChangeText: {fileID: 0}
+  suspicionChangeText: {fileID: 0}
+  resultDismissButton: {fileID: 0}
+  progressBarPrefab: {fileID: 6767852538401195436, guid: 4f1972029024c2f4c826b3841330d459, type: 3}
+  selectedColor: {r: 0.3, g: 0.8, b: 0.3, a: 1}
+  normalColor: {r: 1, g: 1, b: 1, a: 1}
+  successColor: {r: 0.2, g: 0.8, b: 0.2, a: 1}
+  failColor: {r: 0.8, g: 0.2, b: 0.2, a: 1}
+  positiveStatColor: {r: 0.2, g: 0.7, b: 0.2, a: 1}
+  negativeStatColor: {r: 0.8, g: 0.2, b: 0.2, a: 1}

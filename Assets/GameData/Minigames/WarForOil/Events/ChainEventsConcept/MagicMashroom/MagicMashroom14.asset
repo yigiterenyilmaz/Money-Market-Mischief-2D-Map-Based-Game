@@ -1,0 +1,185 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
+  m_Name: MagicMashroom14
+  m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
+  id: wfo_cec_mm_14
+  displayName: A Genuine Breakthrough
+  description: 'Testing confirmed that the product was truly a unique invention.
+
+    With
+    no comparable equivalent, it delivered extraordinary efficiency within military
+    units.
+
+    Soldier performance increased to an unprecedented level.'
+  devNote: 
+  eventNote: 
+  minWarTime: 0
+  maxWarTime: -1
+  decisionTime: 10
+  isRepeatable: 0
+  isUnlimitedRepeat: 0
+  maxRepeatCount: 1
+  choices:
+  - displayName: Keep Using
+    description: You continue using the product, without questioning its origin or
+      who created it.
+    supportModifier: 11
+    suspicionModifier: 0
+    reputationModifier: 2
+    politicalInfluenceModifier: 5
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideTopic: 0
+    feedOverrideRatio: 0
+    hasCounterFeedTopic: 0
+    counterFeedTopic: 0
+    counterFeedRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    eventBlockCycles: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    hasChainTickEffect: 0
+    chainTickStat: 0
+    chainTickAmount: 0
+    chainInfluenceStat: 0
+    chainThreshold0: 20
+    chainThreshold1: 50
+    chainThreshold2: 75
+    chainBranches: []
+    chainCanEnd: 0
+    chainEndWeight: 1
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    permanentMultipliers: []
+    requiredSkills: []
+    statConditions: []
+  - displayName: Search for the Cook
+    description: u allocate funds to locate the person who developed the product;
+      aiming to uncover the truth behind it.
+    supportModifier: 11
+    suspicionModifier: 0
+    reputationModifier: 2
+    politicalInfluenceModifier: 5
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideTopic: 0
+    feedOverrideRatio: 0
+    hasCounterFeedTopic: 0
+    counterFeedTopic: 0
+    counterFeedRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    eventBlockCycles: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    hasChainTickEffect: 0
+    chainTickStat: 0
+    chainTickAmount: 0
+    chainInfluenceStat: 0
+    chainThreshold0: 20
+    chainThreshold1: 50
+    chainThreshold2: 75
+    chainBranches:
+    - targetEvent: {fileID: 11400000, guid: b02dd06f1fad1b7478e9a71e85815295, type: 2}
+      weightRange0: 1
+      weightRange1: 0
+      weightRange2: 0
+      weightRange3: 0
+    chainCanEnd: 0
+    chainEndWeight: 1
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    permanentMultipliers: []
+    requiredSkills: []
+    statConditions: []
+  defaultChoiceIndex: -1
+  hasNarrative: 0
+  narrative: 
+  isVandalismEvent: 0
+  vandalismLevelOnTrigger: 0
+  startsVandalism: 0
+  forcesVandalismStart: 0
+  isMediaPursuitEvent: 0
+  mediaPursuitLevelOnTrigger: 0
+  chainRole: 0
+  blocksSubChainBranching: 1
+  alsoBlockedBranchEvents: []

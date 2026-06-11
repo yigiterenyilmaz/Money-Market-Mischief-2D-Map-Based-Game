@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4fa730af78323040a46d734e1e84469, type: 3}
+  m_Name: DatabasePipeHunt
+  m_EditorClassIdentifier: Assembly-CSharp::PipeHuntDatabase
+  pipeTypes:
+  - {fileID: 11400000, guid: 416faea2baec16146902124ffce2018e, type: 2}
+  - {fileID: 11400000, guid: a20430fd87069324997922a4e194fe92, type: 2}
+  - {fileID: 11400000, guid: e0abad5bcbc9cce4e8665eba8822d054, type: 2}
+  - {fileID: 11400000, guid: d318eca58aee59140a27b29bcd301e66, type: 2}
+  - {fileID: 11400000, guid: 8d9baed384e05464c9accb283bc006fc, type: 2}
+  minPipeCount: 4
+  maxPipeCount: 8
+  tools:
+  - {fileID: 11400000, guid: 099b0de5d2aaf9742b45ef54bc3941c2, type: 2}
+  - {fileID: 11400000, guid: 76019f2d3473cfa4ea11c0f01890697f, type: 2}
+  - {fileID: 11400000, guid: ef0d4f5a258934d4eb03496501b4eb01, type: 2}
+  - {fileID: 11400000, guid: 247dfdd4e5902604aa69493c4358b1e6, type: 2}
+  minGameDuration: 15
+  maxGameDuration: 45
+  minPipeDistance: 0.1
+  suspicionBase: 50
+  suspicionExponent: 2

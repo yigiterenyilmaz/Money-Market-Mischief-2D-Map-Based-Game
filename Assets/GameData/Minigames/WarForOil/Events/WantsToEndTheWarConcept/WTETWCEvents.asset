@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96002c63fcdea79458d953705d0372da, type: 3}
+  m_Name: WTETWCEvents
+  m_EditorClassIdentifier: Assembly-CSharp::WTETWCEventGroup
+  id: 
+  description: 
+  members:
+  - warEvent: {fileID: 11400000, guid: 331b7e45d631938468700ae16b8a7541, type: 2}
+    weightLevel: 2
+  - warEvent: {fileID: 11400000, guid: d5766e0beea51aa45bc7cace452f768f, type: 2}
+    weightLevel: 2
+  - warEvent: {fileID: 11400000, guid: 5a36fee3d4f17ea45b99637185b66d9e, type: 2}
+    weightLevel: 1
+  maxTriggerCount: 2

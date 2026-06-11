@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
+  m_Name: TechForum11
+  m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
+  id: wfo_cec_tf_11
+  displayName: 
+  description: 
+  devNote: 
+  eventNote: 
+  minWarTime: 0
+  maxWarTime: -1
+  decisionTime: 10
+  isRepeatable: 0
+  isUnlimitedRepeat: 0
+  maxRepeatCount: 1
+  choices: []
+  defaultChoiceIndex: -1
+  hasNarrative: 0
+  narrative: 
+  isVandalismEvent: 0
+  vandalismLevelOnTrigger: 0
+  startsVandalism: 0
+  forcesVandalismStart: 0
+  isMediaPursuitEvent: 0
+  mediaPursuitLevelOnTrigger: 0
+  isWomanProcessEvent: 0
+  chainRole: 0
+  blocksSubChainBranching: 0
+  alsoBlockedBranchEvents: []

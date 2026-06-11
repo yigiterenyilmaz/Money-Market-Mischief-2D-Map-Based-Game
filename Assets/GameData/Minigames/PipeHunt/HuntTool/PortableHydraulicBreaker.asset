@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 461e6d77b97acd244925fc0b15893a48, type: 3}
+  m_Name: PortableHydraulicBreaker
+  m_EditorClassIdentifier: Assembly-CSharp::HuntTool
+  id: hunttool03
+  displayName: Portable Hydraulic Breaker
+  description: An industrial-grade tool built to fracture reinforced pipelines. High
+    sustained damage output, at the cost of increased operational risk.
+  icon: {fileID: 0}
+  cost: 0
+  durability: 8
+  damagePerHit: 5
+  stealth: 0.4

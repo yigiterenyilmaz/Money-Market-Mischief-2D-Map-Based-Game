@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a81e7ebc5c65ae479492f25c25aa894, type: 3}
+  m_Name: PapersPleaseEnes
+  m_EditorClassIdentifier: Assembly-CSharp::MiniGameData
+  id: mi_02
+  displayName: You cant always get what you want
+  icon: {fileID: 0}
+  description: "\xDClkelerin yurt d\u0131\u015F\u0131nda saklanan alt\u0131nlar\u0131n\u0131
+    ekonomik krizleri kullanarak ele ge\xE7irme minigame'i. Oyuncuya belirli aral\u0131klarla
+    teklif gelir, oyuncu krizin ger\xE7ek mi sahte mi oldu\u011Funu de\u011Ferlendirip
+    karar verir. Kendi UI paneli yok \u2014 mevcut event panelini kullan\u0131r.
+    ,"
+  cooldownDuration: 300

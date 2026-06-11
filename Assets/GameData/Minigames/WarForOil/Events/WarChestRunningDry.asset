@@ -1,0 +1,121 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
+  m_Name: WarChestRunningDry
+  m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
+  id: wfoevent02
+  displayName: War Chest Running Dry
+  description: "The government is struggling to fund the war. You can provide support
+    to increase the chance of victory or withhold aid to preserve your resources
+    \u2014 but refusing support will lower the odds of winning and raise the risk
+    of defeat."
+  devNote: 
+  minWarTime: 0
+  decisionTime: 20
+  isRepeatable: 1
+  maxRepeatCount: 1
+  choices:
+  - displayName: Fund the War
+    description: Provide additional resources to reinforce the war budget and increase
+      the chance of victory.
+    supportModifier: 4.3
+    suspicionModifier: 0
+    reputationModifier: 0
+    politicalInfluenceModifier: 0
+    costModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills: []
+    statConditions: []
+  - displayName: Withhold Support
+    description: Refuse to finance the war to preserve your resources, but lower
+      the chance of victory and increase the risk of defeat.
+    supportModifier: -2
+    suspicionModifier: 0
+    reputationModifier: 0
+    politicalInfluenceModifier: 0
+    costModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills: []
+    statConditions: []
+  defaultChoiceIndex: 1
+  isVandalismEvent: 0
+  vandalismLevelOnTrigger: 0
+  isMediaPursuitEvent: 0
+  mediaPursuitLevelOnTrigger: 0
+  chainRole: 0
+  nextChainEvent: {fileID: 0}
+  chainInterval: 5
+  skillsToLock: []
+  chainFine: 0
+  refusalThresholds: []

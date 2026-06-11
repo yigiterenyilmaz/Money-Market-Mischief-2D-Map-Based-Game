@@ -1,0 +1,600 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Serialization;
+
+[CreateAssetMenu(menuName = "Minigames/WarForOil/Event")]
+public class WarForOilEvent : ScriptableObject
+{
+    public string id;
+    [TextArea(1, 3)] public string displayName;
+    [TextArea(2, 8)] public string description;
+    public bool useTypewriterEffect; //true ise açıklama harf harf akar, false ise direkt paragraf olarak gösterilir
+
+    //ardışık konuşmalar — boşsa eski tek-description davranışı, doluysa UI sırayla bu listeyi gösterir
+    public List<DialogueLine> dialogueLines = new List<DialogueLine>();
+
+    //hikaye bayrağına göre değişken metin (isim + açıklama)
+    public bool hasConditionalText; //true ise aşağıdaki listeye göre displayName/description override edilebilir
+    public List<ConditionalChoiceText> conditionalTexts; //her entry: flag + alt isim + alt açıklama. İlk eşleşen kazanır.
+
+    [Header("Geliştirici Notu")]
+    [TextArea(3, 10)] public string devNote; //sadece Inspector'da görünür, oyuna etkisi yok
+
+    [Header("Event Açıklaması")]
+    [FormerlySerializedAs("skillNote")]
+    [TextArea(3, 10)] public string eventNote; //geliştiriciler için event açıklama notu, oyuna etkisi yok
+
+    [Range(0f, 1f)] public float minWarTime = 0f; //savaş süresinin yüzdesi olarak en erken tetiklenme (0.2 = %20, 300sn savaşta 60sn)
+    [Range(-1f, 1f)] public float maxWarTime = -1f; //savaş süresinin yüzdesi olarak en geç tetiklenme (-1 = sınırsız, 0.8 = %80)
+    public float decisionTime = 45f; //karar süresi (saniye)
+    public bool isRepeatable; //aynı savaşta tekrar tetiklenebilir mi
+    public bool isUnlimitedRepeat; //sınırsız tekrar (isRepeatable true ise)
+    public int maxRepeatCount = 1; //en fazla kaç kez tekrar edebilir (isRepeatable true ve isUnlimitedRepeat false ise)
+    public List<WarForOilEventChoice> choices;
+    public int defaultChoiceIndex = -1; //süre dolunca otomatik seçilecek seçenek (-1 = ilk seçenek)
+
+    [Header("Narrative")]
+    public bool hasNarrative; //true ise event gösterildiğinde narrative metni de gösterilir
+    [TextArea(5, 20)] public string narrative; //UI'da gösterilecek anlatı metni
+
+    [Header("Vandalizm Tetikleme")]
+    public bool isVandalismEvent; //bu event tetiklendiğinde vandalizm seviyesi otomatik değişir
+    public VandalismLevel vandalismLevelOnTrigger; //tetiklendiğinde atanacak vandalizm seviyesi
+    public bool startsVandalism; //true ise bu event vandalizm başlatıcı — vandalizm aktifken havuzdan çıkarılır
+    public bool forcesVandalismStart; //true ise vandalizm aktifken bile gelir (startsVandalism filtresini yok sayar)
+
+    [Header("Medya Takibi Tetikleme")]
+    public bool isMediaPursuitEvent; //bu event tetiklendiğinde medya takibi seviyesi otomatik değişir
+    public MediaPursuitLevel mediaPursuitLevelOnTrigger; //tetiklendiğinde atanacak medya takibi seviyesi
+
+    [Header("Kadın Süreci")]
+    public bool requiresBothProcessesActive; //true ise bu event sadece hem savaş hem kadın süreci aktifken tetiklenebilir
+    public bool isWomanProcessEvent; //true ise bu event kadın süreci havuzlarında kullanılır
+    public float minObsession = 0f; //bu event sadece obsesyon bu değerin üstündeyken gelir (0 = sınırsız)
+    public float maxObsession = 100f; //bu event sadece obsesyon bu değerin altındayken gelir (100 = sınırsız)
+    public List<WarForOilEvent> blockedWomanProcessEvents; //bu event tetiklenince havuzdan/zincirlerden çıkarılacak eventler
+
+    //öncü event — bu event tetiklenmeden önce gösterilir, 4 saniye sonra asıl event gelir
+    //hem kadın eventleri hem savaş (WFO) eventleri için geçerli
+    public bool hasPrecursorEvent; //true ise bu eventin bir öncü eventi var
+    public PrecursorEventType precursorEventType; //öncü eventin tipi
+    public WarForOilEvent precursorWarEvent; //öncü war for oil eventi
+    public Event precursorRandomEvent; //öncü random event
+    public bool precursorRequiresStoryFlag; //true ise öncü sadece belirli bayrak aktifken gelir, kapalıysa eski davranış (her zaman gelir)
+    public StoryFlag precursorRequiredFlag = StoryFlag.None; //öncüyü tetikleyecek hikaye bayrağı (None ise koşul yok sayılır)
+
+    [Header("Hikaye Bayrak Koşulları")]
+    public List<StoryFlag> requiredStoryFlags; //bu event sadece bu bayraklar aktifken tetiklenebilir (hepsi gerekli)
+
+    [Header("Zincir Ayarları")]
+    public ChainRole chainRole = ChainRole.None; //bu event zincirde mi (Head = zincir başlatıcı)
+    public bool blocksSubChainBranching; //true ise bu event tetiklendikten sonra başka zincirlerden dallanma hedefi olarak seçilemez
+    public List<WarForOilEvent> alsoBlockedBranchEvents; //blocksSubChainBranching tetiklenince bu event'ler de dallanma hedefi olarak engellenir
+
+    /// <summary>
+    /// Aktif hikaye bayrağına göre uygun displayName'i döner.
+    /// hasConditionalText kapalıysa veya eşleşen flag yoksa default displayName döner.
+    /// İlk eşleşen entry kazanır. Entry'nin alt ismi boşsa default'a düşer.
+    /// </summary>
+    public string GetDisplayName()
+    {
+        if (!hasConditionalText || conditionalTexts == null || conditionalTexts.Count == 0
+            || StoryFlagManager.Instance == null)
+            return displayName;
+
+        for (int i = 0; i < conditionalTexts.Count; i++)
+        {
+            var ct = conditionalTexts[i];
+            if (ct.requiredFlag != StoryFlag.None && StoryFlagManager.Instance.HasFlag(ct.requiredFlag))
+                return string.IsNullOrEmpty(ct.alternativeDisplayName) ? displayName : ct.alternativeDisplayName;
+        }
+        return displayName;
+    }
+
+    /// <summary>
+    /// Aktif hikaye bayrağına göre uygun description'ı döner.
+    /// hasConditionalText kapalıysa veya eşleşen flag yoksa default description döner.
+    /// İlk eşleşen entry kazanır. Entry'nin alt açıklaması boşsa default'a düşer.
+    /// </summary>
+    public string GetDescription()
+    {
+        if (!hasConditionalText || conditionalTexts == null || conditionalTexts.Count == 0
+            || StoryFlagManager.Instance == null)
+            return description;
+
+        for (int i = 0; i < conditionalTexts.Count; i++)
+        {
+            var ct = conditionalTexts[i];
+            if (ct.requiredFlag != StoryFlag.None && StoryFlagManager.Instance.HasFlag(ct.requiredFlag))
+                return string.IsNullOrEmpty(ct.alternativeDescription) ? description : ct.alternativeDescription;
+        }
+        return description;
+    }
+
+    /// <summary>
+    /// Ardışık konuşma listesi dolu mu — UI bunu çağırarak tek-description mi yoksa sıralı diyalog mu göstereceğine karar verir.
+    /// </summary>
+    public bool HasSequentialDialogue()
+    {
+        return dialogueLines != null && dialogueLines.Count > 0;
+    }
+
+    /// <summary>
+    /// Bu event tetiklenmeden önce öncü event gösterilmeli mi.
+    /// hasPrecursorEvent kapalıysa false. Açıksa precursorRequiresStoryFlag false ise her zaman true.
+    /// Açıksa ve precursorRequiresStoryFlag true ise ilgili bayrak aktifse true, değilse false.
+    /// </summary>
+    public bool ShouldShowPrecursor()
+    {
+        if (!hasPrecursorEvent) return false;
+        if (!precursorRequiresStoryFlag) return true;
+        if (precursorRequiredFlag == StoryFlag.None) return true; //None seçili ise koşul yok say
+        if (StoryFlagManager.Instance == null) return false;
+        return StoryFlagManager.Instance.HasFlag(precursorRequiredFlag);
+    }
+
+    /// <summary>
+    /// Şu an seçilebilir olan choice'ların listesini döner.
+    /// </summary>
+    public List<WarForOilEventChoice> GetAvailableChoices()
+    {
+        List<WarForOilEventChoice> available = new List<WarForOilEventChoice>();
+        if (choices == null) return available;
+
+        for (int i = 0; i < choices.Count; i++)
+        {
+            if (choices[i].IsAvailable())
+                available.Add(choices[i]);
+        }
+        return available;
+    }
+}
+
+[System.Serializable]
+public class WarForOilEventChoice
+{
+    public string displayName;
+    [TextArea(2, 4)] public string description;
+    public bool isDirectResponse; //true ise UI bu seçeneği "direkt cevap" olarak işler — backend mantığını etkilemez, sadece UI bayrağı
+
+    //hikaye bayrağına göre değişken metin (isim + açıklama)
+    public bool hasConditionalText; //true ise aşağıdaki listeye göre displayName/description override edilebilir
+    public List<ConditionalChoiceText> conditionalTexts; //her entry: flag + alt isim + alt açıklama. İlk eşleşen kazanır.
+
+    public float supportModifier; //destek stat'ını etkiler (pozitif = ülkeyi destekle)
+    public float suspicionModifier; //şüphe etkisi
+    public float reputationModifier; //itibar etkisi (pozitif = artar, negatif = düşer)
+    public bool hasReputationFloor; //true ise itibar bu choice yüzünden belirli bir değerin altına düşmez
+    public float reputationFloor; //itibarın düşemeyeceği minimum değer
+    public float politicalInfluenceModifier; //politik nüfuz etkisi (negatif = düşürür)
+    public int costModifier; //maliyet etkisi (savaş sonunda birikimli uygulanır)
+    public float wealthModifier; //anlık para değişimi (pozitif = kazan, negatif = kaybet, seçildiğinde hemen uygulanır)
+    public float cornerGrabModifier; //köşe kapma stat'ını etkiler (pozitif = bizim lehimize)
+    public float protestModifier; //toplum tepkisi stat'ını etkiler (pozitif = tepki artar, negatif = azalır)
+    [Range(0f, 1f)] public float protestTriggerChanceBonus; //protest tetiklenme şansına eklenen bonus (yarılanarak söner)
+    public bool hasProtestChance; //true ise protestModifier yerine olasılık bazlı sistem kullanılır
+    [Range(0f, 1f)] public float protestDecreaseChance; //azalma ihtimali (0-1)
+    public float protestDecreaseAmount; //azalma miktarı (pozitif değer, otomatik çıkarılır)
+    public float protestIncreaseAmount; //artma miktarı (pozitif değer, otomatik eklenir)
+
+    //feed etkileri
+    public bool freezesFeed; //seçilince sosyal medya feed'ini dondurur (SocialMediaManager.TryFreezeFeed)
+    public bool slowsFeed; //seçilince sosyal medya feed'ini yavaşlatır (SocialMediaManager.TrySlowFeed)
+    public bool hasFeedOverride; //feed'i belirli bir konuya yönlendirir (SocialMediaManager.SetEventOverride)
+    public TopicType feedOverrideTopic; //yönlendirilecek konu
+    [Range(0f, 1f)] public float feedOverrideRatio; //yönlendirme oranı (0-1, örn. 0.8 = %80)
+    public bool hasCounterFeedTopic; //2. konu — istenmeyen konuları bastırmak için feed'e eklenir
+    public TopicType counterFeedTopic; //counter konu
+    [Range(0f, 1f)] public float counterFeedRatio; //counter konu oranı (0-1)
+    public float feedOverrideDuration; //yönlendirme süresi (saniye, her iki topic için ortak)
+
+    //diğer sonuçlar (Editor tarafından foldout içinde çizilir)
+    public bool endsWar; //bu seçenek savaşı bitirir mi
+    public float warEndDelay; //savaş kaç saniye sonra biter (0 = anında)
+    public bool reducesReward; //ödülü düşürür mü
+    [Range(0f, 1f)] public float baseRewardReduction; //base reward'ı bu oranda düşürür (0.3 = %30 düşüş)
+    public bool winsWar; //savaşı direkt kazandırır (garanti zafer)
+    public float winWarDelay; //kazanım kaç saniye sonra gerçekleşir (0 = anında)
+    public bool winWarCustomReward; //true ise ödül oranı direkt girilir, false ise war support tabanlı hesaplanır
+    [Range(0f, 1f)] public float winWarRewardRatio = 1f; //kazanım ödül oranı (winWarCustomReward true ise kullanılır)
+    public bool endsWarWithDeal; //savaşı anlaşmayla bitirir (garanti ödül)
+    public float dealDelay; //anlaşma kaç saniye sonra savaşı bitirir (0 = anında)
+    [Range(0f, 1f)] public float dealRewardRatio; //normal kazanımın bu oranı garanti verilir (0.8 = %80)
+    public bool blocksEvents; //seçilirse savaş sonuna kadar yeni event gelmez
+    [Range(0, 10)] public int eventBlockCycles; //seçilirse bu kadar event dönemi boyunca savaş eventi gelmez (0 = etkisiz)
+    [Range(0, 10)] public int globalEventBlockCycles; //seçilirse bu kadar event dönemi boyunca kadın eventleri HARİÇ tüm eventler durur (0 = etkisiz)
+    public bool blocksCeasefire; //seçilirse savaş sonuna kadar ateşkes yapılamaz
+    public bool blocksEventGroup; //seçilirse belirtilen gruptaki tüm eventler bir daha tetiklenmez
+    public ScriptableObject blockedGroup; //engellenecek grup (WTETWCEventGroup veya OFPCEventGroup sürüklenebilir)
+
+    //olasılıklı ödül düşürme (3 sonuç: event tekrar tetiklenir / ödül düşer / hiçbir şey olmaz)
+    public bool hasProbabilisticRewardReduction;
+    [Range(0f, 1f)] public float probRetriggerChance; //event tekrar tetiklenme şansı
+    [Range(0f, 1f)] public float probRewardReductionChance; //ödül düşme şansı
+    [Range(0f, 1f)] public float probRewardReductionAmount; //ödül düşme miktarı (0.3 = %30)
+
+    //olasılıklı savaş bitirme (Inspector tarafından "Diğer Sonuçlar" foldout'unda çizilir)
+    public bool hasProbabilisticWarEnd; //olasılık bazlı 3 sonuç: savaş biter / event yok olur / tekrar tetiklenir
+    [Range(0f, 1f)] public float probWarEndChance; //savaş bitme olasılığı (support=50 için base değer)
+    [Range(0f, 1f)] public float probDismissChance; //event yok olma olasılığı (support=50 için base değer)
+    public float probWarEndDelay; //savaş biterse gecikme süresi (saniye)
+
+    //zincir sayaç sistemi — zincir boyunca seçimleri takip eder
+    public bool incrementsChainCounter; //bu choice seçilince zincir sayacını artırır
+    public string chainCounterKey; //sayaç adı (ör. "acele", "yavasla")
+    public int chainCounterIncrement = 1; //artış miktarı
+    public bool hasEarlyChainTrigger; //sayaç eşiğe ulaşırsa zinciri atlayıp direkt bu event'e geç
+    public int earlyTriggerThreshold; //erken tetikleme eşiği
+    public WarForOilEvent earlyTriggerEvent; //erken tetiklenecek event
+
+    //zincir arası tick etkisi — bir sonraki chain eventine kadar her event aralığında uygulanır
+    public bool hasChainTickEffect; //true ise dallanma sonrası her event tick'inde stat etkisi uygulanır
+    public ChainTickStatType chainTickStat; //etkilenecek stat
+    public float chainTickAmount; //her tick'te uygulanacak miktar (pozitif = artır, negatif = azalt)
+
+    //zincir dallanmasında gecikme — sıradaki chain event N event dönemi sonra tetiklensin (bu süre boyunca random eventler gelmeye devam eder)
+    public bool hasChainDelay; //true ise zincir devam etmeden önce chainDelayCycles kadar event dönemi beklenir
+    [Range(1, 10)] public int chainDelayCycles = 1; //kaç event dönemi gecikme (sadece hasChainDelay true ise etkili)
+
+    //zincir dallanması — choice seçilince sıradaki chain event'in hangi havuzdan geleceğini belirler
+    public ChainInfluenceStat chainInfluenceStat = ChainInfluenceStat.JustLuck; //dallanma seçimini etkileyen stat (JustLuck = stat yok)
+    [Range(0f, 100f)] public float chainThreshold0 = 20f;  //1. eşik (0-t0 = aralık 0)
+    [Range(0f, 100f)] public float chainThreshold1 = 50f;  //2. eşik (t0-t1 = aralık 1)
+    [Range(0f, 100f)] public float chainThreshold2 = 75f;  //3. eşik (t1-t2 = aralık 2, t2-100 = aralık 3)
+    public List<ChainBranch> chainBranches; //koşulsuz dallar — koşul sağlanmazsa veya koşullu dallanma yoksa buradan seçilir
+    public bool chainCanEnd; //true ise dallanma seçiminde chain'in bitme ihtimali de eklenir
+    public float chainEndWeight = 1f; //chain bitme ağırlığı (dallanma ağırlıklarıyla yarışır)
+    public bool hasConditionalBranching; //true ise koşullu dallanma aktif
+    public BranchConditionType branchConditionMode = BranchConditionType.Counter; //koşulun tipi (counter veya hikaye bayrağı)
+    public string branchCounterKey; //counter modu: sayaç adı
+    public int branchCounterMin; //counter modu: minimum sayaç değeri (dahil)
+    public int branchCounterMax = -1; //counter modu: maksimum sayaç değeri (-1 = sınırsız)
+    public StoryFlag branchRequiredStoryFlag = StoryFlag.None; //story flag modu: bayrak aktifse koşullu havuz seçilir
+    public List<ChainBranch> conditionalChainBranches; //koşullu dallar — koşul sağlanırsa buradan seçilir
+
+    //rakip işgal flagleri (Editor tarafından foldout içinde çizilir)
+    public bool acceptsRivalDeal; //rakip işgal anlaşmasını kabul eder
+    public bool rejectsRivalDeal; //rakip işgal anlaşmasını reddeder → köşe kapma yarışı başlar
+
+    //vandalizm etkileri (Editor tarafından foldout içinde çizilir)
+    public bool affectsVandalism; //bu choice vandalizm seviyesini değiştirir mi
+    public VandalismChangeType vandalismChangeType; //direkt atama mı göreceli mi
+    public VandalismLevel vandalismTargetLevel; //direkt atama: hedef seviye
+    public int vandalismLevelDelta; //göreceli değişim: +/- tık (Light=1, Moderate=2, Heavy=3, Severe=4)
+
+    //medya takibi etkileri (Editor tarafından foldout içinde çizilir)
+    public bool affectsMediaPursuit; //bu choice medya takibi seviyesini değiştirir mi
+    public MediaPursuitChangeType mediaPursuitChangeType; //direkt atama mı göreceli mi
+    public MediaPursuitLevel mediaPursuitTargetLevel; //direkt atama: hedef seviye
+    public int mediaPursuitLevelDelta; //göreceli değişim: +/- tık (Low=1, Medium=2, High=3)
+
+    //kadın süreci
+    public bool startsWomanProcess; //seçilince kadın sürecini başlatır (oyun boyunca tek sefer)
+    public bool endsWomanProcess; //seçilince kadın sürecini anında bitirir
+    public float womanObsessionModifier; //kadın süreci stat'ını etkiler (pozitif = artar, negatif = azalır)
+    public bool hasObsessionFloor; //true ise obsesyon bu choice yüzünden belirli bir değerin altına düşmez
+    public float obsessionFloor; //obsesyonun düşemeyeceği minimum değer
+    public bool redirectsWomanPool; //seçilince kadın süreci havuzunu başka bir database'e yönlendirir (kalıcı)
+    public WomanProcessDatabase womanPoolDatabase; //yönlendirilecek database
+    public bool freezesWomanProcess; //seçilince kadın sürecini belirli döngü sayısı kadar dondurur
+    public int womanProcessFreezeCycles = 1; //kaç döngü boyunca kadın eventi gelmeyecek
+    public bool hasObsessionDropLimit; //true ise bu choice seçildikten sonra obsesyon belirli miktar düşerse süreç biter
+    public float obsessionDropLimit; //seçildiği andaki obsesyondan bu kadar düşerse kadın süreci otomatik sona erer
+
+    //kalıcı stat çarpanları (seçildiğinde anında ve kalıcı uygulanır — tüm oyun boyunca geçerli)
+    public List<PermanentMultiplierEntry> permanentMultipliers = new List<PermanentMultiplierEntry>();
+
+    //dinamik stat tavanı — choice seçildiğinde belirli stat'ların tavanını düşürür veya kaldırır
+    public List<StatCeilingEntry> statCeilingEffects; //tavan koy veya kaldır
+
+    //periyodik değişiklikler — choice seçildiğinde belirli süre boyunca düzenli stat değişimi
+    public bool hasPeriodicChanges; //true ise seçildiğinde periyodik stat değişimleri başlar
+    public PeriodicTimeUnit periodicChangesDurationUnit = PeriodicTimeUnit.Seconds; //toplam süre birimi (saniye veya gün)
+    public float periodicChangesDuration; //toplam süre — birime göre yorumlanır (saniye veya gün)
+    public List<PeriodicChangeEntry> periodicChanges = new List<PeriodicChangeEntry>(); //her giriş bir stat'ı kendi aralığıyla değiştirir
+
+    //anında tetiklenen event — choice seçildiğinde havuzdan biri gösterilir
+    public bool hasImmediateEvent; //true ise seçildiğinde bir event tetiklenir
+    [Range(0f, 15f)] public float immediateEventDelay; //tetikleme gecikmesi (0 = anında, saniye cinsinden)
+    public bool immediateEventIsTiered; //true ise kadın obsesyon tier'ına göre farklı event seçilir
+    public List<ImmediateEventEntry> immediateEventPool; //ağırlıklı event havuzu (tier'sız mod)
+    public WarForOilEvent immediateEventTier1; //low obsesyon → bu event gelir
+    public WarForOilEvent immediateEventTier2; //mid obsesyon → bu event gelir
+    public WarForOilEvent immediateEventTier3; //high obsesyon → bu event gelir
+
+    //hikaye bayrakları — bu choice seçildiğinde aktif edilen bayraklar
+    public List<StoryFlag> setsStoryFlags;
+
+    //ön koşullar (Editor tarafından foldout içinde çizilir)
+    public List<Skill> requiredSkills; //bu seçenek için açılmış olması gereken skill'ler
+    public List<StatCondition> statConditions; //bu seçenek için sağlanması gereken stat koşulları
+
+    /// <summary>
+    /// Tüm ön koşullar sağlanıyorsa true döner. Koşul yoksa her zaman true.
+    /// </summary>
+    public bool IsAvailable()
+    {
+        if (requiredSkills != null && requiredSkills.Count > 0)
+        {
+            if (SkillTreeManager.Instance == null) return false;
+            for (int i = 0; i < requiredSkills.Count; i++)
+            {
+                if (requiredSkills[i] != null && !SkillTreeManager.Instance.IsUnlocked(requiredSkills[i].id))
+                    return false;
+            }
+        }
+
+        if (statConditions != null && statConditions.Count > 0)
+        {
+            for (int i = 0; i < statConditions.Count; i++)
+            {
+                if (!statConditions[i].IsMet())
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Aktif hikaye bayrağına göre uygun displayName'i döner.
+    /// hasConditionalText kapalıysa veya eşleşen flag yoksa default displayName döner.
+    /// İlk eşleşen entry kazanır. Entry'nin alt ismi boşsa default'a düşer.
+    /// </summary>
+    public string GetDisplayName()
+    {
+        if (!hasConditionalText || conditionalTexts == null || conditionalTexts.Count == 0
+            || StoryFlagManager.Instance == null)
+            return displayName;
+
+        for (int i = 0; i < conditionalTexts.Count; i++)
+        {
+            var ct = conditionalTexts[i];
+            if (ct.requiredFlag != StoryFlag.None && StoryFlagManager.Instance.HasFlag(ct.requiredFlag))
+                return string.IsNullOrEmpty(ct.alternativeDisplayName) ? displayName : ct.alternativeDisplayName;
+        }
+        return displayName;
+    }
+
+    /// <summary>
+    /// Aktif hikaye bayrağına göre uygun description'ı döner.
+    /// hasConditionalText kapalıysa veya eşleşen flag yoksa default description döner.
+    /// İlk eşleşen entry kazanır. Entry'nin alt açıklaması boşsa default'a düşer.
+    /// </summary>
+    public string GetDescription()
+    {
+        if (!hasConditionalText || conditionalTexts == null || conditionalTexts.Count == 0
+            || StoryFlagManager.Instance == null)
+            return description;
+
+        for (int i = 0; i < conditionalTexts.Count; i++)
+        {
+            var ct = conditionalTexts[i];
+            if (ct.requiredFlag != StoryFlag.None && StoryFlagManager.Instance.HasFlag(ct.requiredFlag))
+                return string.IsNullOrEmpty(ct.alternativeDescription) ? description : ct.alternativeDescription;
+        }
+        return description;
+    }
+}
+
+public enum ChainRole
+{
+    None,   //normal event, zincir dışı
+    Head    //zincirin başlangıç event'i — normal havuzdan tetiklenir, chain sürecini başlatır
+}
+
+/// <summary>
+/// Zincir arası tick etkisinde kullanılacak stat tipi.
+/// </summary>
+public enum ChainTickStatType
+{
+    Support,            //savaş destek stat'ı (WarForOilManager internal)
+    Suspicion,          //şüphe (GameStatManager)
+    Reputation,         //itibar (GameStatManager)
+    PoliticalInfluence  //politik nüfuz (GameStatManager)
+}
+
+/// <summary>
+/// Dallanma stat seçimi. JustLuck seçilirse stat etkisi yok, sadece tek ağırlık kullanılır.
+/// </summary>
+public enum ChainInfluenceStat
+{
+    JustLuck,           //stat etkisi yok, saf olasılık
+    Wealth,             //para stat'ına göre
+    Suspicion,          //şüphe stat'ına göre
+    Reputation,         //itibar stat'ına göre
+    PoliticalInfluence  //politik nüfuz stat'ına göre
+}
+
+/// <summary>
+/// Bir choice seçildiğinde sıradaki chain event'in olası hedeflerinden birini tanımlar.
+/// JustLuck: sadece weightRange0 kullanılır.
+/// Stat bazlı: stat'ın mevcut yüzdesine göre 4 aralıktan biri seçilir, o aralığın ağırlığı kullanılır.
+/// </summary>
+[System.Serializable]
+public class ChainBranch
+{
+    public WarForOilEvent targetEvent;   //dallanmanın hedef eventi
+    [Range(0f, 1f)] public float weightRange0; //aralık 0 ağırlığı (JustLuck'ta tek ağırlık)
+    [Range(0f, 1f)] public float weightRange1; //aralık 1 ağırlığı
+    [Range(0f, 1f)] public float weightRange2; //aralık 2 ağırlığı
+    [Range(0f, 1f)] public float weightRange3; //aralık 3 ağırlığı
+    public bool triggersAsImmediateEvent; //true ise zincir devamı yerine anında event olarak tetiklenir (zincir biter)
+    [Range(0f, 15f)] public float immediateEventDelay; //anında event gecikmesi (0 = anında, saniye cinsinden)
+}
+
+/// <summary>
+/// Vandalizm seviyesi. Light(1)-Severe(4) aktif seviyeler, altına düşerse Ended olur.
+/// </summary>
+public enum VandalismLevel
+{
+    None,       //vandalizm yok (başlamadı)
+    Light,      //hafif (1)
+    Moderate,   //orta (2)
+    Heavy,      //ağır (3)
+    Severe,     //şiddetli (4)
+    Ended       //vandalizm bitti/bastırıldı
+}
+
+public enum VandalismChangeType
+{
+    Direct,     //direkt belirli bir seviyeye ata
+    Relative    //mevcut seviyeyi +/- kaydır
+}
+
+/// <summary>
+/// Medya takibi seviyesi. Low(1)-High(3) aktif seviyeler, altına düşerse Ended olur.
+/// </summary>
+public enum MediaPursuitLevel
+{
+    None,       //medya takibi yok (başlamadı)
+    Low,        //düşük baskı (1)
+    Medium,     //orta baskı (2)
+    High,       //yüksek baskı (3)
+    Ended       //medya takibi bitti/atlatıldı
+}
+
+public enum MediaPursuitChangeType
+{
+    Direct,     //direkt belirli bir seviyeye ata
+    Relative    //mevcut seviyeyi +/- kaydır
+}
+
+/// <summary>
+/// Kalıcı stat çarpanı girişi. Bir choice birden fazla stat'ı kalıcı olarak çarpabilir.
+/// </summary>
+[System.Serializable]
+public class PermanentMultiplierEntry
+{
+    public PermanentMultiplierStatType stat;
+    public float multiplier = 1f; //1.1 = %10 artış, 0.9 = %10 azalış
+}
+
+/// <summary>
+/// Kalıcı çarpan için seçilebilir stat tipleri.
+/// GameStatManager stat'ları + savaşa özel WarSupport.
+/// </summary>
+public enum PermanentMultiplierStatType
+{
+    Wealth,
+    Suspicion,
+    Reputation,
+    PoliticalInfluence,
+    WarSupport,
+    WomanObsession
+}
+
+/// <summary>
+/// Stat tavan işlem tipi.
+/// </summary>
+public enum StatCeilingMode
+{
+    Set,      //direkt değer ata
+    Multiply, //mevcut tavanı çarpanla çarp (0-1 arası)
+    Remove    //tavanı kaldır
+}
+
+/// <summary>
+/// Dinamik stat tavanı girişi. Bir stat'ın tavanını düşürür, çarpanla değiştirir veya kaldırır.
+/// </summary>
+[System.Serializable]
+public class StatCeilingEntry
+{
+    public StatType stat; //etkilenecek stat
+    public StatCeilingMode mode; //işlem tipi
+    public float ceilingValue; //tavan değeri (Set modunda kullanılır)
+    [Range(0f, 1f)] public float ceilingMultiplier = 1f; //çarpan (Multiply modunda kullanılır)
+}
+
+/// <summary>
+/// Ardışık konuşma satırı — bir event'in description'ı yerine sıralı diyalog gösterilmesi için kullanılır.
+/// UI tek seferde bir satır gösterir, OK ile sonraki satıra geçilir.
+/// </summary>
+[System.Serializable]
+public class DialogueLine
+{
+    [TextArea(2, 6)] public string text;
+    public bool isFromPlayer; //true = oyuncu konuşuyor, false = karşı taraf konuşuyor
+    public string speakerName; //sadece isFromPlayer false iken kullanılır — karşı tarafın ismi (Inspector'da koşullu görünür)
+}
+
+/// <summary>
+/// Öncü event tipi (hem kadın hem savaş eventleri için kullanılır).
+/// </summary>
+public enum PrecursorEventType
+{
+    WarForOil,      //öncü event bir war for oil eventi (savaş yoksa ikisi de tetiklenmez)
+    RandomEvent     //öncü event bir random event
+}
+
+/// <summary>
+/// Choice'taki koşullu dallanmanın koşul tipi.
+/// Counter: chainCounters dict'inden sayaç okuyarak min/max kontrolü.
+/// StoryFlag: belirli bir hikaye bayrağı aktif mi kontrolü.
+/// </summary>
+public enum BranchConditionType
+{
+    Counter,        //counter bazlı (mevcut sistem)
+    StoryFlag       //hikaye bayrağı bazlı
+}
+
+/// <summary>
+/// Anında tetiklenen event havuzu girişi. Ağırlığa göre rastgele seçilir.
+/// </summary>
+[System.Serializable]
+public class ImmediateEventEntry
+{
+    public WarForOilEvent targetEvent; //tetiklenecek event
+    [Range(0f, 100f)] public float weight = 50f; //seçilme yüzdesi (tüm girişlerin toplamı %100 olmalı)
+}
+
+/// <summary>
+/// Hikaye bayrağına göre koşullu metin girişi. Event ve choice seviyesinde aynı tip kullanılır.
+/// Bayrak aktifse default isim ve/veya açıklama yerine alternatif gösterilir.
+/// Alt alanlardan biri boşsa o alan default'a düşer.
+/// </summary>
+[System.Serializable]
+public class ConditionalChoiceText
+{
+    public StoryFlag requiredFlag; //bu bayrak aktifse alternatif metin kullanılır
+    public string alternativeDisplayName; //bayrak aktifken gösterilecek isim (boşsa default)
+    [TextArea(2, 4)] public string alternativeDescription; //bayrak aktifken gösterilecek açıklama (boşsa default)
+}
+
+/// <summary>
+/// Periyodik değişiklik girişi. Choice'ın toplam süresi boyunca belirli aralıklarla
+/// hedef stat'ı değiştirir ve action fırlatır. Her entry kendi tick aralığına sahiptir.
+/// </summary>
+[System.Serializable]
+public class PeriodicChangeEntry
+{
+    public PermanentMultiplierStatType stat; //etkilenecek stat (Wealth/Suspicion/Reputation/PoliticalInfluence/WarSupport/WomanObsession)
+    public PeriodicTimeUnit tickIntervalUnit = PeriodicTimeUnit.Seconds; //tick aralığı birimi (saniye veya gün)
+    public float tickInterval = 1f; //tick aralığı — birime göre yorumlanır (saniye veya gün — gün birimde 0.333 = günde 3 defa)
+    public float amountPerTick; //her tick'te uygulanacak miktar (negatif = azalt)
+    public PeriodicChangeAction action = PeriodicChangeAction.None; //her tick'te fırlatılacak UI action ID'si
+    public DayPhasePreference dayPhasePreference = DayPhasePreference.Either; //tick fazı tercihi — sadece Days birimi + interval>=1 iken anlamlı (editör diğer durumlarda Either'a sabitler)
+}
+
+/// <summary>
+/// Periyodik değişiklik için zaman birimi.
+/// Days birimi DayNightCycle.TotalCycleLength üzerinden saniyeye çevrilir.
+/// </summary>
+public enum PeriodicTimeUnit
+{
+    Seconds,    //değer doğrudan saniye olarak yorumlanır
+    Days        //değer day/night cycle bazlı (1 = bir tam gün, 0.333 = günde 3 defa, 7 = 7 günde bir)
+}
+
+/// <summary>
+/// Tick'in günün hangi bölümünde uygulanacağını belirler.
+/// Sadece tick aralığı Days birimi ve >= 1 gün olduğunda editörde gösterilir.
+/// Day = sadece Phase.Day, Night = sadece Phase.Night, Either = kısıtlama yok.
+/// Dusk/Dawn geçişleri Day veya Night sayılmaz — pending tick uygun fazı bekler.
+/// </summary>
+public enum DayPhasePreference
+{
+    Either, //fark etmez — tick due olduğunda hemen ateşlenir
+    Day,    //sadece gündüz fazında ateşlenir
+    Night   //sadece gece fazında ateşlenir
+}

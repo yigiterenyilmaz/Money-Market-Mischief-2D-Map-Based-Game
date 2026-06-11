@@ -1,0 +1,203 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &6020507653955250300
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3707995630626690391}
+  - component: {fileID: 7105956881453394949}
+  - component: {fileID: 7258465140580761787}
+  - component: {fileID: 1709891473170653770}
+  - component: {fileID: 8877899481719963599}
+  - component: {fileID: 6843358324374739844}
+  - component: {fileID: 3850371656079094139}
+  - component: {fileID: 6937726525939497907}
+  - component: {fileID: 5217794503302282347}
+  - component: {fileID: 8522150817310854748}
+  m_Layer: 0
+  m_Name: Managers
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3707995630626690391
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6020507653955250300}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 506.3474, y: 438.7218, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7105956881453394949
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6020507653955250300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 03074583ea470a4469d746ec101cd7f8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameManager
+--- !u!114 &7258465140580761787
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6020507653955250300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5df46d5d341b0e146b770ebb8ec6cdaa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameStatManager
+  startingWealth: 1000
+  startingSuspicion: 0
+  startingReputation: 50
+  startingPoliticalInfluence: 0
+  minSuspicion: 0
+  maxSuspicion: 100
+  minReputation: 0
+  maxReputation: 100
+  minPoliticalInfluence: -100
+  maxPoliticalInfluence: 100
+  baseSuspicionMultiplier: 1.5
+  minSuspicionMultiplier: 0.5
+  minSkillEfficiency: 0.5
+  maxSkillEfficiency: 1.5
+--- !u!114 &1709891473170653770
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6020507653955250300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af557944fb77385458c56cdf8a73730c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkillTreeManager
+  database: {fileID: 0}
+--- !u!114 &8877899481719963599
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6020507653955250300}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2ff0d9c7cef5bf342aaea0062b8f254e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SocialMediaManager
+  postDatabase: {fileID: 0}
+  minTrendDuration: 40
+  maxTrendDuration: 150
+  minNaturalTrendRatio: 0.28
+  maxNaturalTrendRatio: 0.45
+  minPlayerOverrideDuration: 30
+  maxPlayerOverrideDuration: 90
+  minPlayerOverrideRatio: 0.7
+  maxPlayerOverrideRatio: 0.9
+  baseMinPostInterval: 1
+  baseMaxPostInterval: 6
+  absoluteMinInterval: 1
+  minSpeedBoostDuration: 30
+  maxSpeedBoostDuration: 90
+  freezeDuration: 30
+  slowDuration: 45
+  slowedMinInterval: 8
+  slowedMaxInterval: 15
+  eligibleSensitiveTopics: 
+--- !u!114 &6843358324374739844
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6020507653955250300}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ec92bb770899e748bf927f0dd1160b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ElectionManager
+  electionInterval: 300
+--- !u!114 &3850371656079094139
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6020507653955250300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cfe6bc87828aa6428cbf6180c9c2327, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RandomEventManager
+  eventDatabase: {fileID: 0}
+  phaseInterval: 900
+  currentGamePhase: 0
+  elapsedTime: 0
+  minEventInterval: 240
+  maxEventInterval: 360
+--- !u!114 &6937726525939497907
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6020507653955250300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b381d5d71646e9d4ead2f15847321704, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MinigameManager
+--- !u!114 &5217794503302282347
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6020507653955250300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4e8ce8e611e35349b751c8780203e6d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SmuggleManager
+  minigameData: {fileID: 11400000, guid: 7927bdae41eeef14bb32842b707d5777, type: 2}
+  database: {fileID: 11400000, guid: df7667f7e23254648968de923a5544e6, type: 2}
+  eventCheckInterval: 5
+  eventDecisionTime: 10
+--- !u!114 &8522150817310854748
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6020507653955250300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a9cc7600d1c1db4999771029306fa32, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PleasePaperManager
+  minigameData: {fileID: 11400000, guid: 7e2bbd756a91f9841ad8c3501c6a708e, type: 2}
+  database: {fileID: 11400000, guid: e8764274dd132fd439e98b0c09b95cfb, type: 2}
+  minOfferInterval: 90
+  maxOfferInterval: 150
+  offerDecisionTime: 15
+  processDuration: 300
+  processEventInterval: 15
+  initialControlStat: 40

@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0aaa824f7832b94e9010f7cdb57d8aa, type: 3}
+  m_Name: A12-FieldsOfGold
+  m_EditorClassIdentifier: Assembly-CSharp::Skill
+  id: a12
+  displayName: Fields Of Gold
+  description: 'You open a jewelry shop and increase your income.
+
+    Precious metal
+    trading becomes a more stable and sustainable source of profit.'
+  icon: {fileID: 0}
+  cost: 50000
+  prerequisites:
+  - {fileID: 11400000, guid: 768c13daaea0f0d4da14fbda34bb8f50, type: 2}
+  effects:
+  - rid: 2638473143635148866
+  otherPrerequisites: 0
+  blocksSkills: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 2638473143635148866
+      type: {class: UnlockJewelerEffect, ns: , asm: Assembly-CSharp}
+      data:
+        availableJewelers:
+        - {fileID: 11400000, guid: 0be77fa605d5ae7468e37278f6a0bc93, type: 2}
+        - {fileID: 11400000, guid: 5d60dd03e440d75408b47c5ac8236613, type: 2}

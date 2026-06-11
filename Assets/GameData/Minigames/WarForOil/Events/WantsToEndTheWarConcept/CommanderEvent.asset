@@ -1,0 +1,211 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfbaecc4cb0677840a36451123fe4ad1, type: 3}
+  m_Name: CommanderEvent
+  m_EditorClassIdentifier: Assembly-CSharp::WarForOilEvent
+  id: wfo_wtetwc_03
+  displayName: A Commander Wants to End the War
+  description: One of the senior commanders argues that the war is no longer sustainable.
+    He begins seeking internal military support for initiating peace negotiations.
+  devNote: "mafya skilli olu\u015Fturulunca \xF6ld\xFCrme choice una eklenecek"
+  eventNote: "bu event de wants to end the war conceptinin kolay olan\u0131d\u0131r.
+    sava\u015F\u0131 bitirmek isteyen komutand\u0131r ancak di\u011Fer ikisine g\xF6re
+    k\xFC\xE7\xFCk birka\xE7 mekanik farkl\u0131l\u0131\u011F\u0131 var\n\nikna etme
+    choice u yine var ve ikna etme \u015Fans\u0131n y\xFCksek\n\nbar\u0131\u015F\u0131
+    destekleme se\xE7ene\u011Fi yine var ancak bu sefer kesin etkili de\u011Fil,
+    b\xFCy\xFCk olas\u0131l\u0131kla bitirir \xE7\xFCnk\xFC komutan + bizim sava\u015F\u0131
+    bitirme iste\u011Fimiz \xFCst\xFC o kadar ba\u011Flamak zorunda de\u011Fil.\n\n\xF6ld\xFCrme
+    se\xE7ene\u011Fi yine var o da %10 artt\u0131r\u0131r protest ba\u015Flama olas\u0131l\u0131\u011F\u0131n\u0131\n"
+  minWarTime: 0.3
+  maxWarTime: -1
+  decisionTime: 25
+  isRepeatable: 0
+  isUnlimitedRepeat: 0
+  maxRepeatCount: 1
+  choices:
+  - displayName: Persuade the Commander
+    description: You attempt to convince the commander that the war must continue;
+      if successful, he abandons his peace initiative.
+    supportModifier: 3
+    suspicionModifier: 0
+    reputationModifier: 0
+    politicalInfluenceModifier: 0
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 1
+    probWarEndChance: 0.105
+    probDismissChance: 0.471
+    probWarEndDelay: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills: []
+    statConditions: []
+  - displayName: Support the Peace
+    description: You declare your support for the peace initiative; the war will
+      most likely end, but not with certainty.
+    supportModifier: -2
+    suspicionModifier: 0
+    reputationModifier: 1
+    politicalInfluenceModifier: -1
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills: []
+    statConditions: []
+  - displayName: Eliminate the Officer
+    description: You remove the commander; this action completely eliminates the
+      chance of peace but significantly reduces war support.
+    supportModifier: -5
+    suspicionModifier: 3
+    reputationModifier: -1
+    politicalInfluenceModifier: -2
+    costModifier: 0
+    wealthModifier: 0
+    cornerGrabModifier: 0
+    protestModifier: 0
+    protestTriggerChanceBonus: 0.104
+    hasProtestChance: 0
+    protestDecreaseChance: 0
+    protestDecreaseAmount: 0
+    protestIncreaseAmount: 0
+    freezesFeed: 0
+    slowsFeed: 0
+    hasFeedOverride: 0
+    feedOverrideRatio: 0
+    feedOverrideDuration: 0
+    endsWar: 0
+    warEndDelay: 0
+    reducesReward: 0
+    baseRewardReduction: 0
+    endsWarWithDeal: 0
+    dealDelay: 0
+    dealRewardRatio: 0
+    blocksEvents: 0
+    blocksCeasefire: 0
+    blocksEventGroup: 0
+    blockedGroup: {fileID: 0}
+    hasProbabilisticRewardReduction: 0
+    probRetriggerChance: 0
+    probRewardReductionChance: 0
+    probRewardReductionAmount: 0
+    hasProbabilisticWarEnd: 0
+    probWarEndChance: 0
+    probDismissChance: 0
+    probWarEndDelay: 0
+    continuesChain: 0
+    isChainRefusal: 0
+    triggersCeasefire: 0
+    acceptsRivalDeal: 0
+    rejectsRivalDeal: 0
+    affectsVandalism: 0
+    vandalismChangeType: 0
+    vandalismTargetLevel: 0
+    vandalismLevelDelta: 0
+    affectsMediaPursuit: 0
+    mediaPursuitChangeType: 0
+    mediaPursuitTargetLevel: 0
+    mediaPursuitLevelDelta: 0
+    requiredSkills:
+    - {fileID: 0}
+    statConditions: []
+  defaultChoiceIndex: -1
+  isVandalismEvent: 0
+  vandalismLevelOnTrigger: 0
+  isMediaPursuitEvent: 0
+  mediaPursuitLevelOnTrigger: 0
+  chainRole: 0
+  nextChainEvent: {fileID: 0}
+  chainInterval: 5
+  skillsToLock: []
+  chainFine: 0
+  refusalThresholds: []

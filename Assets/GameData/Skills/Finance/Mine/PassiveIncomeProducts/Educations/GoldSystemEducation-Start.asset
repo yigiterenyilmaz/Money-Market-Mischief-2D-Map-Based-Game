@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e181ea621e39a2c4788fb100aae19979, type: 3}
+  m_Name: GoldSystemEducation-Start
+  m_EditorClassIdentifier: Assembly-CSharp::PassiveIncomeProduct
+  id: goldeducation01
+  displayName: 'World''s Gold System: Zero to Hero'
+  description: "From Zero to Hero: The World\u2019s Gold-Silver System Training is
+    a comprehensive program designed to teach you how the global gold system truly
+    works\u2014from its historical foundations to modern financial mechanisms. You\u2019ll
+    learn how gold influences economies, currencies, and global power structures
+    step by step. Build real understanding, not just theory, and master the system
+    from the ground up."
+  icon: {fileID: 0}
+  cost: 5775
+  isSellable: 0
+  sellRatio: 0.38
+  minIncomePerSecond: 50
+  maxIncomePerSecond: 60
