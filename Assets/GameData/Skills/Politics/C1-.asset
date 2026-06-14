@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c1
   displayName: 
-  description: 
+  description: "siyaset root, amac\u0131 politik n\xFCfuzu artt\u0131r\u0131p politikay\u0131
+    ilgilendiren skillerin etkisini artt\u0131rmak, \xE7arpan gibi"
   icon: {fileID: 0}
   cost: 0
   prerequisites: []

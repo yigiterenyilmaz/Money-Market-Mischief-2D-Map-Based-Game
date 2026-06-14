@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c21
   displayName: 
-  description: 
+  description: "consensus in\u015Faas\u0131"
   icon: {fileID: 0}
   cost: 0
   prerequisites:

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c7
   displayName: 
-  description: 
+  description: "siyasi parti se\xE7ip fonlama"
   icon: {fileID: 0}
   cost: 0
   prerequisites:

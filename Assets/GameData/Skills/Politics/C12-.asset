@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c12
   displayName: 
-  description: 
+  description: "yarg\u0131 r\xFC\u015Fveti - paralel yap\u0131lanma \xE7etesi, pe\u015Findeki
+    davalar\u0131 uzakla\u015Ft\u0131r\u0131r \u015F\xFCpheyi az\u0131c\u0131k d\xFC\u015F\xFCrebilir"
   icon: {fileID: 0}
   cost: 0
   prerequisites:

@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c17
   displayName: 
-  description: 
+  description: "r\xFC\u015Fvette pazarl\u0131k pay\u0131n\u0131 ve kabul oran\u0131n\u0131
+    artt\u0131r\u0131r"
   icon: {fileID: 0}
   cost: 0
   prerequisites:

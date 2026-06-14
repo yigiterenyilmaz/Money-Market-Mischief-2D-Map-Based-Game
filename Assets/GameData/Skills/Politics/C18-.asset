@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c18
   displayName: 
-  description: 
+  description: "mafya v3 - \xF6ld\xFCrme"
   icon: {fileID: 0}
   cost: 0
   prerequisites:

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c3
   displayName: 
-  description: 
+  description: "burs programlar\u0131"
   icon: {fileID: 0}
   cost: 0
   prerequisites:

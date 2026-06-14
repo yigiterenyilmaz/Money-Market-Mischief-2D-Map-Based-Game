@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c14
   displayName: 
-  description: 
+  description: "holdinge adam g\xF6nderme, hara\xE7, pasif gelir"
   icon: {fileID: 0}
   cost: 0
   prerequisites:

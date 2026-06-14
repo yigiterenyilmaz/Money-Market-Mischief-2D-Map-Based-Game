@@ -14,10 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c9
   displayName: 
-  description: 
+  description: "destekledi\u011Fin/se\xE7ti\u011Fin siyasi partiden devlet adam\u0131
+    olma"
   icon: {fileID: 0}
   cost: 0
-  prerequisites: []
+  prerequisites:
+  - {fileID: 11400000, guid: f94006d4052373a4ca09181e6548684c, type: 2}
   effects: []
   otherPrerequisites: 0
   blocksSkills: []

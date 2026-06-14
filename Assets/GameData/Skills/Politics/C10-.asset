@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c10
   displayName: 
-  description: 
+  description: "m\xFCfetti\u015F r\xFC\u015Fveti - risk orta; pazarl\u0131\u011F\u0131,
+    if\u015Fa olma a\xE7\u0131l\u0131r risk para biraz daha artar"
   icon: {fileID: 0}
   cost: 0
   prerequisites:

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c5
   displayName: 
-  description: 
+  description: "siyasi partilere ba\u011F\u0131\u015F"
   icon: {fileID: 0}
   cost: 0
   prerequisites:

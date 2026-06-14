@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c11
   displayName: 
-  description: 
+  description: " siyaset\xE7i r\xFC\u015Fveti- zincir a\xE7\u0131l\u0131r, risk para
+    daha da artar, skill a\xE7ma h\u0131z\u0131n\u0131 artt\u0131r\u0131r "
   icon: {fileID: 0}
   cost: 0
   prerequisites:
