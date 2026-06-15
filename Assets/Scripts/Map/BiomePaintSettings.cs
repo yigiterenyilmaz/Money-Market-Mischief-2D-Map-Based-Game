@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum CityZone { Core, Mid, Outer }
+public enum CityLayerStyle { ManhattanGrid, Grid, Scatter }
 
 [System.Serializable]
 public struct CityBuildingEntry
@@ -14,16 +14,49 @@ public struct CityBuildingEntry
 }
 
 [System.Serializable]
+public class CityLayer
+{
+    [Tooltip("Katman adı (inspector'da görünür).")]
+    public string name = "Layer";
+    [Tooltip("Bu katmanda kullanılacak bina spriteleri. Boş bırakılabilir — sonradan doldurun.")]
+    public List<CityBuildingEntry> sprites = new List<CityBuildingEntry>();
+    [Tooltip("Belediye binasından minimum tile uzaklığı (iç sınır, dahil).")]
+    public float innerRadius;
+    [Tooltip("Belediye binasından maksimum tile uzaklığı (dış sınır, hariç).")]
+    public float outerRadius = 60f;
+    [Tooltip("İşaretlenirse bu katman, önceki katmanlara girmeyen tüm tile'ları toplar (catch-all). outerRadius > 0 ise yine de o yarıçapla sınırlanır (şehir adaya yayılmaz); outerRadius = 0 ise adanın kenarına kadar uzanır.")]
+    public bool extendToEdge;
+    [Tooltip("Yerleşim stili: Manhattan ızgarası (avenue+street), düzenli ızgara veya seyrek dağılım.")]
+    public CityLayerStyle style = CityLayerStyle.Grid;
+    [Tooltip("Sprite ölçek aralığı (min, max).")]
+    public Vector2 scaleRange = new Vector2(0.5f, 0.7f);
+    [Tooltip("Doluluk yoğunluğu. 1.0 = tıka basa dolu, 0.5 = yarısı boş.")]
+    [Range(0.1f, 1f)] public float fillDensity = 1f;
+    [Tooltip("Minimum bina aralığı (dünya birimi, yarıçap). Tüm stillerde geçerli. Büyük = binalar daha seyrek. ÖNEMLİ: binalar zaten kendi sprite boyutu kadar aralıklı yerleşir; sprite yarıçapından KÜÇÜK değerlerin etkisi olmaz — seyreltmek için sprite yarıçapından büyük bir değer gir (genelde 0.5–2).")]
+    public float overlapRadius = 0.12f;
+    [Tooltip("Grid ızgara adımı (tile). Bina çapına yakın olmalı; küçük = sık + çakışmalı.")]
+    public int gridStep = 18;
+    [Tooltip("Scatter denemesi çarpanı. Büyük = daha fazla bina.")]
+    public int scatterRate = 2;
+    [Tooltip("Avenue (N-S cadde) aralığı, tile cinsinden. Sadece ManhattanGrid stili.")]
+    public int avenueSpacing = 40;
+    [Tooltip("Street (E-W sokak) aralığı, tile cinsinden. Sadece ManhattanGrid stili.")]
+    public int streetSpacing = 32;
+    [Tooltip("Sokak şerit genişliği (tile). Bu kadar tile sokak olarak boş bırakılır. Sadece ManhattanGrid.")]
+    public int streetWidth = 3;
+}
+
+[System.Serializable]
 public struct SpecialCityBuilding
 {
     [Tooltip("Özel bina sprite'ı (gündüz). Animasyonlu modda ilk frame olarak kullanılır.")]
     public Sprite daySprite;
     [Tooltip("Özel bina sprite'ı (gece). Boş bırakılabilir.")]
     public Sprite nightSprite;
-    [Tooltip("Haritada kaç adet yerleştirilecek.")]
-    [Range(1, 10)] public int count;
-    [Tooltip("Hangi zone'a yerleşsin.")]
-    public CityZone targetZone;
+    [Tooltip("Maksimum kaç adet yerleştirilecek. Yer bulunamazsa daha az olabilir, ama bu sayıdan fazla üretilmez.")]
+    [Range(1, 50)] public int count;
+    [Tooltip("Hangi katmana yerleşsin (0 = ilk katman; cityLayers listesindeki indeks).")]
+    public int targetLayer;
     [Tooltip("Özel ince yol çekilsin mi?")]
     public bool connectToRoad;
     [Tooltip("Etrafında bina olmayacak alan (tile cinsinden).")]
@@ -90,18 +123,110 @@ public class BiomePaintSettings : ScriptableObject
     [Header("City Hall — Belediye Binası (tek)")]
     public CityBuildingEntry cityHallEntry;
 
-    [Header("City Core — Belediye Etrafı (Manhattan Grid)")]
-    [Tooltip("Core bölgede kullanılacak bina spritleri. İki liste birleşip uniform olasılıkla seçilir.")]
-    public List<CityBuildingEntry> citiesCoreHorizontalDecor = new List<CityBuildingEntry>();
-    [Tooltip("Core bölgede kullanılacak bina spritleri. İki liste birleşip uniform olasılıkla seçilir.")]
-    public List<CityBuildingEntry> citiesCoreVerticalDecor = new List<CityBuildingEntry>();
-
-    [Header("City Mid — Orta Bölge")]
-    public List<CityBuildingEntry> citiesMidDecor = new List<CityBuildingEntry>();
-
-    [Header("City Outer — Seyrek Dış Bölge")]
-    public List<CityBuildingEntry> citiesOuterDecor = new List<CityBuildingEntry>();
+    [Header("City Layers — Katmanlı Şehir Bölgeleri")]
+    [Tooltip("Her katman: iç/dış yarıçap + sprite havuzu + yerleşim stili. Sırayla (iç→dış) işlenir. Başlangıçta boş — 'Populate Default City Layers' ile varsayılan katmanları oluşturun.")]
+    public List<CityLayer> cityLayers = new List<CityLayer>();
 
     [Header("City Special Buildings — Sabit Sayılı Özel Binalar")]
     public List<SpecialCityBuilding> specialCityBuildings = new List<SpecialCityBuilding>();
+
+    [ContextMenu("Populate Default City Layers")]
+    void PopulateDefaultCityLayers()
+    {
+        cityLayers.Clear();
+
+        // Towers — iç çekirdek, Manhattan ızgarası (en büyük binalar)
+        cityLayers.Add(new CityLayer
+        {
+            name          = "Towers",
+            innerRadius   = 0f,
+            outerRadius   = 55f,
+            extendToEdge  = false,
+            style         = CityLayerStyle.ManhattanGrid,
+            scaleRange    = new Vector2(0.6f, 0.8f),
+            fillDensity   = 1f,
+            overlapRadius = 0.12f,
+            gridStep      = 22,
+            scatterRate   = 2,
+            avenueSpacing = 40,
+            streetSpacing = 32,
+            streetWidth   = 4,
+        });
+
+        // Buildings — orta halka, düzenli ızgara (orta boy binalar)
+        cityLayers.Add(new CityLayer
+        {
+            name          = "Buildings",
+            innerRadius   = 55f,
+            outerRadius   = 110f,
+            extendToEdge  = false,
+            style         = CityLayerStyle.Grid,
+            scaleRange    = new Vector2(0.42f, 0.58f),
+            fillDensity   = 0.95f,
+            overlapRadius = 0.14f,
+            gridStep      = 22,
+            scatterRate   = 2,
+            avenueSpacing = 40,
+            streetSpacing = 32,
+            streetWidth   = 3,
+        });
+
+        // Neighbourhoods — dış halka, seyrek dağılım (küçük evler, catch-all)
+        cityLayers.Add(new CityLayer
+        {
+            name          = "Neighbourhoods",
+            innerRadius   = 110f,
+            outerRadius   = 0f,
+            extendToEdge  = true,
+            style         = CityLayerStyle.Scatter,
+            scaleRange    = new Vector2(0.28f, 0.42f),
+            fillDensity   = 1f,
+            overlapRadius = 0.16f,
+            gridStep      = 18,
+            scatterRate   = 3,
+            avenueSpacing = 40,
+            streetSpacing = 32,
+            streetWidth   = 3,
+        });
+
+#if UNITY_EDITOR
+        UnityEditor.EditorUtility.SetDirty(this);
+#endif
+        Debug.Log("BiomePaintSettings: 3 varsayılan şehir katmanı oluşturuldu. Sprite'ları inspector'dan ekleyin.");
+    }
+
+    // Unity'nin inspector "+" butonu yeni liste elemanlarını C# constructor yerine
+    // sıfırlarla doldurur — bu da scaleRange=0 (görünmez bina) ve fillDensity=0
+    // (hiç bina yok) gibi bozuk katmanlara yol açar. Burada açıkça başlatılmamış
+    // (<= 0) alanları makul varsayılanlara çekiyoruz. Kullanıcının girdiği pozitif
+    // değerlere dokunmuyoruz.
+    void OnValidate()
+    {
+        if (cityLayers == null) return;
+        for (int i = 0; i < cityLayers.Count; i++)
+        {
+            CityLayer layer = cityLayers[i];
+            if (layer == null) continue;
+            if (layer.scaleRange == Vector2.zero) layer.scaleRange = new Vector2(0.5f, 0.7f);
+            if (layer.fillDensity   <= 0f) layer.fillDensity   = 1f;
+            if (layer.gridStep      <= 0)  layer.gridStep      = 18;
+            if (layer.scatterRate   <= 0)  layer.scatterRate   = 2;
+            if (layer.overlapRadius <= 0f) layer.overlapRadius = 0.12f;
+            if (layer.avenueSpacing <= 0)  layer.avenueSpacing = 40;
+            if (layer.streetSpacing <= 0)  layer.streetSpacing = 32;
+            if (layer.streetWidth   <= 0)  layer.streetWidth   = 3;
+            // Boş halka (innerRadius=outerRadius=0) hiç tile almaz — yeni eklenen katman
+            // varsayılan bir dış yarıçap alsın (catch-all katmanlar hariç).
+            if (!layer.extendToEdge && layer.outerRadius <= 0f) layer.outerRadius = 60f;
+        }
+
+        // Özel binalar struct olduğu için listeye geri yazmak gerekir. count=0 (inspector
+        // "+" sıfırlaması) hiç bina üretmez — en az 1'e çek.
+        if (specialCityBuildings != null)
+            for (int i = 0; i < specialCityBuildings.Count; i++)
+            {
+                var sp = specialCityBuildings[i];
+                if (sp.count <= 0) { sp.count = 1; specialCityBuildings[i] = sp; }
+            }
+    }
 }

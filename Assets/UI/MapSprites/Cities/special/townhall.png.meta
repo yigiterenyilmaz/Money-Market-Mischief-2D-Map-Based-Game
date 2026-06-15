@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 107c90563ab32fc4eb5add6fb2a2e0a2
+guid: 8782847c4c9c2a047b7fa090c7213b61
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4754031575142469345
-    second: carheadlights_0
+      213: -1152812806179444027
+    second: townhall_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,12 +46,12 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 120
+  spritePixelsToUnits: 1300
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -100,23 +100,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: carheadlights_0
+      name: townhall_0
       rect:
         serializedVersion: 2
         x: 0
-        y: 29
-        width: 13
-        height: 16
+        y: 12
+        width: 128
+        height: 116
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f1174a86879460eb0800000000000000
-      internalID: -4754031575142469345
+      spriteID: 5ca27235cd26000f0800000000000000
+      internalID: -1152812806179444027
       vertices: []
       indices: 
       edges: []
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 5e97eb03825dee720800000000000000
+    spriteID: 10a3df681d9aff34dbf5db8e24c712f2
     internalID: 0
     vertices: []
     indices: 
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      carheadlights_0: -4754031575142469345
+      townhall_0: -1152812806179444027
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

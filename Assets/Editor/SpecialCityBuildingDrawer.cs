@@ -24,7 +24,7 @@ public class SpecialCityBuildingDrawer : PropertyDrawer
         SerializedProperty daySprite       = property.FindPropertyRelative("daySprite");
         SerializedProperty nightSprite     = property.FindPropertyRelative("nightSprite");
         SerializedProperty count           = property.FindPropertyRelative("count");
-        SerializedProperty targetZone      = property.FindPropertyRelative("targetZone");
+        SerializedProperty targetLayer      = property.FindPropertyRelative("targetLayer");
         SerializedProperty connectToRoad   = property.FindPropertyRelative("connectToRoad");
         SerializedProperty clearingRadius  = property.FindPropertyRelative("clearingRadius");
         SerializedProperty isIsometric     = property.FindPropertyRelative("isIsometric");
@@ -35,7 +35,7 @@ public class SpecialCityBuildingDrawer : PropertyDrawer
         y = DrawProperty(position, y, daySprite);
         y = DrawProperty(position, y, nightSprite);
         y = DrawProperty(position, y, count);
-        y = DrawProperty(position, y, targetZone);
+        y = DrawProperty(position, y, targetLayer);
         y = DrawProperty(position, y, connectToRoad);
         y = DrawProperty(position, y, clearingRadius);
         y = DrawProperty(position, y, isIsometric);

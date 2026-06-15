@@ -1,10 +1,13 @@
 fileFormatVersion: 2
-guid: 107c90563ab32fc4eb5add6fb2a2e0a2
+guid: bfd4319668320234f8f020fed7480101
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4754031575142469345
-    second: carheadlights_0
+      213: -3516753729168357602
+    second: fye_0
+  - first:
+      213: -4824855099758618034
+    second: fye_1
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,13 +49,13 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 120
-  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spritePixelsToUnits: 260
+  spriteBorder: {x: 16, y: 5, z: 24, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1
@@ -100,23 +103,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: carheadlights_0
+      name: fye_1
       rect:
         serializedVersion: 2
-        x: 0
-        y: 29
-        width: 13
-        height: 16
+        x: 16
+        y: 5
+        width: 60
+        height: 59
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f1174a86879460eb0800000000000000
-      internalID: -4754031575142469345
+      spriteID: e4ad72699dbaa0db0800000000000000
+      internalID: -4824855099758618034
       vertices: []
       indices: 
       edges: []
@@ -126,7 +129,7 @@ TextureImporter:
     physicsShape: []
     bones: []
     spriteID: 5e97eb03825dee720800000000000000
-    internalID: 0
+    internalID: 1537655665
     vertices: []
     indices: 
     edges: []
@@ -135,7 +138,8 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      carheadlights_0: -4754031575142469345
+      fye_0: -3516753729168357602
+      fye_1: -4824855099758618034
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

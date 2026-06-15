@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 107c90563ab32fc4eb5add6fb2a2e0a2
+guid: 3185cc26d5e5062419b9ee88e41d0142
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4754031575142469345
-    second: carheadlights_0
+      213: 6714369015438526544
+    second: bank_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,12 +46,12 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 120
+  spritePixelsToUnits: 250
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -100,23 +100,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: carheadlights_0
+      name: bank_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 29
-        width: 13
-        height: 16
+        x: 7
+        y: 2
+        width: 48
+        height: 80
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f1174a86879460eb0800000000000000
-      internalID: -4754031575142469345
+      spriteID: 0584a189b0b3e2d50800000000000000
+      internalID: 6714369015438526544
       vertices: []
       indices: 
       edges: []
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 5e97eb03825dee720800000000000000
+    spriteID: 5d98f35a40b56de4cae93e02a0fd7215
     internalID: 0
     vertices: []
     indices: 
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      carheadlights_0: -4754031575142469345
+      bank_0: 6714369015438526544
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

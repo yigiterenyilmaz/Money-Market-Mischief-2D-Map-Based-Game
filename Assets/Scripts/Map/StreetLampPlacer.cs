@@ -49,6 +49,12 @@ public class StreetLampPlacer : MonoBehaviour
     [Header("Sorting")]
     public string sortingLayer = "Default";
     public int    sortingOrder = 15;
+    [Tooltip("Işık halosunun sorting order'ı. Binalar Y konumuna göre " +
+             "(MapDecorPlacer: 10 + wy*-100) sıralanır; haritanın altındaki binalar yüksek " +
+             "sorting order alıp halonun üstüne çıkar. Halo ışığı TÜM binaların üstünde görünsün " +
+             "diye bu değer bina tavanını aşmalı. 256px harita ~140'a çıkar; büyük haritalarda " +
+             "(yükseklik/2 * 100) kadar artar — gerekirse yükseltin.")]
+    public int    haloSortingOrder = 1000;
 
     // -------------------------------------------------------------------------
 
@@ -324,7 +330,9 @@ public class StreetLampPlacer : MonoBehaviour
         SpriteRenderer poleNightSR = nightPoleGo.AddComponent<SpriteRenderer>();
         poleNightSR.sprite           = poleNightSprites.ContainsKey(biome) ? poleNightSprites[biome] : poleNightSprites[0];
         poleNightSR.sortingLayerName = sortingLayer;
-        poleNightSR.sortingOrder     = sortingOrder + 1;
+        // Işıklı kafa (gerçek ışık kaynağı) da binaların ÜSTÜNDE kalmalı — yoksa gece bina
+        // ışık noktasını örtüp halo havada asılı kalmış gibi görünür.
+        poleNightSR.sortingOrder     = haloSortingOrder;
         poleNightSR.color            = new Color(1f, 1f, 1f, 0f);
 
         // Isik halosu (bolge renginde)
@@ -335,7 +343,8 @@ public class StreetLampPlacer : MonoBehaviour
         SpriteRenderer haloSR = haloGo.AddComponent<SpriteRenderer>();
         haloSR.sprite           = haloSprites.ContainsKey(biome) ? haloSprites[biome] : haloSprites[0];
         haloSR.sortingLayerName = sortingLayer;
-        haloSR.sortingOrder     = sortingOrder + 2;
+        // Halo, Y-bazlı sıralanan binaların HEPSİNİN üstünde kalmalı (bina ışığın üstüne binmesin).
+        haloSR.sortingOrder     = haloSortingOrder + 1;
         haloSR.color            = new Color(1f, 1f, 1f, 0f);
 
         lamps.Add(new LampData

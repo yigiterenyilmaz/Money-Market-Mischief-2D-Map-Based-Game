@@ -104,7 +104,12 @@ public class MapController : MonoBehaviour
 
         Vector3 mouseBefore = GetMouseWorldPosition();
 
-        float newSize = cam.orthographicSize - (scroll * zoomSpeed * 0.01f);
+        // Çarpımsal (üstel) zoom: her scroll adımı orthographicSize'ı sabit bir ORANLA değiştirir,
+        // böylece zoom hissi her ölçekte aynıdır. Eski lineer adım (size - sabit) tam yakınken
+        // (minSize'a yakın) sabit adımı boyutun büyük bir yüzdesi yapıyordu → son iki kademe
+        // arasında ~2x sıçrama. Üstel adım, yakınlaştıkça mutlak adımı otomatik küçültür.
+        float zoomFactor = Mathf.Exp(-scroll * zoomSpeed * 0.001f);
+        float newSize    = cam.orthographicSize * zoomFactor;
         cam.orthographicSize = Mathf.Clamp(newSize, minSize, maxSize);
 
         Vector3 mouseAfter = GetMouseWorldPosition();

@@ -9202,6 +9202,10 @@ PrefabInstance:
       value: 0.1
       objectReference: {fileID: 0}
     - target: {fileID: 4543920815820282623, guid: 9792acab6e34b3e43905c119b7bfc8b6, type: 3}
+      propertyPath: zoomSpeed
+      value: 120
+      objectReference: {fileID: 0}
+    - target: {fileID: 4543920815820282623, guid: 9792acab6e34b3e43905c119b7bfc8b6, type: 3}
       propertyPath: mapRenderer
       value: 
       objectReference: {fileID: 598282585}
@@ -10741,23 +10745,15 @@ MonoBehaviour:
   isoShadowNoonDeadZone: 0.25
   cityHallScaleRange: {x: 1.5, y: 2}
   cityHallClearingRadius: 10
-  coreRadius: 29
-  midRadius: 94
-  coreDensityStep: 11
-  midDensityStep: 7
-  outerSpawnRate: 1
-  coreSpriteScaleRange: {x: 0.55, y: 0.75}
-  midSpriteScaleRange: {x: 0.4, y: 0.55}
-  outerSpriteScaleRange: {x: 0.25, y: 0.4}
-  denseOverlapRadius: 0.08
-  overlapRadius: 0.3
-  avenueSpacing: 15
-  streetSpacing: 10
-  manhattanStreetWidth: 8
-  coreFillDensity: 1
+  behindClearanceFactor: 0.6
+  specialBigCityTileCount: 3000
+  edgeThinning: 0.5
+  edgeThinningBorderTiles: 30
   brokenBuildingSprites: []
   brokenBuildingTint: {r: 0.55, g: 0.45, b: 0.4, a: 1}
   brokenBuildingSpritesNight: []
+  debugOverlayDayNight: 0
+  debugOverlayAlpha: 0.5
   portSpritesDay:
   - {fileID: 694149444081068427, guid: 5a6b1038ce244cc46806321c64af4317, type: 3}
   portSpritesNight:
@@ -11034,8 +11030,8 @@ MonoBehaviour:
   carSortingLayer: Default
   carSortingOrder: 20
   pixelsPerUnit: 100
-  highwayCarDensity: 2
-  branchCarDensity: 1.15
+  highwayCarDensity: 3.44
+  branchCarDensity: 2.11
   carScale: 0.301
   carScaleVariation: 0.094
   carColors:
@@ -11049,7 +11045,11 @@ MonoBehaviour:
     spawnWeight: 1
   - color: {r: 0.042439155, g: 0, b: 0.3660378, a: 1}
     spawnWeight: 0.6
-  baseSpeed: 0.1
+  - color: {r: 0.24528301, g: 0.1840685, b: 0.07543608, a: 1}
+    spawnWeight: 0.6
+  - color: {r: 0.074509814, g: 0.24705882, b: 0.101246186, a: 1}
+    spawnWeight: 0.6
+  baseSpeed: 0.08
   speedVariation: 0.219
   directionLookahead: 10
   directionSmoothSpeed: 17.3
@@ -11218,6 +11218,7 @@ MonoBehaviour:
   urbanLightColor: {r: 0.9, g: 0.9, b: 1, a: 0.65}
   sortingLayer: Default
   sortingOrder: 30
+  haloSortingOrder: 1000
 --- !u!1 &1711406226
 GameObject:
   m_ObjectHideFlags: 0

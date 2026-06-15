@@ -34,17 +34,137 @@ MonoBehaviour:
   agriculturalDecor: []
   industrialDecor: []
   cityHallEntry:
-    daySprite: {fileID: 3230281143415141360, guid: 9609f21029933e44686e016e30c93926, type: 3}
-    nightSprite: {fileID: 3230281143415141360, guid: 9609f21029933e44686e016e30c93926, type: 3}
+    daySprite: {fileID: -1152812806179444027, guid: 8782847c4c9c2a047b7fa090c7213b61, type: 3}
+    nightSprite: {fileID: 6599969767114084350, guid: fc547ffbae7cc204194477889a2eafeb, type: 3}
     isIsometric: 0
-  citiesCoreHorizontalDecor:
-  - daySprite: {fileID: -1134114314932274614, guid: 43e36440c32f1224aac83ae63fd12828, type: 3}
-    nightSprite: {fileID: -1134114314932274614, guid: 43e36440c32f1224aac83ae63fd12828, type: 3}
-    isIsometric: 1
-  - daySprite: {fileID: 3836954968553550457, guid: ae053028a9b345943966734df00c2e47, type: 3}
-    nightSprite: {fileID: 3836954968553550457, guid: ae053028a9b345943966734df00c2e47, type: 3}
+  cityLayers:
+  - name: Towers
+    sprites:
+    - daySprite: {fileID: 3836954968553550457, guid: e51c32a7ffabddb449c981cdf9be4999, type: 3}
+      nightSprite: {fileID: -6994338726130790008, guid: 5134f2d2967a9364093f3101805f8dc4, type: 3}
+      isIsometric: 0
+    - daySprite: {fileID: -8724057895291212338, guid: 172fa4169dfd7ba42b502073209e1c98, type: 3}
+      nightSprite: {fileID: -6649391066276681341, guid: 2d0c2e5046f75a04f92fdaf95cf11c17, type: 3}
+      isIsometric: 0
+    innerRadius: 0
+    outerRadius: 35
+    extendToEdge: 0
+    style: 0
+    scaleRange: {x: 0.6, y: 0.8}
+    fillDensity: 0.974
+    overlapRadius: 0.08
+    gridStep: 18
+    scatterRate: 2
+    avenueSpacing: 40
+    streetSpacing: 32
+    streetWidth: 4
+  - name: Buildings
+    sprites: []
+    innerRadius: 35
+    outerRadius: 85
+    extendToEdge: 0
+    style: 1
+    scaleRange: {x: 0.42, y: 0.58}
+    fillDensity: 0.353
+    overlapRadius: 0.14
+    gridStep: 22
+    scatterRate: 2
+    avenueSpacing: 40
+    streetSpacing: 32
+    streetWidth: 3
+  - name: Neighbourhoods
+    sprites:
+    - daySprite: {fileID: -162143036952510801, guid: 61182c49e0ca64f498e3a2627c27e1d9, type: 3}
+      nightSprite: {fileID: -1196331990105273991, guid: 38bc3993a1b5224448abedc680f4ea00, type: 3}
+      isIsometric: 0
+    - daySprite: {fileID: -4210603279101473682, guid: 98b5ae1ea81e77a43b711fdece38dd70, type: 3}
+      nightSprite: {fileID: 8271517214827844764, guid: 695a7dc00b67d724daa23ac3a209f571, type: 3}
+      isIsometric: 0
+    - daySprite: {fileID: -3247281926301279507, guid: b59f27e49117a724393aca9dbafcd4e2, type: 3}
+      nightSprite: {fileID: 1253435754805484298, guid: 007c85270d3d7b54e8506e36f14e2e75, type: 3}
+      isIsometric: 0
+    - daySprite: {fileID: -4929393556848980926, guid: 09f1bce130467aa449b7df324ce034f7, type: 3}
+      nightSprite: {fileID: 4814867594135456435, guid: cd2d85359aec38d499ba07d4048e058c, type: 3}
+      isIsometric: 0
+    - daySprite: {fileID: 509731017257147023, guid: 478b676450d437c4daaa90429010afc9, type: 3}
+      nightSprite: {fileID: 585157808258550367, guid: db90cc79dc496754588a5511e24a76d1, type: 3}
+      isIsometric: 0
+    - daySprite: {fileID: -7509758384081943007, guid: 3aa6f1b7586510244b8e5444d9b3ad42, type: 3}
+      nightSprite: {fileID: 7572380781886416335, guid: 5482e4fc238ac9f4097b807c05957efe, type: 3}
+      isIsometric: 0
+    - daySprite: {fileID: 2179392925417448396, guid: 98e1ae39f52bfc24a9678dc6b7cb40fe, type: 3}
+      nightSprite: {fileID: 165367554869356033, guid: b3398575fa807084d93d1e196e6a9cdb, type: 3}
+      isIsometric: 0
+    innerRadius: 0
+    outerRadius: 200
+    extendToEdge: 0
+    style: 2
+    scaleRange: {x: 0.28, y: 0.42}
+    fillDensity: 0.808
+    overlapRadius: 0.02
+    gridStep: 18
+    scatterRate: 20
+    avenueSpacing: 40
+    streetSpacing: 32
+    streetWidth: 3
+  specialCityBuildings:
+  - daySprite: {fileID: 2852610726315664299, guid: 4af866424beb67940b45830745a3d36d, type: 3}
+    nightSprite: {fileID: 2852610726315664299, guid: 4af866424beb67940b45830745a3d36d, type: 3}
+    count: 2
+    targetLayer: 2
+    connectToRoad: 0
+    clearingRadius: 7
     isIsometric: 0
-  citiesCoreVerticalDecor: []
-  citiesMidDecor: []
-  citiesOuterDecor: []
-  specialCityBuildings: []
+    isAnimated: 0
+    animationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: 2676571860423960204, guid: 179899511f03a7c4692dabbefebe12ca, type: 3}
+    nightSprite: {fileID: -4196679815551074920, guid: e2d9fa2f8613c3443b75fce6dadd1407, type: 3}
+    count: 1
+    targetLayer: 2
+    connectToRoad: 0
+    clearingRadius: 10
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: 2438099224679155946, guid: 7f1569610cb3b964b88b93d57eb70cbf, type: 3}
+    nightSprite: {fileID: 6779686078698273997, guid: 06b6c2cc64ddef249871862d1e89591a, type: 3}
+    count: 1
+    targetLayer: 2
+    connectToRoad: 0
+    clearingRadius: 7
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: -3557551177002195219, guid: f38636805862b3d44bd7d7e1a517ff56, type: 3}
+    nightSprite: {fileID: 8733793132580911023, guid: 73ce8b15e30212e4cbc9393126451d69, type: 3}
+    count: 1
+    targetLayer: 2
+    connectToRoad: 0
+    clearingRadius: 15
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: 6714369015438526544, guid: 3185cc26d5e5062419b9ee88e41d0142, type: 3}
+    nightSprite: {fileID: 8485694361672479864, guid: 7efde82e0610ecb419b580f54090a32a, type: 3}
+    count: 1
+    targetLayer: 2
+    connectToRoad: 0
+    clearingRadius: 7
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: -4824855099758618034, guid: bfd4319668320234f8f020fed7480101, type: 3}
+    nightSprite: {fileID: -4449192986817710374, guid: 9d597daa68949dc4ba5826c24b8cf759, type: 3}
+    count: 1
+    targetLayer: 2
+    connectToRoad: 0
+    clearingRadius: 7
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    frameRate: 0

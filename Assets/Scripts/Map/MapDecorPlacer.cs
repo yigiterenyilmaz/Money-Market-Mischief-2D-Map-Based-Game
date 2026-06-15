@@ -57,43 +57,32 @@ public class MapDecorPlacer : MonoBehaviour
     [Tooltip("Belediye etrafında bina olmayacak alan (tile).")]
     [Range(2, 30)] public int cityHallClearingRadius = 8;
 
-    [Header("City Zones — Belediyeden Tile Uzaklığı")]
-    [Tooltip("0..coreRadius arası = core (en yoğun).")]
-    [Range(5, 60)] public int coreRadius = 25;
-    [Tooltip("coreRadius..midRadius arası = mid. Ötesi = outer.")]
-    [Range(10, 120)] public int midRadius = 55;
+    [Header("Isometric Depth — Arkaya Yığılma")]
+    [Tooltip("Yarı-izometrik derinlik. Bir bina başka bir binanın ARKASINDA (yukarıda, +Y) " +
+             "üretiliyorsa o bina tarafından kısmen örtülür; aralık bu oranla çarpılarak " +
+             "daha sıkı paketlenmesine izin verilir. 1 = normal/simetrik aralık (etki yok), " +
+             "0.5 = tam arkadaki binalar yarı mesafede. Düşük değer = daha yoğun, daha az düz görünüm.")]
+    [Range(0.3f, 1f)] public float behindClearanceFactor = 0.6f;
 
-    [Header("Zone Densities")]
-    [Tooltip("Core grid adımı (pixel). Küçük = daha sık.")]
-    [Range(2, 20)] public int coreDensityStep = 4;
-    [Tooltip("Mid grid adımı (pixel).")]
-    [Range(3, 30)] public int midDensityStep = 7;
-    [Tooltip("Outer bölge spawn oranı (attempt sayısı çarpanı).")]
-    [Range(0, 16)] public int outerSpawnRate = 1;
+    [Header("Special Building Spawn Scaling")]
+    [Tooltip("Şehir bu kadar (ya da daha fazla) şehir tile'ı içeriyorsa 'büyük şehir' sayılır → " +
+             "özel binalar tam 'count' kadar üretilir. Daha küçük şehirlerde üretilecek sayı, şehir " +
+             "boyutuyla orantılı olarak 0..count arasında rastgele seçilir; yani count=1 olan binalar " +
+             "küçük şehirlerde her zaman çıkmaz. Doğru eşiği bulmak için üretim sırasındaki " +
+             "'allCityTiles=' log değerine bakın.")]
+    public int specialBigCityTileCount = 3000;
 
-    [Header("Zone Scale Ranges")]
-    [Tooltip("Core bölge sprite scale aralığı (büyük).")]
-    public Vector2 coreSpriteScaleRange  = new Vector2(0.55f, 0.75f);
-    [Tooltip("Mid bölge sprite scale aralığı.")]
-    public Vector2 midSpriteScaleRange   = new Vector2(0.40f, 0.55f);
-    [Tooltip("Outer bölge sprite scale aralığı (küçük).")]
-    public Vector2 outerSpriteScaleRange = new Vector2(0.25f, 0.40f);
-
-    [Header("Overlap")]
-    [Tooltip("Core/Mid için sıkı overlap yarıçapı. Küçük = daha sık.")]
-    [Range(0.01f, 0.5f)] public float denseOverlapRadius = 0.04f;
-    [Tooltip("Outer sparse bölge için overlap yarıçapı.")]
-    [Range(0.05f, 2f)]   public float overlapRadius      = 0.3f;
-
-    [Header("Manhattan Grid — Sadece Core Bölge")]
-    [Tooltip("Avenue (uzun cadde) aralığı, tile cinsinden. Avenue'lar dikey N-S çizgileridir. Bina sprite çapından (~38 tile) en az iki kat büyük olmalı.")]
-    [Range(4, 150)] public int avenueSpacing = 60;
-    [Tooltip("Street (kısa sokak) aralığı, tile cinsinden. Street'ler yatay E-W çizgileridir.")]
-    [Range(2, 100)] public int streetSpacing = 35;
-    [Tooltip("Sokak şeritinin tile genişliği. Bu kadar tile sokak olarak boş bırakılır. Bina sprite'ları büyük olduğundan görünür sokak için yüksek değer (15-30) gerekebilir.")]
-    [Range(0, 60)] public int manhattanStreetWidth = 1;
-    [Tooltip("Core bölge bina yoğunluğu. 1.0 = tıka basa dolu, 0.5 = yarısı boş kalır, 0.3 = oldukça seyrek.")]
-    [Range(0.1f, 1.0f)] public float coreFillDensity = 1.0f;
+    [Header("City Edge Thinning — Kenara Doğru Seyrelme")]
+    [Tooltip("Şehir, belediyeden uzaklaştıkça (dış katmanlara doğru) seyrekleşir. 0 = seyrelme yok " +
+             "(her yer eşit yoğun), 1 = şehrin en dış kenarında yoğunluk 0'a iner. İç katmanlar " +
+             "(tower'lar) merkeze yakın olduğu için neredeyse hiç etkilenmez; dış katmanlar (mahalleler) " +
+             "kenara doğru belirgin şekilde seyrelir.")]
+    [Range(0f, 1f)] public float edgeThinning = 0.5f;
+    [Tooltip("Şehir bölgesi (biome 2) KENARINA doğru seyrelmenin yayıldığı mesafe (tile). " +
+             "Binalar bölge sınırına bu kadar tile kala seyrelmeye başlar; daha içeride yoğun kalır. " +
+             "0 = bölge kenarına göre seyrelme yok (yalnızca belediyeye uzaklık bazlı seyrelme). " +
+             "Mahalle outerRadius'u büyük olduğunda asıl kenar bu olduğundan etkili olan budur.")]
+    [Range(0, 120)] public int edgeThinningBorderTiles = 30;
 
     [Header("Broken Building Sprites")]
     [Tooltip("Sprites randomly picked when a city building is cracked by an earthquake.")]
@@ -104,6 +93,16 @@ public class MapDecorPlacer : MonoBehaviour
     [Header("Day / Night Building Sprites")]
     [Tooltip("Night variants of broken building sprites. Index-matched to brokenBuildingSprites.")]
     public List<Sprite> brokenBuildingSpritesNight = new List<Sprite>();
+
+    [Header("DEBUG — Day/Night Overlap Test")]
+    [Tooltip("TEST ONLY: ignore the day/night cycle and show BOTH the day and night sprite " +
+             "at the same time, each at debugOverlayAlpha. Use this to visually verify whether a " +
+             "night variant is actually the same shape/dimensions as its day variant — if their " +
+             "silhouettes don't line up here, the SPRITES differ (not the placement). " +
+             "Turn off for normal play.")]
+    public bool debugOverlayDayNight = false;
+    [Tooltip("Alpha used for each sprite while debugOverlayDayNight is on. 0.5 = both half-visible.")]
+    [Range(0f, 1f)] public float debugOverlayAlpha = 0.5f;
 
     // =========================================================================
     // PORT SETTINGS
@@ -233,6 +232,13 @@ public class MapDecorPlacer : MonoBehaviour
     private float        cachedHalfW;
     private float        cachedHalfH;
 
+    // Kenar seyrelmesi için: belediye tile'ı ve şehrin belediyeden en uzak tile mesafesi (tile).
+    private Vector2Int cityHallTileCached = new Vector2Int(-1, -1);
+    private float      cityRadiusTiles;
+    // Her şehir tile'ının biome-2 bölge KENARINA tile cinsinden uzaklığı (BFS ile).
+    // Bölge dışı / harita dışı = 0; kenara bitişik şehir tile'ı = 1; içeri doğru artar.
+    private int[,]     cityEdgeDist;
+
     // Downsampled water navigation grid for pathfinding
     private bool[,] navGrid;       // true = navigable water
     private int[,]  navLandDist;   // per-cell minimum land distance (for cost biasing)
@@ -296,6 +302,8 @@ public class MapDecorPlacer : MonoBehaviour
             }
         }
 
+        Debug.Log($"MapDecorPlacer: allCityTiles={allCityTiles.Count} (biome 2, sis/kıyı/yol filtreleri sonrası).");
+
         // 1) Belediye binasını yerleştir ve 3 yol çek
         Vector2Int cityHallTile = FindCityHallTile(allCityTiles);
         if (cityHallTile.x >= 0)
@@ -304,19 +312,56 @@ public class MapDecorPlacer : MonoBehaviour
             if (hasRoads)
                 RoadGenerator.Instance.ConnectCityHallToRoads(map, cityHallTile);
         }
+        else
+        {
+            Debug.LogWarning($"MapDecorPlacer: belediye binası için uygun şehir tile'ı bulunamadı " +
+                             $"(allCityTiles={allCityTiles.Count}). Biome 2 (şehir) alanı yok ya da " +
+                             $"tümü sis/kıyı/yol filtrelerine takıldı.");
+        }
 
-        // 2) Tile'ları zone'lara ayır (clearing zone dışındakiler)
-        var coreHorizontalPool = new List<Vector2Int>();
-        var coreVerticalPool   = new List<Vector2Int>();
-        var midPool            = new List<Vector2Int>();
-        var outerPool          = new List<Vector2Int>();
-        ClassifyZones(allCityTiles, cityHallTile,
-                      coreHorizontalPool, coreVerticalPool, midPool, outerPool);
+        // Kenar seyrelmesi için şehrin belediyeden en uzak tile mesafesini ölç (tile).
+        cityHallTileCached = cityHallTile;
+        cityRadiusTiles    = 0f;
+        if (cityHallTile.x >= 0)
+            for (int i = 0; i < allCityTiles.Count; i++)
+            {
+                float d = Vector2Int.Distance(allCityTiles[i], cityHallTile);
+                if (d > cityRadiusTiles) cityRadiusTiles = d;
+            }
 
-        // Özel binalar için 2 core dilimini birleştir
-        var corePool = new List<Vector2Int>(coreHorizontalPool.Count + coreVerticalPool.Count);
-        corePool.AddRange(coreHorizontalPool);
-        corePool.AddRange(coreVerticalPool);
+        // Şehir bölgesi (biome 2) kenarına uzaklık alanını kur — kenara doğru seyrelme için.
+        BuildCityEdgeDistance(map);
+
+        // --- TEŞHİS: kenar seyrelmesi değerleri canlı mı? (sorun çözülünce kaldırılabilir) ---
+        {
+            int maxEdgeDist = 0;
+            if (cityEdgeDist != null)
+                for (int x = 0; x < map.width; x++)
+                for (int y = 0; y < map.height; y++)
+                    if (cityEdgeDist[x, y] > maxEdgeDist && cityEdgeDist[x, y] != int.MaxValue)
+                        maxEdgeDist = cityEdgeDist[x, y];
+
+            float fHall = (cityHallTile.x >= 0) ? EdgeThinFactor(cityHallTile.x, cityHallTile.y) : -1f;
+            // En uzak (kenar) tile'da faktör
+            float fEdge = -1f;
+            if (allCityTiles.Count > 0 && cityHallTile.x >= 0)
+            {
+                Vector2Int far = allCityTiles[0]; float fd = -1f;
+                for (int i = 0; i < allCityTiles.Count; i++)
+                {
+                    float d = Vector2Int.Distance(allCityTiles[i], cityHallTile);
+                    if (d > fd) { fd = d; far = allCityTiles[i]; }
+                }
+                fEdge = EdgeThinFactor(far.x, far.y);
+            }
+            Debug.Log($"[EdgeThinning] edgeThinning={edgeThinning}, borderTiles={edgeThinningBorderTiles}, " +
+                      $"cityRadiusTiles={cityRadiusTiles:F0}, maxEdgeDist={maxEdgeDist}, " +
+                      $"EdgeThinFactor@hall={fHall:F2}, EdgeThinFactor@farEdge={fEdge:F2} " +
+                      $"→ spacing@hall={RadialSpacingMultiplier(cityHallTile.x, cityHallTile.y):F2}x");
+        }
+
+        // 2) Tile'ları katmanlara ayır (clearing zone dışındakiler)
+        var layerPools = ClassifyLayers(allCityTiles, cityHallTile, settings.cityLayers);
 
         // 3) Port'ları yerleştir ve yola bağla — bina yerleşimi yeni port yollarini gormeli
         PlacePorts(map, halfW, halfH);
@@ -326,23 +371,12 @@ public class MapDecorPlacer : MonoBehaviour
                 RoadGenerator.Instance.ConnectPortToRoad(map, new Vector2Int(port.tileX, port.tileY));
         }
 
-        // 4) Özel binaları yerleştir
-        PlaceSpecialCityBuildings(map, settings, corePool, midPool, outerPool, halfW, halfH);
+        // 4) Özel binaları yerleştir (sayı şehir boyutuna göre ölçeklenir)
+        PlaceSpecialCityBuildings(map, settings, layerPools, allCityTiles.Count, halfW, halfH);
 
-        // 5) Core bölge — Manhattan ızgarası (avenue + street şeritleri boş, bloklar dolu)
-        FillCoreManhattan(map, settings, cityHallTile, corePool, halfW, halfH);
-
-        // 6) Mid bölge — grid tarama, orta yoğunluk
-        FillZoneGrid(map, settings.citiesMidDecor, midPool, midDensityStep, midSpriteScaleRange, halfW, halfH);
-
-        // 7) Outer bölge — seyrek random
-        int sparseAttempts = (outerPool.Count / Mathf.Max(1, cellArea)) * outerSpawnRate;
-        for (int attempt = 0; attempt < sparseAttempts; attempt++)
-        {
-            if (outerPool.Count == 0) break;
-            Vector2Int tile = outerPool[Random.Range(0, outerPool.Count)];
-            TryPlaceOuterBuilding(map, settings, tile.x, tile.y, halfW, halfH);
-        }
+        // 5) Katmanları sırayla doldur (iç→dış)
+        for (int i = 0; i < settings.cityLayers.Count; i++)
+            FillLayer(map, settings, settings.cityLayers[i], cityHallTile, layerPools[i], halfW, halfH);
 
         foreach (var kvp in biomeTilePools)
         {
@@ -399,7 +433,14 @@ public class MapDecorPlacer : MonoBehaviour
         // Crossfade buildings + ports
         if (cityBuildings.Count > 0 || ports.Count > 0)
         {
-            if (Mathf.Abs(ratio - prevRatio) > 0.005f)
+            // DEBUG overlap test: show both sprites every frame, bypassing the ratio gate
+            // (otherwise a stable ratio would skip re-applying after the toggle is flipped).
+            if (debugOverlayDayNight)
+            {
+                prevRatio = -1f; // force a normal re-apply once debug is turned back off
+                ApplyCrossfade(ratio);
+            }
+            else if (Mathf.Abs(ratio - prevRatio) > 0.005f)
             {
                 prevRatio = ratio;
                 ApplyCrossfade(ratio);
@@ -420,10 +461,22 @@ public class MapDecorPlacer : MonoBehaviour
 
     void ApplyCrossfade(float ratio)
     {
-        // Gunduz sprite her zaman tam opak — altta, silueti doldurur.
-        // Gece sprite ustte, ratio ile fade in/out olur. Boylece gecis sirasinda
-        // arka plan asla sizmaz, sadece gunduz ve gece arasinda blend yapilir.
-        float nightAlphaMultiplier = ratio;
+        // Gerçek crossfade: gündüz sprite gece sprite'ı solarken SOLAR (eskiden hep tam
+        // opak kalıyordu → gece sprite'ının altında görünüp, hizasızlıkta hayalet/blur
+        // yapıyordu). Sabit-güç (sqrt) eğrisi: geçiş boyunca toplam kapama yüksek kalır
+        // (zemin sızmaz) ama uçlarda yalnızca tek sprite görünür → gece gündüz silueti
+        // tamamen kaybolur. Gece sprite YOKSA gündüz tam opak kalır (bina gece kaybolmasın).
+        float nightFactor = Mathf.Sqrt(Mathf.Clamp01(ratio));
+        float dayFadeFactor = Mathf.Sqrt(Mathf.Clamp01(1f - ratio));
+
+        // DEBUG overlap test: force BOTH sprites visible at a fixed alpha so day/night
+        // silhouettes can be compared directly. If they don't line up here, the variant
+        // sprites differ in shape/size — placement is already identical.
+        if (debugOverlayDayNight)
+        {
+            nightFactor   = debugOverlayAlpha;
+            dayFadeFactor = debugOverlayAlpha;
+        }
 
         // Buildings
         for (int i = 0; i < cityBuildings.Count; i++)
@@ -431,16 +484,17 @@ public class MapDecorPlacer : MonoBehaviour
             BuildingData bd = cityBuildings[i];
             if (bd.dayRenderer == null) continue;
 
-            float baseA = bd.baseAlpha;
+            float baseA    = bd.baseAlpha;
+            bool  hasNight = bd.nightRenderer != null;
 
             crossfadeTemp   = bd.dayRenderer.color;
-            crossfadeTemp.a = baseA;
+            crossfadeTemp.a = hasNight ? baseA * dayFadeFactor : baseA;
             bd.dayRenderer.color = crossfadeTemp;
 
-            if (bd.nightRenderer != null)
+            if (hasNight)
             {
                 crossfadeTemp   = bd.nightRenderer.color;
-                crossfadeTemp.a = baseA * nightAlphaMultiplier;
+                crossfadeTemp.a = baseA * nightFactor;
                 bd.nightRenderer.color = crossfadeTemp;
             }
         }
@@ -451,16 +505,17 @@ public class MapDecorPlacer : MonoBehaviour
             PortData pd = ports[i];
             if (pd.dayRenderer == null) continue;
 
-            float baseA = pd.baseAlpha;
+            float baseA    = pd.baseAlpha;
+            bool  hasNight = pd.nightRenderer != null;
 
             crossfadeTemp   = pd.dayRenderer.color;
-            crossfadeTemp.a = baseA;
+            crossfadeTemp.a = hasNight ? baseA * dayFadeFactor : baseA;
             pd.dayRenderer.color = crossfadeTemp;
 
-            if (pd.nightRenderer != null)
+            if (hasNight)
             {
                 crossfadeTemp   = pd.nightRenderer.color;
-                crossfadeTemp.a = baseA * nightAlphaMultiplier;
+                crossfadeTemp.a = baseA * nightFactor;
                 pd.nightRenderer.color = crossfadeTemp;
             }
         }
@@ -471,16 +526,17 @@ public class MapDecorPlacer : MonoBehaviour
             ShipInstance ship = activeShips[i];
             if (ship.dayRenderer == null) continue;
 
-            float baseA = ship.baseAlpha;
+            float baseA    = ship.baseAlpha;
+            bool  hasNight = ship.nightRenderer != null;
 
             crossfadeTemp   = ship.dayRenderer.color;
-            crossfadeTemp.a = baseA;
+            crossfadeTemp.a = hasNight ? baseA * dayFadeFactor : baseA;
             ship.dayRenderer.color = crossfadeTemp;
 
-            if (ship.nightRenderer != null)
+            if (hasNight)
             {
                 crossfadeTemp   = ship.nightRenderer.color;
-                crossfadeTemp.a = baseA * nightAlphaMultiplier;
+                crossfadeTemp.a = baseA * nightFactor;
                 ship.nightRenderer.color = crossfadeTemp;
             }
         }
@@ -819,7 +875,11 @@ public class MapDecorPlacer : MonoBehaviour
                           Vector2Int tile, float halfW, float halfH)
     {
         Sprite daySprite = settings.cityHallEntry.daySprite;
-        if (daySprite == null) return;
+        if (daySprite == null)
+        {
+            Debug.LogWarning("MapDecorPlacer: cityHallEntry.daySprite atanmamış — belediye binası çizilemez.");
+            return;
+        }
 
         float wx = transform.position.x + (tile.x / pixelsPerUnit) - halfW;
         float wy = transform.position.y + (tile.y / pixelsPerUnit) - halfH;
@@ -857,76 +917,69 @@ public class MapDecorPlacer : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // ZONE CLASSIFICATION — Belediyeden uzaklığa göre tile'ları ayır
+    // LAYER CLASSIFICATION — Belediyeden uzaklığa göre tile'ları katmanlara ayır
     // -------------------------------------------------------------------------
 
-    void ClassifyZones(List<Vector2Int> allTiles, Vector2Int hallTile,
-                       List<Vector2Int> coreHorizontalOut, List<Vector2Int> coreVerticalOut,
-                       List<Vector2Int> midOut, List<Vector2Int> outerOut)
+    List<List<Vector2Int>> ClassifyLayers(List<Vector2Int> allTiles, Vector2Int hallTile,
+                                          List<CityLayer> layers)
     {
-        float clearWorldTile = cityHallClearingRadius; // tile cinsinden
+        var result = new List<List<Vector2Int>>(layers.Count);
+        for (int i = 0; i < layers.Count; i++)
+            result.Add(new List<Vector2Int>());
 
-        for (int i = 0; i < allTiles.Count; i++)
+        if (layers.Count == 0) return result;
+
+        float clearRadius = cityHallClearingRadius;
+
+        // Katmanlar ÖZEL DEĞİL — iç içe geçer ve blend olur. Her tile, kendi
+        // [innerRadius, outerRadius) aralığına giren HER katmanın havuzuna eklenir.
+        // Böylece innerRadius=0 olan bir katman (ör. Neighbourhoods) merkeze kadar
+        // tile alır; başka bir katman (Towers/Buildings) aynı bölgeyi kapsasa bile.
+        // Fiziksel çakışma FillLayer içindeki IsDenseOverlapping ile zaten engellenir.
+        for (int t = 0; t < allTiles.Count; t++)
         {
-            Vector2Int t = allTiles[i];
-            float dist = Vector2Int.Distance(t, hallTile);
+            Vector2Int tile = allTiles[t];
+            float dist = Vector2Int.Distance(tile, hallTile);
 
-            // Clearing zone içindeyse hiçbir zone'a ekleme
-            if (hallTile.x >= 0 && dist <= clearWorldTile) continue;
+            if (hallTile.x >= 0 && dist <= clearRadius) continue;
 
-            if (dist <= coreRadius)
+            for (int i = 0; i < layers.Count; i++)
             {
-                // X şeklinde çapraz bölme: |dx| vs |dy|
-                int dx = t.x - hallTile.x;
-                int dy = t.y - hallTile.y;
-                if (Mathf.Abs(dx) >= Mathf.Abs(dy))
-                    coreHorizontalOut.Add(t); // doğu veya batı dilimi
-                else
-                    coreVerticalOut.Add(t);   // kuzey veya güney dilimi
+                CityLayer layer = layers[i];
+
+                // extendToEdge (catch-all): outerRadius <= 0 ise kenara kadar uzanır;
+                // outerRadius > 0 ise o yarıçapla kesilir (şehir adaya yayılmaz).
+                float outer = (layer.extendToEdge && layer.outerRadius <= 0f)
+                    ? float.MaxValue
+                    : layer.outerRadius;
+
+                if (dist >= layer.innerRadius && dist < outer)
+                    result[i].Add(tile);
             }
-            else if (dist <= midRadius)
-                midOut.Add(t);
-            else
-                outerOut.Add(t);
         }
 
-        Debug.Log($"MapDecorPlacer: city zones — coreH={coreHorizontalOut.Count}, coreV={coreVerticalOut.Count}, " +
-                  $"mid={midOut.Count}, outer={outerOut.Count}");
+        for (int i = 0; i < layers.Count; i++)
+            Debug.Log($"MapDecorPlacer: katman[{i}] '{layers[i].name}' — {result[i].Count} tile");
+
+        return result;
     }
 
     // -------------------------------------------------------------------------
-    // ZONE GRID FILL — Core ve Mid bölge doldurma
+    // GRID LAYER FILL — Jittered grid doldurma (Grid stili)
     // -------------------------------------------------------------------------
 
-    void FillZoneGrid(MapGenerator map, List<CityBuildingEntry> decor,
-                      List<Vector2Int> pool, int step, Vector2 scaleRange,
-                      float halfW, float halfH)
+    void FillLayerGrid(MapGenerator map, CityLayer layer, List<Vector2Int> pool,
+                       float halfW, float halfH)
     {
-        FillZoneGrid(map, decor, null, null, 0f, pool, step, scaleRange, halfW, halfH);
-    }
-
-    /// <summary>
-    /// Core şerit doldurma. Kendi şeridinin listesi (primary) ağırlıklı,
-    /// yabancı iki şeridin listeleri (foreign1, foreign2) leakWeight oranında sızar.
-    /// leakWeight=0 ise sadece primary kullanılır.
-    /// </summary>
-    void FillZoneGrid(MapGenerator map,
-                      List<CityBuildingEntry> primary,
-                      List<CityBuildingEntry> foreign1,
-                      List<CityBuildingEntry> foreign2,
-                      float leakWeight,
-                      List<Vector2Int> pool, int step, Vector2 scaleRange,
-                      float halfW, float halfH)
-    {
-        bool hasPrimary = primary != null && primary.Count > 0;
-        bool hasForeign1 = foreign1 != null && foreign1.Count > 0;
-        bool hasForeign2 = foreign2 != null && foreign2.Count > 0;
-        if (!hasPrimary && !hasForeign1 && !hasForeign2) return;
+        if (layer.sprites == null || layer.sprites.Count == 0) return;
         if (pool.Count == 0) return;
 
+        int step = Mathf.Max(1, layer.gridStep);
+        // Güvenlik ağı: inspector "+" ile sıfırlanmış katmanlar görünmez/boş kalmasın
+        Vector2 sr   = layer.scaleRange == Vector2.zero ? new Vector2(0.5f, 0.7f) : layer.scaleRange;
+        float density = layer.fillDensity > 0f ? layer.fillDensity : 1f;
         var poolSet = new HashSet<Vector2Int>(pool);
 
-        // Bölge sınırları
         int minX = int.MaxValue, minY = int.MaxValue;
         int maxX = int.MinValue, maxY = int.MinValue;
         for (int i = 0; i < pool.Count; i++)
@@ -940,18 +993,25 @@ public class MapDecorPlacer : MonoBehaviour
 
         int placed = 0;
         int jitter  = Mathf.Max(1, step / 2);
+        int[] spriteCounts = new int[layer.sprites.Count];
 
+        // Grid hücrelerini topla ve karıştır — sütun düzeni süpürmesinden doğan hizalama
+        // yanlılığını kır (ızgara aralığı 'step'ten geldiği için yapı korunur).
+        var cells = new List<Vector2Int>();
         for (int gx = minX; gx <= maxX; gx += step)
         for (int gy = minY; gy <= maxY; gy += step)
+            cells.Add(new Vector2Int(gx, gy));
+        ShuffleInPlace(cells);
+
+        for (int c = 0; c < cells.Count; c++)
         {
+            int gx = cells[c].x, gy = cells[c].y;
             int jx = gx + Random.Range(-jitter, jitter + 1);
             int jy = gy + Random.Range(-jitter, jitter + 1);
 
-            // Kaydırılmış nokta pool'da mı?
             bool inPool = poolSet.Contains(new Vector2Int(jx, jy));
             if (!inPool)
             {
-                // Yakın komşu dene
                 int half = Mathf.Max(1, step / 2);
                 for (int dx = -half; dx <= half && !inPool; dx += half)
                 for (int dy = -half; dy <= half && !inPool; dy += half)
@@ -962,37 +1022,20 @@ public class MapDecorPlacer : MonoBehaviour
             }
             if (!inPool) continue;
 
+            float effDensity = density * RadialDensityMultiplier(jx, jy);
+            if (Random.value > effDensity) continue;
+
             if (!map.IsLand(jx, jy)) continue;
             if (map.GetBiome(jx, jy) != 2) continue;
             if (cityShoreBuffer > 0 && !HasShoreBuffer(map, jx, jy)) continue;
 
-            // Leak weight ile şerit listesi seç: primary ağırlıklı, foreign'lar leakWeight kadar sızar
-            List<CityBuildingEntry> chosenList;
-            if (leakWeight > 0f && (hasForeign1 || hasForeign2))
-            {
-                float r = Random.value;
-                float w1 = hasForeign1 ? leakWeight : 0f;
-                float w2 = hasForeign2 ? leakWeight : 0f;
-                if (hasForeign1 && r < w1)
-                    chosenList = foreign1;
-                else if (hasForeign2 && r < w1 + w2)
-                    chosenList = foreign2;
-                else
-                    chosenList = hasPrimary ? primary : (hasForeign1 ? foreign1 : foreign2);
-            }
-            else
-            {
-                chosenList = hasPrimary ? primary : (hasForeign1 ? foreign1 : foreign2);
-            }
-
-            int spriteIdx = Random.Range(0, chosenList.Count);
-            var entry = chosenList[spriteIdx];
+            int spriteIdx = PickBalancedSpriteIndex(spriteCounts);
+            var entry = layer.sprites[spriteIdx];
             Sprite daySprite = entry.daySprite;
             if (daySprite == null) continue;
 
-            float scale = Random.Range(scaleRange.x, scaleRange.y);
+            float scale = Random.Range(sr.x, sr.y);
 
-            // Yol kontrolu — sprite yola degmiyorsa olduğu yerde, deginiyorsa kaydirip dene
             if (!TryFindRoadFreePosition(jx, jy, daySprite, scale, 8, cityMinRoadDistance, out int newJx, out int newJy))
                 continue;
             if (newJx != jx || newJy != jy)
@@ -1003,12 +1046,13 @@ public class MapDecorPlacer : MonoBehaviour
             }
             jx = newJx; jy = newJy;
 
-            float spriteRadius = (daySprite.rect.width / daySprite.pixelsPerUnit) * scale * 0.45f;
+            float effRadius = ComputeBuildingRadius(daySprite, scale, layer.overlapRadius)
+                              * RadialSpacingMultiplier(jx, jy);
             float wx = transform.position.x + (jx / pixelsPerUnit) - halfW;
             float wy = transform.position.y + (jy / pixelsPerUnit) - halfH;
 
-            if (IsDenseOverlapping(wx, wy, spriteRadius)) continue;
-            denseOccupied.Add(new Vector3(wx, wy, spriteRadius));
+            if (IsDenseOverlapping(wx, wy, effRadius)) continue;
+            denseOccupied.Add(new Vector3(wx, wy, effRadius));
 
             float baseA   = 1f;
             int sortOrder = 10 + (int)(wy * -100f);
@@ -1031,54 +1075,46 @@ public class MapDecorPlacer : MonoBehaviour
                 brokenIndex   = -1,
                 baseAlpha     = baseA,
             });
+            spriteCounts[spriteIdx]++;
             placed++;
         }
 
-        Debug.Log($"MapDecorPlacer: zone fill step={step}, placed={placed}");
+        Debug.Log($"MapDecorPlacer: grid layer '{layer.name}' step={step}, placed={placed}");
     }
 
     // -------------------------------------------------------------------------
-    // CORE MANHATTAN — Belediye'den referansla ortogonal cadde/sokak ızgarası
+    // MANHATTAN LAYER FILL — Belediye'den referansla ortogonal cadde/sokak ızgarası
     // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Core bölge için Manhattan tarzı yerleşim. Belediye binası tile'ından başlayan
-    /// dikey avenue ve yatay street çizgileri "sokak" olarak boş bırakılır; aralarda
-    /// kalan blok tile'ları core sprite havuzu ile doldurulur. Mid/outer'a dokunmaz.
-    /// </summary>
-    void FillCoreManhattan(MapGenerator map, BiomePaintSettings settings,
-                           Vector2Int hallTile, List<Vector2Int> corePool,
-                           float halfW, float halfH)
+    void FillLayerManhattan(MapGenerator map, CityLayer layer, Vector2Int hallTile,
+                             List<Vector2Int> pool, float halfW, float halfH)
     {
-        // Belediye yoksa core bölge zaten boştur — hiçbir şey yapma
         if (hallTile.x < 0) return;
-        if (corePool == null || corePool.Count == 0) return;
+        if (layer.sprites == null || layer.sprites.Count == 0) return;
+        if (pool == null || pool.Count == 0) return;
 
-        // Iki core listesini tek havuzda birlestir — tum spriteler esit olasilikla secilsin
-        var combinedPool = new List<CityBuildingEntry>();
-        if (settings.citiesCoreHorizontalDecor != null)
-            combinedPool.AddRange(settings.citiesCoreHorizontalDecor);
-        if (settings.citiesCoreVerticalDecor != null)
-            combinedPool.AddRange(settings.citiesCoreVerticalDecor);
-        if (combinedPool.Count == 0) return;
-
-        // Inspector değerlerini güvenli aralığa çek
-        int avenueGap = Mathf.Max(2, avenueSpacing);
-        int streetGap = Mathf.Max(2, streetSpacing);
-        // Strip width spacing'in yarisindan buyuk olamaz (yoksa hicbir tile gecmez)
+        int avenueGap = Mathf.Max(2, layer.avenueSpacing);
+        int streetGap = Mathf.Max(2, layer.streetSpacing);
         int maxStripWidth = Mathf.Max(0, Mathf.Min(avenueGap, streetGap) / 2 - 1);
-        int stripWidth = Mathf.Clamp(manhattanStreetWidth, 0, maxStripWidth);
+        int stripWidth = Mathf.Clamp(layer.streetWidth, 0, maxStripWidth);
+        // Güvenlik ağı: inspector "+" ile sıfırlanmış katmanlar görünmez/boş kalmasın
+        Vector2 sr   = layer.scaleRange == Vector2.zero ? new Vector2(0.5f, 0.7f) : layer.scaleRange;
+        float density = layer.fillDensity > 0f ? layer.fillDensity : 1f;
 
         int placed = 0;
         int streetSkipped = 0;
+        int[] spriteCounts = new int[layer.sprites.Count];
 
-        for (int i = 0; i < corePool.Count; i++)
+        // Sütun düzeni yanlılığını kır — yerleşimi rastgele sırada dene (sokak ızgarası korunur).
+        var shuffled = new List<Vector2Int>(pool);
+        ShuffleInPlace(shuffled);
+
+        for (int i = 0; i < shuffled.Count; i++)
         {
-            Vector2Int t = corePool[i];
+            Vector2Int t = shuffled[i];
             int tx = t.x, ty = t.y;
 
-            // Manhattan kontrolü: avenue (dikey) veya street (yatay) seridi mi?
-            // stripWidth kadar tile dogrudan skip edilir — sokak olarak bos kalir
+            // Avenue (dikey) veya street (yatay) şeridinde mi? → sokak olarak boş bırak
             int avMod = MathMod(tx - hallTile.x, avenueGap);
             int stMod = MathMod(ty - hallTile.y, streetGap);
             if (avMod < stripWidth || stMod < stripWidth)
@@ -1087,23 +1123,20 @@ public class MapDecorPlacer : MonoBehaviour
                 continue;
             }
 
-            // Yogunluk kontrolu — coreFillDensity olasiligindan dusukse atla
-            if (coreFillDensity < 1.0f && Random.value > coreFillDensity) continue;
+            float effDensity = density * RadialDensityMultiplier(tx, ty);
+            if (Random.value > effDensity) continue;
 
-            // Standart yerleştirme filtreleri
             if (!map.IsLand(tx, ty)) continue;
             if (map.GetBiome(tx, ty) != 2) continue;
             if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) continue;
 
-            // Birlestirilmis havuzdan uniform sprite secimi — her sprite esit olasilik
-            int spriteIdx = Random.Range(0, combinedPool.Count);
-            var entry = combinedPool[spriteIdx];
+            int spriteIdx = PickBalancedSpriteIndex(spriteCounts);
+            var entry = layer.sprites[spriteIdx];
             Sprite daySprite = entry.daySprite;
             if (daySprite == null) continue;
 
-            float scale = Random.Range(coreSpriteScaleRange.x, coreSpriteScaleRange.y);
+            float scale = Random.Range(sr.x, sr.y);
 
-            // Yol kontrolu — sprite yola degmiyorsa olduğu yerde, deginiyorsa kaydirip dene
             if (!TryFindRoadFreePosition(tx, ty, daySprite, scale, 8, cityMinRoadDistance, out int newTx, out int newTy))
                 continue;
             if (newTx != tx || newTy != ty)
@@ -1114,12 +1147,13 @@ public class MapDecorPlacer : MonoBehaviour
             }
             tx = newTx; ty = newTy;
 
-            float spriteRadius = (daySprite.rect.width / daySprite.pixelsPerUnit) * scale * 0.45f;
+            float effRadius = ComputeBuildingRadius(daySprite, scale, layer.overlapRadius)
+                              * RadialSpacingMultiplier(tx, ty);
             float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
             float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
 
-            if (IsDenseOverlapping(wx, wy, spriteRadius)) continue;
-            denseOccupied.Add(new Vector3(wx, wy, spriteRadius));
+            if (IsDenseOverlapping(wx, wy, effRadius)) continue;
+            denseOccupied.Add(new Vector3(wx, wy, effRadius));
 
             float baseA   = 1f;
             int sortOrder = 10 + (int)(wy * -100f);
@@ -1142,10 +1176,11 @@ public class MapDecorPlacer : MonoBehaviour
                 brokenIndex   = -1,
                 baseAlpha     = baseA,
             });
+            spriteCounts[spriteIdx]++;
             placed++;
         }
 
-        Debug.Log($"MapDecorPlacer: core Manhattan — placed={placed}, streetSkipped={streetSkipped}, " +
+        Debug.Log($"MapDecorPlacer: manhattan layer '{layer.name}' — placed={placed}, streetSkipped={streetSkipped}, " +
                   $"avenue={avenueGap}, street={streetGap}, stripWidth={stripWidth}");
     }
 
@@ -1156,58 +1191,146 @@ public class MapDecorPlacer : MonoBehaviour
         return r < 0 ? r + m : r;
     }
 
-    // -------------------------------------------------------------------------
-    // OUTER BUILDING — Seyrek dış bölge
-    // -------------------------------------------------------------------------
-
-    void TryPlaceOuterBuilding(MapGenerator map, BiomePaintSettings settings,
-                               int tx, int ty, float halfW, float halfH)
+    // Fisher-Yates karıştırma. Tile havuzu üretim sırasında x-then-y (sütun düzeni) sıralı
+    // geldiği için doldurma da bu yönde "süpürüyor" → binalar düzenli sütun/satır bloklarına
+    // (batch) hizalanıyor. Havuzu karıştırmak yerleşim sırasını rastgeleleştirir; ızgara/sokak
+    // yapısı modulo kontrolünden geldiği için korunur, yalnızca hizalama yanlılığı kalkar.
+    static void ShuffleInPlace<T>(List<T> list)
     {
-        if (settings.citiesOuterDecor == null || settings.citiesOuterDecor.Count == 0) return;
-        if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) return;
-
-        int spriteIdx = Random.Range(0, settings.citiesOuterDecor.Count);
-        var entry = settings.citiesOuterDecor[spriteIdx];
-        Sprite daySprite = entry.daySprite;
-        if (daySprite == null) return;
-
-        float scale    = Random.Range(outerSpriteScaleRange.x, outerSpriteScaleRange.y);
-
-        // Yol kontrolu — sprite yola degmiyorsa olduğu yerde, deginiyorsa kaydirip dene
-        if (!TryFindRoadFreePosition(tx, ty, daySprite, scale, 8, cityMinRoadDistance, out int newTx, out int newTy))
-            return;
-        if (newTx != tx || newTy != ty)
+        for (int i = list.Count - 1; i > 0; i--)
         {
-            if (!map.IsLand(newTx, newTy)) return;
-            if (cityShoreBuffer > 0 && !HasShoreBuffer(map, newTx, newTy)) return;
+            int j = Random.Range(0, i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
         }
-        tx = newTx; ty = newTy;
+    }
 
-        float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
-        float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
-        if (IsOverlapping(wx, wy)) return;
-        occupiedCenters.Add(new Vector2(wx, wy));
-        float baseA    = Random.Range(0.85f, 1f);
-        int sortOrder  = 10 + (int)(wy * -100f);
+    // Sprite varyant seçimini dengele: şu ana kadar EN AZ yerleştirilmiş varyantı seç
+    // (eşitlikte rastgele). Düz Random.Range tüm varyantlara eşit DENEME hakkı verir; ama
+    // büyük sprite'lar daha geniş yarıçap ayırıp overlap/yol kontrolünde daha sık reddedilir
+    // → eşit deneme, eşitsiz YERLEŞİM olur ve küçük sprite baskın çıkar. Yerleşim sayısını
+    // referans alınca zor yerleşen varyant geride kalır, sonraki turda öne çıkar → dengeli dağılım.
+    static int PickBalancedSpriteIndex(int[] placedCounts)
+    {
+        int min = int.MaxValue;
+        for (int i = 0; i < placedCounts.Length; i++)
+            if (placedCounts[i] < min) min = placedCounts[i];
 
-        var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
-            daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder, entry.isIsometric);
+        int ties = 0;
+        for (int i = 0; i < placedCounts.Length; i++)
+            if (placedCounts[i] == min) ties++;
 
-        decorObjects.Add(go);
-        cityBuildings.Add(new BuildingData
+        int pick = Random.Range(0, ties);
+        for (int i = 0; i < placedCounts.Length; i++)
+            if (placedCounts[i] == min && pick-- == 0) return i;
+
+        return 0;
+    }
+
+    // -------------------------------------------------------------------------
+    // SCATTER LAYER FILL — Seyrek dağılım (Scatter stili)
+    // -------------------------------------------------------------------------
+
+    void FillLayerScatter(MapGenerator map, CityLayer layer, List<Vector2Int> pool,
+                           float halfW, float halfH)
+    {
+        if (layer.sprites == null || layer.sprites.Count == 0) return;
+        if (pool == null || pool.Count == 0) return;
+
+        // Yoğunluk: fillDensity ana kontrol (0.1 seyrek … 1 yoğun), scatterRate fazladan
+        // deneme çarpanı (boşlukları doldurur). Eski tamsayı bölmesi küçük havuzlarda 0
+        // deneme üretiyordu — artık deneme sayısı havuz boyutuyla doğru orantılı.
+        Vector2 sr = layer.scaleRange == Vector2.zero ? new Vector2(0.5f, 0.7f) : layer.scaleRange;
+        float density = layer.fillDensity > 0f ? layer.fillDensity : 1f;
+        int rate = Mathf.Clamp(layer.scatterRate, 1, 8);
+        int attempts = Mathf.Max(1, Mathf.RoundToInt(pool.Count * density * rate));
+
+        int placed = 0;
+        int[] spriteCounts = new int[layer.sprites.Count];
+        for (int attempt = 0; attempt < attempts; attempt++)
         {
-            go            = go,
-            dayRenderer   = daySR,
-            nightRenderer = nightSR,
-            shadow        = shadow,
-            tileX         = tx,
-            tileY         = ty,
-            isBroken      = false,
-            isSpecial     = false,
-            spriteIndex   = spriteIdx,
-            brokenIndex   = -1,
-            baseAlpha     = baseA,
-        });
+            Vector2Int t = pool[Random.Range(0, pool.Count)];
+            int tx = t.x, ty = t.y;
+
+            // Kenara doğru seyrelme — dış tile'larda yerleşme olasılığını düşür.
+            if (Random.value > RadialDensityMultiplier(tx, ty)) continue;
+
+            if (!map.IsLand(tx, ty)) continue;
+            if (map.GetBiome(tx, ty) != 2) continue;
+            if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) continue;
+
+            int spriteIdx = PickBalancedSpriteIndex(spriteCounts);
+            var entry = layer.sprites[spriteIdx];
+            Sprite daySprite = entry.daySprite;
+            if (daySprite == null) continue;
+
+            float scale = Random.Range(sr.x, sr.y);
+
+            if (!TryFindRoadFreePosition(tx, ty, daySprite, scale, 8, cityMinRoadDistance, out int newTx, out int newTy))
+                continue;
+            if (newTx != tx || newTy != ty)
+            {
+                if (!map.IsLand(newTx, newTy)) continue;
+                if (cityShoreBuffer > 0 && !HasShoreBuffer(map, newTx, newTy)) continue;
+            }
+            tx = newTx; ty = newTy;
+
+            float effRadius = ComputeBuildingRadius(daySprite, scale, layer.overlapRadius)
+                              * RadialSpacingMultiplier(tx, ty);
+            float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
+            float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
+            if (IsDenseOverlapping(wx, wy, effRadius)) continue;
+            denseOccupied.Add(new Vector3(wx, wy, effRadius));
+
+            float baseA   = 1f; // tüm binalar tam opak
+            int sortOrder = 10 + (int)(wy * -100f);
+
+            var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
+                daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder, entry.isIsometric);
+
+            decorObjects.Add(go);
+            cityBuildings.Add(new BuildingData
+            {
+                go            = go,
+                dayRenderer   = daySR,
+                nightRenderer = nightSR,
+                shadow        = shadow,
+                tileX         = tx,
+                tileY         = ty,
+                isBroken      = false,
+                isSpecial     = false,
+                spriteIndex   = spriteIdx,
+                brokenIndex   = -1,
+                baseAlpha     = baseA,
+            });
+            spriteCounts[spriteIdx]++;
+            placed++;
+        }
+
+        Debug.Log($"MapDecorPlacer: scatter layer '{layer.name}' attempts={attempts}, placed={placed}");
+    }
+
+    // -------------------------------------------------------------------------
+    // FILL LAYER DISPATCHER
+    // -------------------------------------------------------------------------
+
+    void FillLayer(MapGenerator map, BiomePaintSettings settings, CityLayer layer,
+                   Vector2Int hallTile, List<Vector2Int> layerTiles, float halfW, float halfH)
+    {
+        if (layer.sprites == null || layer.sprites.Count == 0) return;
+        if (layerTiles == null || layerTiles.Count == 0) return;
+
+        switch (layer.style)
+        {
+            case CityLayerStyle.ManhattanGrid:
+                FillLayerManhattan(map, layer, hallTile, layerTiles, halfW, halfH);
+                break;
+            case CityLayerStyle.Grid:
+                FillLayerGrid(map, layer, layerTiles, halfW, halfH);
+                break;
+            case CityLayerStyle.Scatter:
+                FillLayerScatter(map, layer, layerTiles, halfW, halfH);
+                break;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -1215,10 +1338,11 @@ public class MapDecorPlacer : MonoBehaviour
     // -------------------------------------------------------------------------
 
     void PlaceSpecialCityBuildings(MapGenerator map, BiomePaintSettings settings,
-                                   List<Vector2Int> corePool, List<Vector2Int> midPool,
-                                   List<Vector2Int> outerPool, float halfW, float halfH)
+                                   List<List<Vector2Int>> layerPools, int cityTileCount,
+                                   float halfW, float halfH)
     {
         if (settings.specialCityBuildings == null) return;
+        if (layerPools == null || layerPools.Count == 0) return;
         bool hasRoads = RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated;
 
         for (int s = 0; s < settings.specialCityBuildings.Count; s++)
@@ -1226,46 +1350,94 @@ public class MapDecorPlacer : MonoBehaviour
             var special = settings.specialCityBuildings[s];
             if (special.daySprite == null || special.count <= 0) continue;
 
-            // Zone'a göre havuz seç
-            List<Vector2Int> pool;
-            switch (special.targetZone)
+            // Şehir boyutuna göre hedef sayı: büyük şehir → tam count, küçük şehir → rastgele.
+            int targetCount = ResolveSpecialCount(special.count, cityTileCount);
+            if (targetCount <= 0)
             {
-                case CityZone.Core:  pool = corePool;  break;
-                case CityZone.Mid:   pool = midPool;   break;
-                default:             pool = outerPool; break;
+                Debug.Log($"MapDecorPlacer: özel bina '{special.daySprite.name}' bu şehirde " +
+                          $"üretilmedi (şehir küçük, cityTiles={cityTileCount}).");
+                continue;
             }
 
+            int layerIdx = Mathf.Clamp(special.targetLayer, 0, layerPools.Count - 1);
+            List<Vector2Int> pool = layerPools[layerIdx];
             if (pool.Count == 0) continue;
+
+            // Outskirts kuralı: özel bina, hedef katmandan daha İÇ katmanların (kule/orta bina)
+            // kapsadığı çekirdeği dışlasın. Mahalle katmanı innerRadius=0 olduğundan havuzu
+            // tüm şehri kaplar; iç katmanların en büyük outerRadius'unu çekirdek sınırı sayıp
+            // yalnızca onun DIŞINDAki tile'lara yerleştiriyoruz → landmark'lar dış halkaya düşer.
+            float coreRadius = 0f;
+            for (int li = 0; li < layerIdx && li < settings.cityLayers.Count; li++)
+                if (settings.cityLayers[li].outerRadius > coreRadius)
+                    coreRadius = settings.cityLayers[li].outerRadius;
+
+            if (coreRadius > 0f && cityHallTileCached.x >= 0)
+            {
+                var outskirts = new List<Vector2Int>(pool.Count);
+                for (int p = 0; p < pool.Count; p++)
+                    if (Vector2Int.Distance(pool[p], cityHallTileCached) >= coreRadius)
+                        outskirts.Add(pool[p]);
+
+                if (outskirts.Count > 0)
+                    pool = outskirts;
+                else
+                    Debug.LogWarning($"MapDecorPlacer: özel bina '{special.daySprite.name}' — " +
+                        $"çekirdek dışı (>= {coreRadius} tile) boş kaldı, tüm katman havuzuna düşülüyor.");
+            }
+
+            // Ölçek ve overlap hedef katmandan alınır
+            CityLayer targetLayer = settings.cityLayers.Count > 0
+                ? settings.cityLayers[Mathf.Clamp(special.targetLayer, 0, settings.cityLayers.Count - 1)]
+                : null;
+            Vector2 scaleRange = targetLayer != null ? targetLayer.scaleRange : new Vector2(0.40f, 0.55f);
+            float overlapR     = targetLayer != null ? targetLayer.overlapRadius : 0.3f;
 
             int placed = 0;
             int maxAttempts = pool.Count * 2;
 
-            for (int attempt = 0; attempt < maxAttempts && placed < special.count; attempt++)
+            for (int attempt = 0; attempt < maxAttempts && placed < targetCount; attempt++)
             {
                 Vector2Int tile = pool[Random.Range(0, pool.Count)];
-                if (TryPlaceSpecialBuilding(map, special, tile.x, tile.y, halfW, halfH))
+                if (TryPlaceSpecialBuilding(map, special, tile.x, tile.y, scaleRange, overlapR, halfW, halfH))
                 {
                     placed++;
-                    // Özel yol bağlantısı
                     if (special.connectToRoad && hasRoads)
                         RoadGenerator.Instance.ConnectBuildingToRoad(map, tile);
                 }
             }
 
-            if (placed < special.count)
+            if (placed < targetCount)
                 Debug.LogWarning($"MapDecorPlacer: özel bina '{special.daySprite.name}' — " +
-                                 $"hedef={special.count}, yerleşen={placed}");
+                                 $"hedef={targetCount} (max={special.count}), yerleşen={placed}");
         }
     }
 
+    /// <summary>
+    /// Özel bina sayısını şehir boyutuna göre çözer.
+    /// Büyük şehir (cityTileCount >= specialBigCityTileCount) → tam maxCount üretilir.
+    /// Daha küçük şehirlerde tavan şehir boyutuyla orantılı küçülür ve 0..tavan arası
+    /// rastgele bir sayı seçilir — böylece maxCount=1 olan binalar küçük şehirlerde
+    /// her zaman görünmez.
+    /// </summary>
+    int ResolveSpecialCount(int maxCount, int cityTileCount)
+    {
+        if (specialBigCityTileCount <= 0 || cityTileCount >= specialBigCityTileCount)
+            return maxCount;
+
+        float t   = Mathf.Clamp01((float)cityTileCount / specialBigCityTileCount);
+        int   cap = Mathf.CeilToInt(maxCount * t);
+        return Random.Range(0, cap + 1); // üst sınır hariç → 0..cap
+    }
+
     bool TryPlaceSpecialBuilding(MapGenerator map, SpecialCityBuilding special,
-                                 int tx, int ty, float halfW, float halfH)
+                                 int tx, int ty, Vector2 scaleRange, float overlapR,
+                                 float halfW, float halfH)
     {
         if (!map.IsLand(tx, ty)) return false;
         if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) return false;
 
-        // Özel binalar mid-scale kullan
-        float scale    = Random.Range(midSpriteScaleRange.x, midSpriteScaleRange.y);
+        float scale = Random.Range(scaleRange.x, scaleRange.y);
 
         // Yol kontrolu — special icin kaydirma yok (yol konnektoru orijinal tile'a cekiliyor),
         // sadece reject. Caller havuzdan baska bir tile dener.
@@ -1273,17 +1445,20 @@ public class MapDecorPlacer : MonoBehaviour
 
         float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
         float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
-        if (IsOverlapping(wx, wy)) return false;
+
+        // Özel binalar da normal binalarla AYNI dense sistemine girer (tower/building/neighbourhood
+        // hepsi denseOccupied kullanır). Böylece hem mevcut binaların üstüne yerleşmez hem de
+        // behind-clearance / sprite-yarıçapı mantığından faydalanır. Özel binalar katmanlardan
+        // ÖNCE yerleştiği için kendilerini denseOccupied'a yazmak şart — yoksa sonradan dolan
+        // tower katmanı bu binayı görmez ve üstüne biner.
+        float effRadius = ComputeBuildingRadius(special.daySprite, scale, overlapR);
+        if (IsDenseOverlapping(wx, wy, effRadius)) return false;
+
+        float clearWorld = special.clearingRadius > 0 ? special.clearingRadius / pixelsPerUnit : 0f;
+        denseOccupied.Add(new Vector3(wx, wy, Mathf.Max(effRadius, clearWorld)));
         occupiedCenters.Add(new Vector2(wx, wy));
 
-        // Clearing radius kadar alanı reserved et
-        if (special.clearingRadius > 0)
-        {
-            float clearWorld = special.clearingRadius / pixelsPerUnit;
-            denseOccupied.Add(new Vector3(wx, wy, clearWorld));
-        }
-
-        float baseA    = Random.Range(0.85f, 1f);
+        float baseA    = 1f; // tüm binalar tam opak
         int sortOrder  = 10 + (int)(wy * -100f);
 
         var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
@@ -1340,6 +1515,20 @@ public class MapDecorPlacer : MonoBehaviour
         return true;
     }
 
+    // Gece sprite'ını gündüz sprite'ının üstüne hizalar.
+    // Sorun: sprite'lar opak piksel sınırına otomatik dilimlenmiş; gece varyantında pencere/çatı
+    // ışığı dışarı taştığı için bounding box DAHA BÜYÜK çıkar (ör. sky 98px, skynight 105px → +7px
+    // tepede). Eski yöntem (bounds.center) iki MERKEZİ çakıştırdığı için fazla ışık binayı aşağı
+    // kaydırıyordu. Bina YERE BASTIĞI için yatayda merkez, dikeyde ALT KENAR referans alınır →
+    // bina tabanı sabit kalır, ışık serbestçe yukarı taşar.
+    static Vector3 ComputeDayNightAlign(Sprite daySprite, Sprite nightSprite)
+    {
+        return new Vector3(
+            daySprite.bounds.center.x - nightSprite.bounds.center.x, // yatay: merkez
+            daySprite.bounds.min.y    - nightSprite.bounds.min.y,    // dikey: alt kenar (taban)
+            0f);
+    }
+
     (GameObject go, SpriteRenderer daySR, SpriteRenderer nightSR, ShadowHandle shadow) CreateCityBuildingObject(
         Sprite daySprite, Sprite nightSprite, float wx, float wy,
         float scale, float baseA, int sortOrder, bool isIsometric)
@@ -1364,7 +1553,10 @@ public class MapDecorPlacer : MonoBehaviour
         {
             GameObject nightGo = new GameObject("NightOverlay");
             nightGo.transform.SetParent(go.transform, false);
-            nightGo.transform.localPosition = Vector3.zero;
+            // Gece sprite'ını gündüz tabanına hizala (bkz. ComputeDayNightAlign — ışık taşması
+            // bounding box'ı büyüttüğü için merkez yerine alt kenar referans alınır).
+            Vector3 align = ComputeDayNightAlign(daySprite, nightSprite);
+            nightGo.transform.localPosition = new Vector3(align.x, align.y, 0f);
             nightGo.transform.localScale    = Vector3.one;
             nightGo.transform.localRotation = Quaternion.identity;
 
@@ -1474,12 +1666,109 @@ public class MapDecorPlacer : MonoBehaviour
         };
     }
 
-    bool IsOverlapping(float wx, float wy)
+    bool IsOverlapping(float wx, float wy, float overlapR)
     {
-        float minDist = overlapRadius * 2f;
+        float minDist = overlapR * 2f;
         foreach (var c in occupiedCenters)
             if (Vector2.Distance(new Vector2(wx, wy), c) < minDist) return true;
         return false;
+    }
+
+    // Bina yerleşim yarıçapı (dünya birimi). Sprite'ın GENİŞ ve YÜKSEK boyutundan
+    // büyüğünü baz alır — yüksek/izometrik binalar (tower'lar) dikeyde de yeterli yer
+    // ayırır, böylece küçük binalar tall sprite'ların üstüne/altına oturmaz.
+    // layer.overlapRadius bir TABAN olarak uygulanır: binayı daha da seyreltmek için
+    // sprite yarıçapından büyük bir değer gir.
+    float ComputeBuildingRadius(Sprite sprite, float scale, float overlapRadius)
+    {
+        float halfW = (sprite.rect.width  / sprite.pixelsPerUnit) * scale * 0.5f;
+        float halfH = (sprite.rect.height / sprite.pixelsPerUnit) * scale * 0.5f;
+        float spriteRadius = Mathf.Max(halfW, halfH) * 0.9f;
+        return Mathf.Max(spriteRadius, overlapRadius);
+    }
+
+    /// <summary>
+    /// Her şehir tile'ının biome-2 bölge kenarına uzaklığını (tile) BFS ile hesaplar.
+    /// Kaynaklar: bölge dışına (veya harita dışına) komşu olan şehir tile'ları (dist=1).
+    /// İçeri doğru artar. Bölge dışı tile'lar 0'da kalır. Kenara doğru seyrelmede kullanılır.
+    /// </summary>
+    void BuildCityEdgeDistance(MapGenerator map)
+    {
+        int w = map.width, h = map.height;
+        cityEdgeDist = new int[w, h];
+
+        var q = new Queue<Vector2Int>();
+        int[] dx4 = { 1, -1, 0, 0 };
+        int[] dy4 = { 0, 0, 1, -1 };
+
+        bool IsCity(int x, int y) =>
+            x >= 0 && x < w && y >= 0 && y < h && map.IsLand(x, y) && map.GetBiome(x, y) == 2;
+
+        for (int x = 0; x < w; x++)
+        for (int y = 0; y < h; y++)
+        {
+            if (!IsCity(x, y)) { cityEdgeDist[x, y] = 0; continue; }
+
+            bool rim = false;
+            for (int i = 0; i < 4; i++)
+                if (!IsCity(x + dx4[i], y + dy4[i])) { rim = true; break; }
+
+            if (rim) { cityEdgeDist[x, y] = 1; q.Enqueue(new Vector2Int(x, y)); }
+            else       cityEdgeDist[x, y] = int.MaxValue;
+        }
+
+        while (q.Count > 0)
+        {
+            var p = q.Dequeue();
+            int d = cityEdgeDist[p.x, p.y];
+            for (int i = 0; i < 4; i++)
+            {
+                int nx = p.x + dx4[i], ny = p.y + dy4[i];
+                if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                if (cityEdgeDist[nx, ny] <= d + 1) continue;
+                cityEdgeDist[nx, ny] = d + 1;
+                q.Enqueue(new Vector2Int(nx, ny));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Seyrelme parametresi t (0 = yoğun, 1 = en seyrek). Yalnızca ŞEHİR BÖLGESİ (biome 2)
+    /// KENARINA uzaklığa göre: tile bölge sınırına edgeThinningBorderTiles tile kala seyrelmeye
+    /// başlar, sınırda en seyrek. Doğrusal → tüm bant boyunca görünür gradyan. Şehrin iç omurgası
+    /// (kenardan uzak tile'lar) tam yoğun kalır. Şehir düzensiz/ince şekilliyse de simetrik çalışır.
+    /// (Belediyeye uzaklık bazlı radyal terim kaldırıldı — uzun/ince bölgelerde asimetrik
+    ///  aşırı seyrelmeye yol açıyordu; istenen, sınır çevresinde simetrik bir solma.)
+    /// </summary>
+    float EdgeThinFactor(int tx, int ty)
+    {
+        if (edgeThinningBorderTiles <= 0 || cityEdgeDist == null) return 0f;
+        if (tx < 0 || tx >= cityEdgeDist.GetLength(0) || ty < 0 || ty >= cityEdgeDist.GetLength(1))
+            return 0f;
+
+        int d = cityEdgeDist[tx, ty];
+        if (d <= 0) return 0f; // bölge dışı
+
+        float inside = Mathf.Clamp01((float)d / edgeThinningBorderTiles); // 0 kenar, 1 derin
+        return 1f - inside;                                               // 1 kenar, 0 derin
+    }
+
+    // Kenara doğru seyrelme YOĞUNLUK çarpanı (0..1). Yoğun bölgede 1, kenarda (1-edgeThinning).
+    // NOT: Tek başına yoğunluk düşürmek overlap'e doyan (Scatter) katmanlarda görünmez —
+    // asıl seyrelme RadialSpacingMultiplier (aralık büyütme) ile sağlanır.
+    float RadialDensityMultiplier(int tx, int ty)
+    {
+        if (edgeThinning <= 0f) return 1f;
+        return Mathf.Lerp(1f, 1f - edgeThinning, EdgeThinFactor(tx, ty));
+    }
+
+    // Kenara doğru bina ARALIĞI çarpanı (>= 1). Yoğun bölgede 1×, kenarda en fazla
+    // (1 + edgeThinning*3)× — effRadius ile çarpılır → binalar kenara doğru fiziksel olarak
+    // daha seyrek dizilir. Overlap'e doyan katmanlarda bile çalışan asıl mekanizma budur.
+    float RadialSpacingMultiplier(int tx, int ty)
+    {
+        if (edgeThinning <= 0f) return 1f;
+        return Mathf.Lerp(1f, 1f + edgeThinning * 3f, EdgeThinFactor(tx, ty));
     }
 
     bool IsDenseOverlapping(float wx, float wy, float myRadius)
@@ -1490,7 +1779,18 @@ public class MapDecorPlacer : MonoBehaviour
             float minDist = myRadius + other.z; // iki sprite'ın yarıçapı toplamı
             float dx = wx - other.x;
             float dy = wy - other.y;
-            if (dx * dx + dy * dy < minDist * minDist) return true;
+            float distSq = dx * dx + dy * dy;
+
+            // Yarı-izometrik derinlik: aday bina, mevcut binanın ARKASINDA (yukarıda, +Y)
+            // ise o bina tarafından kısmen örtülür. Ne kadar "tam arkada" ise gerekli aralık
+            // o kadar azalır (behindClearanceFactor'a doğru). Yana/öne doğru tam aralık korunur.
+            if (behindClearanceFactor < 1f && distSq > 0.0000001f && dy > 0f)
+            {
+                float upFraction = dy / Mathf.Sqrt(distSq);          // 0 = yanda, 1 = tam arkada
+                minDist *= Mathf.Lerp(1f, behindClearanceFactor, upFraction);
+            }
+
+            if (distSq < minDist * minDist) return true;
         }
         return false;
     }
@@ -1812,7 +2112,9 @@ public class MapDecorPlacer : MonoBehaviour
         {
             GameObject nightGo = new GameObject("PortNight");
             nightGo.transform.SetParent(go.transform, false);
-            nightGo.transform.localPosition = Vector3.zero;
+            // Gece sprite'ını gündüz tabanına hizala (ışık taşması bounding box'ı büyütür).
+            Vector3 align = ComputeDayNightAlign(daySprite, portSpritesNight[spriteIdx]);
+            nightGo.transform.localPosition = new Vector3(align.x, align.y, 0f);
             nightGo.transform.localScale    = Vector3.one;
             nightGo.transform.localRotation = Quaternion.identity;
 
@@ -2443,7 +2745,9 @@ public class MapDecorPlacer : MonoBehaviour
         {
             GameObject nightGo = new GameObject("ShipNight");
             nightGo.transform.SetParent(go.transform, false);
-            nightGo.transform.localPosition = Vector3.zero;
+            // Gece sprite'ını gündüz tabanına hizala (ışık taşması bounding box'ı büyütür).
+            Vector3 align = ComputeDayNightAlign(daySprite, shipSpritesNight[spriteIdx]);
+            nightGo.transform.localPosition = new Vector3(align.x, align.y, 0f);
             nightGo.transform.localScale    = Vector3.one;
             nightGo.transform.localRotation = Quaternion.identity;
 
