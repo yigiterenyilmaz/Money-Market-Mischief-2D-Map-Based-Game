@@ -168,3 +168,13 @@ MonoBehaviour:
     isAnimated: 0
     animationFrames: []
     frameRate: 0
+  industrialBuildings:
+  - daySprite: {fileID: -5751065912239279844, guid: 47d48c09295788c458647bfc565ad4fc, type: 3}
+    nightSprite: {fileID: 5936056061838387249, guid: 5f0fc590543a8e2408258c645e5ac252, type: 3}
+    isIsometric: 0
+  - daySprite: {fileID: 5112021148277248812, guid: a56e4486821a8a046be1092e6917259a, type: 3}
+    nightSprite: {fileID: 8953170161214832916, guid: e902f07874db26043b5f93a9dbd798be, type: 3}
+    isIsometric: 0
+  - daySprite: {fileID: 2016430755416406589, guid: 7710fc2b032ca5f4f91f8b75b40f9c85, type: 3}
+    nightSprite: {fileID: 4555362489834924753, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
+    isIsometric: 0

@@ -130,6 +130,15 @@ public class BiomePaintSettings : ScriptableObject
     [Header("City Special Buildings — Sabit Sayılı Özel Binalar")]
     public List<SpecialCityBuilding> specialCityBuildings = new List<SpecialCityBuilding>();
 
+    // =========================================================================
+    // SANAYİ BİNALARI
+    // =========================================================================
+
+    [Header("Industrial Buildings — Sanayi Yapıları (Lane Düzeni)")]
+    [Tooltip("Sanayi bölgesinde (biome 3) yatay lane'ler halinde yan yana yerleştirilen " +
+             "fabrika/sanayi binaları. Boş bırakılabilir — sonradan doldurun.")]
+    public List<CityBuildingEntry> industrialBuildings = new List<CityBuildingEntry>();
+
     [ContextMenu("Populate Default City Layers")]
     void PopulateDefaultCityLayers()
     {

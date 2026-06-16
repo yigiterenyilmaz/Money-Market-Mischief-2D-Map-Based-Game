@@ -236,4 +236,27 @@ public class DayNightCycle : MonoBehaviour
             return Mathf.Clamp01(pos / lightPeriod);
         }
     }
+
+    /// <summary>
+    /// SunProgress değeri Gündüz (Day) fazının BAŞLADIĞI nokta (0..1).
+    /// = dawnLength / (dawn+day+dusk). Gölge süpürmesini faza göre yeniden eşlemek için.
+    /// </summary>
+    public float SunDayStart
+    {
+        get
+        {
+            float lightPeriod = dawnLength + dayLength + duskLength;
+            return lightPeriod > 0f ? dawnLength / lightPeriod : 0f;
+        }
+    }
+
+    /// <summary>SunProgress değeri Gündüz (Day) fazının BİTTİĞİ nokta (0..1).</summary>
+    public float SunDayEnd
+    {
+        get
+        {
+            float lightPeriod = dawnLength + dayLength + duskLength;
+            return lightPeriod > 0f ? (dawnLength + dayLength) / lightPeriod : 1f;
+        }
+    }
 }
