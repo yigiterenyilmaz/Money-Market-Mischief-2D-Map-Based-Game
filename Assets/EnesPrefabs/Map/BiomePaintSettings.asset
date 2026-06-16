@@ -37,15 +37,27 @@ MonoBehaviour:
     daySprite: {fileID: -1152812806179444027, guid: 8782847c4c9c2a047b7fa090c7213b61, type: 3}
     nightSprite: {fileID: 6599969767114084350, guid: fc547ffbae7cc204194477889a2eafeb, type: 3}
     isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0
   cityLayers:
   - name: Towers
     sprites:
     - daySprite: {fileID: 3836954968553550457, guid: e51c32a7ffabddb449c981cdf9be4999, type: 3}
       nightSprite: {fileID: -6994338726130790008, guid: 5134f2d2967a9364093f3101805f8dc4, type: 3}
       isIsometric: 0
+      isAnimated: 0
+      animationFrames: []
+      nightAnimationFrames: []
+      frameRate: 0
     - daySprite: {fileID: -8724057895291212338, guid: 172fa4169dfd7ba42b502073209e1c98, type: 3}
       nightSprite: {fileID: -6649391066276681341, guid: 2d0c2e5046f75a04f92fdaf95cf11c17, type: 3}
       isIsometric: 0
+      isAnimated: 0
+      animationFrames: []
+      nightAnimationFrames: []
+      frameRate: 0
     innerRadius: 0
     outerRadius: 35
     extendToEdge: 0
@@ -77,24 +89,52 @@ MonoBehaviour:
     - daySprite: {fileID: -162143036952510801, guid: 61182c49e0ca64f498e3a2627c27e1d9, type: 3}
       nightSprite: {fileID: -1196331990105273991, guid: 38bc3993a1b5224448abedc680f4ea00, type: 3}
       isIsometric: 0
+      isAnimated: 0
+      animationFrames: []
+      nightAnimationFrames: []
+      frameRate: 0
     - daySprite: {fileID: -4210603279101473682, guid: 98b5ae1ea81e77a43b711fdece38dd70, type: 3}
       nightSprite: {fileID: 8271517214827844764, guid: 695a7dc00b67d724daa23ac3a209f571, type: 3}
       isIsometric: 0
+      isAnimated: 0
+      animationFrames: []
+      nightAnimationFrames: []
+      frameRate: 0
     - daySprite: {fileID: -3247281926301279507, guid: b59f27e49117a724393aca9dbafcd4e2, type: 3}
       nightSprite: {fileID: 1253435754805484298, guid: 007c85270d3d7b54e8506e36f14e2e75, type: 3}
       isIsometric: 0
+      isAnimated: 0
+      animationFrames: []
+      nightAnimationFrames: []
+      frameRate: 0
     - daySprite: {fileID: -4929393556848980926, guid: 09f1bce130467aa449b7df324ce034f7, type: 3}
       nightSprite: {fileID: 4814867594135456435, guid: cd2d85359aec38d499ba07d4048e058c, type: 3}
       isIsometric: 0
+      isAnimated: 0
+      animationFrames: []
+      nightAnimationFrames: []
+      frameRate: 0
     - daySprite: {fileID: 509731017257147023, guid: 478b676450d437c4daaa90429010afc9, type: 3}
       nightSprite: {fileID: 585157808258550367, guid: db90cc79dc496754588a5511e24a76d1, type: 3}
       isIsometric: 0
+      isAnimated: 0
+      animationFrames: []
+      nightAnimationFrames: []
+      frameRate: 0
     - daySprite: {fileID: -7509758384081943007, guid: 3aa6f1b7586510244b8e5444d9b3ad42, type: 3}
       nightSprite: {fileID: 7572380781886416335, guid: 5482e4fc238ac9f4097b807c05957efe, type: 3}
       isIsometric: 0
+      isAnimated: 0
+      animationFrames: []
+      nightAnimationFrames: []
+      frameRate: 0
     - daySprite: {fileID: 2179392925417448396, guid: 98e1ae39f52bfc24a9678dc6b7cb40fe, type: 3}
       nightSprite: {fileID: 165367554869356033, guid: b3398575fa807084d93d1e196e6a9cdb, type: 3}
       isIsometric: 0
+      isAnimated: 0
+      animationFrames: []
+      nightAnimationFrames: []
+      frameRate: 0
     innerRadius: 0
     outerRadius: 200
     extendToEdge: 0
@@ -172,9 +212,43 @@ MonoBehaviour:
   - daySprite: {fileID: -5751065912239279844, guid: 47d48c09295788c458647bfc565ad4fc, type: 3}
     nightSprite: {fileID: 5936056061838387249, guid: 5f0fc590543a8e2408258c645e5ac252, type: 3}
     isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0
   - daySprite: {fileID: 5112021148277248812, guid: a56e4486821a8a046be1092e6917259a, type: 3}
     nightSprite: {fileID: 8953170161214832916, guid: e902f07874db26043b5f93a9dbd798be, type: 3}
     isIsometric: 0
+    isAnimated: 1
+    animationFrames:
+    - {fileID: 5112021148277248812, guid: a56e4486821a8a046be1092e6917259a, type: 3}
+    - {fileID: 3006506660816071312, guid: a56e4486821a8a046be1092e6917259a, type: 3}
+    - {fileID: 8891652111998737439, guid: a56e4486821a8a046be1092e6917259a, type: 3}
+    - {fileID: -561641110884195024, guid: a56e4486821a8a046be1092e6917259a, type: 3}
+    - {fileID: 5217160638154322995, guid: a56e4486821a8a046be1092e6917259a, type: 3}
+    nightAnimationFrames:
+    - {fileID: -2196898081438997135, guid: e902f07874db26043b5f93a9dbd798be, type: 3}
+    - {fileID: -274831800682557562, guid: e902f07874db26043b5f93a9dbd798be, type: 3}
+    - {fileID: 3576286166572170887, guid: e902f07874db26043b5f93a9dbd798be, type: 3}
+    - {fileID: 8953170161214832916, guid: e902f07874db26043b5f93a9dbd798be, type: 3}
+    - {fileID: 2293887727340015838, guid: e902f07874db26043b5f93a9dbd798be, type: 3}
+    frameRate: 4
   - daySprite: {fileID: 2016430755416406589, guid: 7710fc2b032ca5f4f91f8b75b40f9c85, type: 3}
     nightSprite: {fileID: 4555362489834924753, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
     isIsometric: 0
+    isAnimated: 1
+    animationFrames:
+    - {fileID: 2016430755416406589, guid: 7710fc2b032ca5f4f91f8b75b40f9c85, type: 3}
+    - {fileID: -5304250481101949664, guid: 7710fc2b032ca5f4f91f8b75b40f9c85, type: 3}
+    - {fileID: -236243477660751522, guid: 7710fc2b032ca5f4f91f8b75b40f9c85, type: 3}
+    - {fileID: -2844386962187736291, guid: 7710fc2b032ca5f4f91f8b75b40f9c85, type: 3}
+    - {fileID: -1149014299722206341, guid: 7710fc2b032ca5f4f91f8b75b40f9c85, type: 3}
+    - {fileID: -8811053443742653242, guid: 7710fc2b032ca5f4f91f8b75b40f9c85, type: 3}
+    nightAnimationFrames:
+    - {fileID: 4555362489834924753, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
+    - {fileID: 5302662241081665587, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
+    - {fileID: -4714395482744411481, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
+    - {fileID: 19218331756729818, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
+    - {fileID: -5747762080561553749, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
+    - {fileID: -2178313058140480348, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
+    frameRate: 4

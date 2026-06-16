@@ -344,6 +344,36 @@ public partial class MapDecorPlacer
         return (go, daySR, nightSR, shadow);
     }
 
+    /// <summary>
+    /// CityBuildingEntry animasyonluysa gündüz (ve varsa gece) renderer'ına SpriteSheetAnimator takar.
+    /// Animator sadece SpriteRenderer.sprite'ı döndürür; gündüz/gece crossfade alpha'yı ayrı yönetir,
+    /// yani ikisi çakışmaz. Gece frame'leri boşsa gece statik kalır. frameRate gündüz/gece ortak.
+    /// </summary>
+    void AttachBuildingAnimators(SpriteRenderer daySR, SpriteRenderer nightSR, CityBuildingEntry entry)
+    {
+        if (!entry.isAnimated || entry.frameRate <= 0f) return;
+
+        // Bu binaya özel tek bir faz: farklı binalar senkron oynamaz, ama AYNI binanın gündüz/gece
+        // animatörleri aynı fazı paylaştığı için birbirleriyle senkron kalır.
+        float phase = Random.value;
+
+        if (daySR != null && entry.animationFrames != null && entry.animationFrames.Length > 1)
+        {
+            var anim = daySR.gameObject.AddComponent<SpriteSheetAnimator>();
+            anim.frames       = entry.animationFrames;
+            anim.frameRate    = entry.frameRate;
+            anim.startPhase01 = phase;
+        }
+
+        if (nightSR != null && entry.nightAnimationFrames != null && entry.nightAnimationFrames.Length > 1)
+        {
+            var anim = nightSR.gameObject.AddComponent<SpriteSheetAnimator>();
+            anim.frames       = entry.nightAnimationFrames;
+            anim.frameRate    = entry.frameRate;
+            anim.startPhase01 = phase;
+        }
+    }
+
     ShadowHandle AddShadow(GameObject parent, Sprite sprite, int sortOrder, bool isIsometric)
     {
         // Container — bina merkezinde sabit; UpdateShadows localPosition + scale.x (flip) günceller.

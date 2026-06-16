@@ -177,6 +177,9 @@ public partial class MapDecorPlacer
                         daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder, entry.isIsometric);
                     go.name = "IndustrialBuilding";
 
+                    // Animasyonlu sanayi binası ise frame döngüsünü tak (gündüz + varsa gece).
+                    AttachBuildingAnimators(daySR, nightSR, entry);
+
                     decorObjects.Add(go);
                     cityBuildings.Add(new BuildingData
                     {

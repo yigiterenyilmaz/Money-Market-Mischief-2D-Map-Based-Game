@@ -11,6 +11,16 @@ public struct CityBuildingEntry
     public Sprite nightSprite;
     [Tooltip("İzometrik sprite ise işaretle. Gölge mekanizması binanın tabanından diyagonal çıkacak şekilde değişir.")]
     public bool isIsometric;
+    [Tooltip("İşaretlenirse bina animasyonlu olur. Tek bir sprite sheet'ten dilimlenmiş frame'ler sırayla döner. " +
+             "NOT: şu an sadece sanayi (industrial) yerleşiminde çalışır.")]
+    public bool isAnimated;
+    [Tooltip("Gündüz animasyon frame'leri (tek görselden dilimlenmiş sprite'lar). Sırayla döner. En az 2 frame gerekir; " +
+             "frame[0] gündüz görünümü olur.")]
+    public Sprite[] animationFrames;
+    [Tooltip("Gece animasyon frame'leri. Boş bırakılırsa gece statik nightSprite kullanılır.")]
+    public Sprite[] nightAnimationFrames;
+    [Tooltip("Saniyedeki frame sayısı (gündüz ve gece için ortak). 12-15 çoğu animasyon için yeterli.")]
+    public float frameRate;
 }
 
 [System.Serializable]
