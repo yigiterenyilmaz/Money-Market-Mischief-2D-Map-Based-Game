@@ -42,6 +42,10 @@ public class CityLayer
     public Vector2 scaleRange = new Vector2(0.5f, 0.7f);
     [Tooltip("Doluluk yoğunluğu. 1.0 = tıka basa dolu, 0.5 = yarısı boş.")]
     [Range(0.1f, 1f)] public float fillDensity = 1f;
+    [Tooltip("İşaretlenirse bu katmanın binaları şehrin DIŞ bölgesine doğru seyrelir (kenara yaklaştıkça daha az/ daha aralıklı). " +
+             "Seyrelme şehrin GERÇEK kenarına olan uzaklığa göre hesaplanır — şehir outerRadius'tan küçükse de doğru çalışır. " +
+             "Etki için MapDecorPlacer'daki edgeThinning > 0 olmalı.")]
+    public bool thinning = false;
     [Tooltip("Minimum bina aralığı (dünya birimi, yarıçap). Tüm stillerde geçerli. Büyük = binalar daha seyrek. ÖNEMLİ: binalar zaten kendi sprite boyutu kadar aralıklı yerleşir; sprite yarıçapından KÜÇÜK değerlerin etkisi olmaz — seyreltmek için sprite yarıçapından büyük bir değer gir (genelde 0.5–2).")]
     public float overlapRadius = 0.12f;
     [Tooltip("Grid ızgara adımı (tile). Bina çapına yakın olmalı; küçük = sık + çakışmalı.")]
@@ -148,6 +152,24 @@ public class BiomePaintSettings : ScriptableObject
     [Tooltip("Sanayi bölgesinde (biome 3) yatay lane'ler halinde yan yana yerleştirilen " +
              "fabrika/sanayi binaları. Boş bırakılabilir — sonradan doldurun.")]
     public List<CityBuildingEntry> industrialBuildings = new List<CityBuildingEntry>();
+
+    // =========================================================================
+    // ŞEHİR (URBAN) BİNALARI
+    // =========================================================================
+
+    [Header("Urban Buildings — Şehir/Kasaba Yapıları (Seyrek)")]
+    [Tooltip("Urban bölgesinde (biome 4) seyrek dağılımla yerleştirilen küçük yapı/evler. " +
+             "Boş bırakılabilir — sonradan doldurun.")]
+    public List<CityBuildingEntry> urbanBuildings = new List<CityBuildingEntry>();
+
+    // =========================================================================
+    // TARIM (AGRICULTURAL) BİNALARI
+    // =========================================================================
+
+    [Header("Agricultural Buildings — Tarım/Çiftlik Yapıları (Seyrek)")]
+    [Tooltip("Tarım bölgesinde (biome 1) seyrek dağılımla yerleştirilen çiftlik/ambar/ev yapıları. " +
+             "Boş bırakılabilir — sonradan doldurun.")]
+    public List<CityBuildingEntry> agriculturalBuildings = new List<CityBuildingEntry>();
 
     [ContextMenu("Populate Default City Layers")]
     void PopulateDefaultCityLayers()

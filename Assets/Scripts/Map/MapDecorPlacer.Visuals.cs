@@ -257,29 +257,28 @@ public partial class MapDecorPlacer
             }
             else
             {
-                // Flat branch — mevcut algoritma, sprite merkezinden yatay trapez.
-                // Pivot = gölgenin binaya bitişik kenarı = binanın güneş karşı taban kenarı.
-                // shadowDir=-1 (sabah): pivot binanın sol kenarı (-hw), gölge sola uzanır.
-                // shadowDir=+1 (akşam): pivot binanın sağ kenarı (+hw), gölge sağa uzanır.
-                // Container scale.x = dirSign: mesh +x yönünde uzanır, flip ile diğer tarafa yansır.
-                sh.transform.localPosition = new Vector3(shadowDir * sh.halfWidth, 0f, 0f);
-                sh.transform.localScale    = new Vector3(dirSign, 1f, 1f);
+                // Flat branch — PROJEKSIYON: binanın kendi sprite'ı tabandan (y=0, pivot node)
+                // eğilip yassıltılarak gölgeye dönüştürülür. Siluet binayla birebir, hep bitişik.
+                //
+                // YÖN: sprite doğal halde ayakları y=0'da YUKARI durur. Pivot node'u ~180°
+                // döndürünce siluet AŞAĞI (izleyiciye doğru) düşer = "aşağı-ve-yana" gölge.
+                // shadowDir bu düşey ekseni yana eğer: -1 sabah (sol), 0 öğle (düz aşağı), +1 akşam (sağ).
+                // Öğleyi geçerken eğim 0'dan sürekli geçer → gölge bir tarafta küçülürken hemen
+                // diğer tarafta büyür; HİÇ kaybolmaz (öğlede düz aşağı kısa bir kütük kalır).
+                float leanZ = 180f - shadowDir * shadowLeanDegrees;
+                sh.transform.localRotation = Quaternion.Euler(0f, 0f, leanZ);
 
-                // Trapez vertex güncellemesi — yakın uç tam bina kenarı, uzak uç tipRatio'ya göre incelmiş.
-                // Uzunluk = binanın tam genişliği (halfWidth*2) × lengthFactor.
-                float near   = sh.halfHeight * shadowNearScale;
-                float far    = near * shadowTipRatio;
-                float length = sh.halfWidth * 2f * lengthFactor;
+                // Düşey ölçek = gölge uzunluğu. lengthFactor altitude ile sürekli değişir
+                // (alçak güneş = uzun, öğle = kısa); shadowProjectLength çarpanı ölçeği büyütür.
+                // Yatay ölçek sabit (1) → genişlik binayla aynı kalır, siluet bozulmaz.
+                float lenScale = lengthFactor * shadowProjectLength;
+                sh.transform.localScale = new Vector3(1f, lenScale, 1f);
 
-                sh.verts[0] = new Vector3(0f,     -near, 0f);
-                sh.verts[1] = new Vector3(0f,     +near, 0f);
-                sh.verts[2] = new Vector3(length, +far, 0f);
-                sh.verts[3] = new Vector3(length, -far, 0f);
-                sh.mesh.vertices = sh.verts;
-                sh.mesh.RecalculateBounds();
+                sh.spriteRenderer.color = col;
+                continue;
             }
 
-            // Alpha fade — şafakta yavaş yavaş oluşur, akşamda yavaş yavaş kaybolur
+            // Iso alpha fade — şafakta yavaş yavaş oluşur, akşamda yavaş yavaş kaybolur
             if (sh.material != null)
                 sh.material.color = col;
         }
@@ -385,6 +384,45 @@ public partial class MapDecorPlacer
 
         float halfWidth  = sprite.rect.width  / sprite.pixelsPerUnit * 0.5f;
         float halfHeight = sprite.rect.height / sprite.pixelsPerUnit * 0.5f;
+
+        // -- FLAT PROJEKSIYON GÖLGE --------------------------------------------------------
+        // ESKİ trapez mesh karmaşık/L-şekilli siluetlerde silueti döndürüp esnetip binadan
+        // KOPARIYORDU. ŞİMDİ: binanın KENDİ sprite'ını koyu tonlayıp tabandan (zemin temas
+        // çizgisi = bina origin, y=0) eğip yassıltarak "yansıtırız" → siluet binayla BİREBİR
+        // aynı, hep bitişik. Pivot node bina origin'inde; sprite child'ı ayakları pivot'a
+        // gelecek şekilde yukarı kaydırılır, böylece UpdateShadows pivot node'u döndürünce
+        // gölge tabandan döner (sprite merkezi pivot olsaydı orta etrafında dönerdi → yanlış).
+        if (!isIsometric)
+        {
+            // Bina izometrik → görsel TABAN sprite'ın EN ALT kenarına yakın (merkezde değil).
+            // Pivot node'u sprite alt kenarından yukarı taşı: -halfHeight tam alt kenar,
+            // shadowBaseRaiseRatio kadar (halfHeight oranı) yukarı kaldırılır → gölge dönme/
+            // uzama noktası binanın gerçek temas noktasına oturur (tam alt kenar biraz fazla düşük).
+            containerGo.transform.localPosition =
+                new Vector3(0f, -halfHeight + halfHeight * shadowBaseRaiseRatio, 0f);
+
+            GameObject spriteGo = new GameObject("ShadowSprite");
+            spriteGo.transform.SetParent(containerGo.transform, false);
+            // Sprite pivot'u merkezde (alignment=Center) → ayakları pivot node'a (sprite alt
+            // kenarı) getirmek için merkezi +halfHeight yukarı: sprite pivot node üstünde
+            // binayla birebir çakışır, ayak ucu pivot node'da durur.
+            spriteGo.transform.localPosition = new Vector3(0f, halfHeight, 0f);
+
+            SpriteRenderer shadowSR = spriteGo.AddComponent<SpriteRenderer>();
+            shadowSR.sprite       = sprite;
+            shadowSR.color        = shadowColor;
+            shadowSR.sortingOrder = sortOrder - 1;
+
+            return new ShadowHandle
+            {
+                transform      = containerGo.transform,
+                spriteRenderer = shadowSR,
+                spriteChild    = spriteGo.transform,
+                halfWidth      = halfWidth,
+                halfHeight     = halfHeight,
+                isIsometric    = false,
+            };
+        }
 
         // Başlangıç vertex'leri — UpdateShadows zaten her frame yeniden yazıyor, sadece bounds için.
         // Iso modda kalınlık halfWidth, uzunluk halfHeight üzerinden hesaplanır.

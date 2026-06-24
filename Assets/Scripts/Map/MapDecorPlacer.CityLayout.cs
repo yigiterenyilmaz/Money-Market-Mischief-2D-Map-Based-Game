@@ -114,7 +114,7 @@ public partial class MapDecorPlacer
 
         // Clearing radius kadar alanı işaretle
         float clearWorld = cityHallClearingRadius / pixelsPerUnit;
-        denseOccupied.Add(new Vector3(wx, wy, clearWorld));
+        AddDense(wx, wy, clearWorld);
         occupiedCenters.Add(new Vector2(wx, wy));
 
         decorObjects.Add(go);
@@ -240,7 +240,7 @@ public partial class MapDecorPlacer
             }
             if (!inPool) continue;
 
-            float effDensity = density * RadialDensityMultiplier(jx, jy);
+            float effDensity = density * RadialDensityMultiplier(jx, jy, layer.thinning);
             if (Random.value > effDensity) continue;
 
             if (!map.IsLand(jx, jy)) continue;
@@ -265,12 +265,12 @@ public partial class MapDecorPlacer
             jx = newJx; jy = newJy;
 
             float effRadius = ComputeBuildingRadius(daySprite, scale, layer.overlapRadius)
-                              * RadialSpacingMultiplier(jx, jy);
+                              * RadialSpacingMultiplier(jx, jy, layer.thinning);
             float wx = transform.position.x + (jx / pixelsPerUnit) - halfW;
             float wy = transform.position.y + (jy / pixelsPerUnit) - halfH;
 
             if (IsDenseOverlapping(wx, wy, effRadius)) continue;
-            denseOccupied.Add(new Vector3(wx, wy, effRadius));
+            AddDense(wx, wy, effRadius);
 
             float baseA   = 1f;
             int sortOrder = 10 + (int)(wy * -100f);
@@ -341,7 +341,7 @@ public partial class MapDecorPlacer
                 continue;
             }
 
-            float effDensity = density * RadialDensityMultiplier(tx, ty);
+            float effDensity = density * RadialDensityMultiplier(tx, ty, layer.thinning);
             if (Random.value > effDensity) continue;
 
             if (!map.IsLand(tx, ty)) continue;
@@ -366,12 +366,12 @@ public partial class MapDecorPlacer
             tx = newTx; ty = newTy;
 
             float effRadius = ComputeBuildingRadius(daySprite, scale, layer.overlapRadius)
-                              * RadialSpacingMultiplier(tx, ty);
+                              * RadialSpacingMultiplier(tx, ty, layer.thinning);
             float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
             float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
 
             if (IsDenseOverlapping(wx, wy, effRadius)) continue;
-            denseOccupied.Add(new Vector3(wx, wy, effRadius));
+            AddDense(wx, wy, effRadius);
 
             float baseA   = 1f;
             int sortOrder = 10 + (int)(wy * -100f);
@@ -428,7 +428,7 @@ public partial class MapDecorPlacer
             int tx = t.x, ty = t.y;
 
             // Kenara doğru seyrelme — dış tile'larda yerleşme olasılığını düşür.
-            if (Random.value > RadialDensityMultiplier(tx, ty)) continue;
+            if (Random.value > RadialDensityMultiplier(tx, ty, layer.thinning)) continue;
 
             if (!map.IsLand(tx, ty)) continue;
             if (map.GetBiome(tx, ty) != 2) continue;
@@ -451,11 +451,11 @@ public partial class MapDecorPlacer
             tx = newTx; ty = newTy;
 
             float effRadius = ComputeBuildingRadius(daySprite, scale, layer.overlapRadius)
-                              * RadialSpacingMultiplier(tx, ty);
+                              * RadialSpacingMultiplier(tx, ty, layer.thinning);
             float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
             float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
             if (IsDenseOverlapping(wx, wy, effRadius)) continue;
-            denseOccupied.Add(new Vector3(wx, wy, effRadius));
+            AddDense(wx, wy, effRadius);
 
             float baseA   = 1f; // tüm binalar tam opak
             int sortOrder = 10 + (int)(wy * -100f);
@@ -631,7 +631,7 @@ public partial class MapDecorPlacer
         if (IsDenseOverlapping(wx, wy, effRadius)) return false;
 
         float clearWorld = special.clearingRadius > 0 ? special.clearingRadius / pixelsPerUnit : 0f;
-        denseOccupied.Add(new Vector3(wx, wy, Mathf.Max(effRadius, clearWorld)));
+        AddDense(wx, wy, Mathf.Max(effRadius, clearWorld));
         occupiedCenters.Add(new Vector2(wx, wy));
 
         float baseA    = 1f; // tüm binalar tam opak

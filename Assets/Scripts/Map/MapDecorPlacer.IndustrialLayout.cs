@@ -2,34 +2,96 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// Industrial layout: factories / industrial buildings packed into vertical lanes
-// (columns) separated by aisles, for a dense industrial-district look. Lanes share a
-// slight tilt and gently wander (Perlin) so they read as parallel-but-natural rather
-// than ruler-straight. Runs over the industrial biome (biome 3) tile pool. Buildings
-// reuse the city-building machinery (CreateCityBuildingObject) so they get day/night
-// crossfade + dynamic shadows. All tuning is serialized on MapDecorPlacer.
+// Industrial BUILDING placement over the industrial biome (biome 3). Buildings are LINED ALONG
+// BOTH EDGES of the straight grid streets that RoadGenerator produces: walking each grid street
+// (RoadGenerator.GetIndustrialGridPaths) and dropping buildings at building-footprint spacing,
+// offset perpendicular to the street on each side. Buildings stay world-upright; only their
+// position aligns to the roads. They reuse the city-building machinery (CreateCityBuildingObject)
+// so they get day/night crossfade + dynamic shadows.
+//
+// NOTE: the industrial ROAD grid is generated separately in RoadGenerator (at initial road
+// generation time). This file only places buildings; it never paints roads. Currently gated off
+// by industrialPlaceBuildings while the road layout is being finalized.
 public partial class MapDecorPlacer
 {
     // -------------------------------------------------------------------------
-    // INDUSTRIAL LANE FILL
+    // INDUSTRIAL BLOCK GRID — serialized tuning (declared here; Unity serializes
+    // public fields of a partial class regardless of which file they live in).
+    // -------------------------------------------------------------------------
+
+    [Header("Industrial Layout — Yol Kenari (Bina)")]
+    [Tooltip("Sanayi binalarını yerleştir. Yol ızgarası RoadGenerator'da üretiliyor; bu sınıf yalnızca " +
+             "bina koyar (yol BOYAMAZ). Binalar ızgara SOKAKLARININ iki kenarına dizilir. " +
+             "Yollar oturana kadar KAPALI tutulabilir.")]
+    public bool industrialPlaceBuildings = true;
+    [Tooltip("Sokağın HER İKİ kenarına da diz (kapalıysa yalnızca bir kenar).")]
+    public bool industrialLineBothSides = true;
+
+    [Tooltip("Sanayi binalarının ölçek aralığı (min, max).")]
+    public Vector2 industrialScaleRange = new Vector2(0.5f, 0.8f);
+
+    // --- Sokağa dik yerleşim (yoldan uzaklık) ---
+    [Tooltip("Bina ön cephesi ile yol KENARI arasında bırakılan boşluk (tile). Büyük = binalar yoldan geride.")]
+    [Range(0, 8)] public int industrialRoadEdgeMargin = 1;
+    [Tooltip("Sokağın her kenarına, yoldan içeri doğru kaç SIRA bina dizilsin.")]
+    [Range(1, 4)] public int industrialRowsPerSide = 1;
+    [Tooltip("Arka arkaya gelen bina sıraları arasındaki boşluk (tile). industrialRowsPerSide > 1 iken etkili.")]
+    [Range(0, 12)] public int industrialRowSpacing = 1;
+
+    // --- Sokak boyunca diziliş ---
+    [Tooltip("Sokak boyunca bina adımı = ortalama bina genişliği × bu çarpan. " +
+             "1 = bitişik, <1 = üst üste binerek sık, >1 = aralıklı.")]
+    [Range(0.4f, 2.5f)] public float industrialAlongSpacing = 1f;
+    [Tooltip("Her slotun dolma olasılığı. 1 = kesintisiz cephe, 0.5 = slotların yarısı boş (seyrek).")]
+    [Range(0.1f, 1f)] public float industrialFillChance = 1f;
+    [Tooltip("Bina başına SOKAK BOYUNCA küçük rastgele kaydırma (tile). Yola olan uzaklığı bozmaz; " +
+             "yalnızca cephe boyunca hizayı kırar → daha doğal. 0 = tam hizalı.")]
+    [Range(0f, 4f)] public float industrialAlongJitter = 0.2f;
+
+    // -------------------------------------------------------------------------
+    // INDUSTRIAL BLOCK FILL
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Sanayi bölgesini (biome 3) DİKEY lane'ler halinde doldurur. Her lane içinde binalar
-    /// aşağıdan yukarı üst üste (footprint yüksekliği + küçük boşluk kadar ilerleyerek)
-    /// paketlenir; lane'ler arasında aisle (yol/boşluk) bırakılır. Tüm lane'ler ortak bir
-    /// açıyla hafifçe yatar ve Perlin gürültüsüyle yumuşakça kıvrılır → cetvel gibi düz değil,
-    /// paralel ama doğal bir sanayi-sokağı görünümü. Tüm ayarlar MapDecorPlacer'da serileştirilir.
+    /// Sanayi binalarını, RoadGenerator'ın ürettiği DÜZ IZGARA SOKAKLARININ iki kenarına dizer.
+    /// Her ızgara sokağı (industrialGridPaths) boyunca, bina ayak izi kadar aralıklarla, sokağın
+    /// her iki tarafına dik yönde ofsetli binalar yerleştirilir. Binalar dünya-dik kalır (şehir
+    /// binalarıyla aynı görünüm); yalnızca konumları yola göre hizalanır. Yola değen adaylar
+    /// dışarı doğru itilir (TryFindRoadFreePosition). Tüm ayarlar yukarıda + MapDecorPlacer'da
+    /// serileştirilir.
     /// </summary>
     void PlaceIndustrialLayout(MapGenerator map, BiomePaintSettings settings,
                                List<Vector2Int> tiles, float halfW, float halfH)
     {
+        // Yollar RoadGenerator'da çiziliyor. Yollar doğrulanana kadar bina yerleşimini atla.
+        // Açmak için industrialPlaceBuildings = true.
+        if (!industrialPlaceBuildings)
+        {
+            Debug.Log("MapDecorPlacer: industrial layout atlandı — industrialPlaceBuildings KAPALI " +
+                      "(MapDecorPlacer bileşenindeki 'Industrial Place Buildings' kutusunu işaretle).");
+            return;
+        }
+
         if (settings.industrialBuildings == null || settings.industrialBuildings.Count == 0)
         {
             Debug.Log("MapDecorPlacer: industrial layout atlandı — industrialBuildings boş.");
             return;
         }
-        if (tiles == null || tiles.Count == 0) return;
+
+        var rg = RoadGenerator.Instance;
+        if (rg == null || !rg.IsGenerated)
+        {
+            Debug.Log("MapDecorPlacer: industrial layout atlandı — yollar henüz üretilmedi.");
+            return;
+        }
+
+        var gridPaths = rg.GetIndustrialGridPaths();
+        if (gridPaths == null || gridPaths.Count == 0)
+        {
+            Debug.Log("MapDecorPlacer: industrial layout atlandı — sanayi ızgara yolu yok " +
+                      "(RoadGenerator.enableIndustrialGrids kapalı veya bölge çok küçük olabilir).");
+            return;
+        }
 
         // null sprite'lı entry'leri ele — geçerli indeksleri topla (dengeli seçim için)
         var valid = new List<int>();
@@ -42,133 +104,91 @@ public partial class MapDecorPlacer
             return;
         }
 
-        bool hasRoads = RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated;
+        Vector2 sr      = industrialScaleRange == Vector2.zero ? new Vector2(0.5f, 0.8f) : industrialScaleRange;
+        float density   = Mathf.Clamp01(industrialFillChance);
+        float alongSp   = Mathf.Max(0.4f, industrialAlongSpacing);
+        float jitterAmp = Mathf.Max(0f, industrialAlongJitter); // sokak boyunca (tile)
+        int rows        = Mathf.Max(1, industrialRowsPerSide);
+        int rowGap      = Mathf.Max(0, industrialRowSpacing);
 
-        // Hızlı tile lookup + bölge bounding box
-        var tileSet = new HashSet<Vector2Int>(tiles);
-        int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
-        for (int i = 0; i < tiles.Count; i++)
-        {
-            var t = tiles[i];
-            if (t.x < minX) minX = t.x;
-            if (t.x > maxX) maxX = t.x;
-            if (t.y < minY) minY = t.y;
-            if (t.y > maxY) maxY = t.y;
-        }
-
-        Vector2 sr     = industrialScaleRange == Vector2.zero ? new Vector2(0.5f, 0.8f) : industrialScaleRange;
-        int columns    = Mathf.Max(1, industrialLaneDepth);             // bir stripe kaç bina KOLONU geniş
-        int gap        = Mathf.Max(0, industrialBuildingGap);
-        float density  = industrialFillDensity > 0f ? industrialFillDensity : 1f;
-        // Sıkılık çarpanı: lane İÇİ kolon adımını (yatay) ve dikey ilerlemeyi birlikte küçültür →
-        // binalar stripe içinde her iki eksende de birbirine yanaşır, hatta hafifçe örtüşür →
-        // yoğun, sıkışık sanayi görünümü. DİKKAT: lane'ler arası mesafeyi (aisle) ETKİLEMEZ.
-        float packing  = Mathf.Clamp(industrialPacking, 0.3f, 1f);
-
-        // --- Birim uyumu: spacing'i TILE değil, BİNA AYAK İZİ cinsinden ölç --------------------
-        // Bir bina ~rect.height*scale tile yüksekliğinde (PPU=100, sprite PPU=100). Tile cinsinden
-        // laneWidth=4 gibi değerler bir binanın onda biri kadar kalıyordu; bu yüzden temsili bir
-        // ayak izi (fpW/fpH) hesaplayıp tüm geometriyi onun katları olarak kuruyoruz.
+        // --- Birim uyumu: spacing'i ortalama BİNA AYAK İZİ cinsinden ölç ----------------------
         float meanScale = (sr.x + sr.y) * 0.5f;
-        float fpW = 0f, fpH = 0f;
+        float fpW = 0f;
         for (int i = 0; i < valid.Count; i++)
-        {
-            var s = settings.industrialBuildings[valid[i]].daySprite;
-            fpW += s.rect.width  * meanScale;
-            fpH += s.rect.height * meanScale;
-        }
+            fpW += settings.industrialBuildings[valid[i]].daySprite.rect.width * meanScale;
         fpW /= valid.Count;  // ortalama bina genişliği (tile)
-        fpH /= valid.Count;  // ortalama bina yüksekliği (tile)
 
-        float colStep  = Mathf.Max(1f, fpW * packing);                  // stripe içi kolonlar arası yatay adım
-        float laneSpan = columns * colStep;                             // stripe genişliği (tile)
-        // Aisle: bina genişliği KATI olarak boşluk (örn. 1.5 = ~1.5 bina genişliği boş koridor).
-        float aisleSpan = Mathf.Max(0f, industrialAisleSpacing) * fpW;
-        float stride    = Mathf.Max(1f, laneSpan + aisleSpan);          // lane merkezleri arası mesafe — packing'den BAĞIMSIZ
+        // Sokak boyunca bina adımı (tile) — binalar yan yana dizilsin.
+        int stepAlong = Mathf.Max(1, Mathf.RoundToInt(fpW * alongSp));
 
-        // Hafif eğim: tüm lane'ler ortak bir açıyla yatar → paralel ama düz değil "sanayi" hissi.
-        // tiltSlope, Y boyunca her tile için kolon X'inin kaç tile kayacağı (tan(açı)).
-        float tiltSlope = Mathf.Tan(Mathf.Clamp(industrialLaneTiltDegrees, -45f, 45f) * Mathf.Deg2Rad);
+        // Yol kenarına kadar dik ofset tabanı: yol kalınlığı + outline + omuz + ek margin.
+        float roadClear = rg.industrialGridThickness * 0.5f + rg.industrialGridOutlineWidth
+                          + rg.shoulderWidth + Mathf.Max(0, industrialRoadEdgeMargin);
 
-        // Organik kıvrım: tüm stripe bir Perlin omurgasıyla birlikte dalgalanır (kolonlar bir arada
-        // kalır). Genlik/frekans ve bina jitter'ı tamamen inspector'dan ayarlanır.
-        float wobbleAmp  = Mathf.Max(0f, industrialLaneWobble);         // tile
-        float wobbleFreq = Mathf.Max(0.0001f, industrialLaneWobbleFrequency);
-        float jitterAmp  = Mathf.Max(0f, industrialBuildingJitter);    // tile
+        int[] sides = industrialLineBothSides ? new[] { +1, -1 } : new[] { +1 };
 
-        int placed = 0, lanes = 0;
+        int placed = 0, streets = 0;
         int[] spriteCounts = new int[valid.Count];
 
-        // Lane'leri kenara hizalı göstermemek için band başlangıcını rastgele kaydır.
-        float startX = minX + Random.value * stride;
-
-        int laneIndex = 0;
-        for (float laneBaseX = startX; laneBaseX <= maxX; laneBaseX += stride, laneIndex++)
+        foreach (var path in gridPaths)
         {
-            // Her lane'e ayrı bir gürültü fazı ver → komşu lane'ler aynı şekilde kıvrılmasın.
-            float noisePhase = laneIndex * 0.37f + Random.value * 0.13f;
-            bool anyInLane = false;
+            if (path == null || path.Count < 2) continue;
+            bool anyOnStreet = false;
 
-            // Stripe genişliği boyunca KOLONLAR: her kolon ayrı bir dikey bina dizisi.
-            for (int c = 0; c < columns; c++)
+            for (int p = 0; p < path.Count; p += stepAlong)
             {
-                float colX = laneBaseX + c * colStep;
+                Vector2Int c = path[p];
 
-                // Kolon boyunca aşağıdan yukarı süpür, binaları üst üste (dikey) paketle.
-                int y = minY;
-                while (y <= maxY)
+                // Sokak teğeti (komşu path noktalarından) ve dik yön.
+                int a = Mathf.Max(0, p - 1);
+                int b = Mathf.Min(path.Count - 1, p + 1);
+                Vector2 tangent = ((Vector2)(path[b] - path[a]));
+                if (tangent.sqrMagnitude < 1e-4f) tangent = Vector2.right;
+                tangent.Normalize();
+                Vector2 perp = new Vector2(-tangent.y, tangent.x);
+
+                // Sokak boyunca (teğet yönünde) rastgele kaydırma — yola uzaklığı bozmaz.
+                float jAlong = jitterAmp > 0f ? (Random.value - 0.5f) * 2f * jitterAmp : 0f;
+
+                foreach (int side in sides)
+                for (int row = 0; row < rows; row++)
                 {
+                    if (Random.value > density) continue;
+
                     int pick      = PickBalancedSpriteIndex(spriteCounts);
                     var entry     = settings.industrialBuildings[valid[pick]];
                     Sprite daySprite = entry.daySprite;
 
                     float scale = Random.Range(sr.x, sr.y);
-
-                    // Bina footprint yüksekliği (tile). 1 tile = 1/pixelsPerUnit dünya birimi,
-                    // yani tile yüksekliği = sprite piksel yüksekliği × scale.
                     int hTiles  = Mathf.Max(1, Mathf.RoundToInt(daySprite.rect.height * scale));
-                    int advance = Mathf.Max(1, Mathf.RoundToInt(hTiles * packing) + gap);
+                    float halfDepth = daySprite.rect.width * scale * 0.5f; // binanın yola bakan yarı-genişliği
 
-                    // Stripe omurgasının bu Y'deki kayması: eğim + ortak organik kıvrım. Jitter binaya özel.
-                    float wobble = wobbleAmp > 0f
-                        ? (Mathf.PerlinNoise(noisePhase, y * wobbleFreq) - 0.5f) * 2f * wobbleAmp
-                        : 0f;
-                    float jitter = jitterAmp > 0f ? (Random.value - 0.5f) * 2f * jitterAmp : 0f;
+                    // Yol merkezinden dik yönde dışarı ofset; her sıra bir bina boyu daha geride.
+                    float offset = roadClear + halfDepth + row * (fpW + rowGap);
+                    float baseX = c.x + perp.x * offset * side + tangent.x * jAlong;
+                    float baseY = c.y + perp.y * offset * side + tangent.y * jAlong;
 
-                    int tx = Mathf.RoundToInt(colX + tiltSlope * (y - minY) + wobble + jitter);
-                    int ty = y + hTiles / 2;
+                    // Sprite merkezini taban üstünden yukarı kaydır (taban yere otursun).
+                    int tx = Mathf.RoundToInt(baseX);
+                    int ty = Mathf.RoundToInt(baseY + hTiles * 0.5f);
 
-                    // Bu hücre sanayi bölgesinde değilse: tek tile ilerle (kolon boşlukta devam etsin).
-                    if (!tileSet.Contains(new Vector2Int(tx, ty)) ||
-                        !map.IsLand(tx, ty) || map.GetBiome(tx, ty) != 3)
-                    {
-                        y += 1;
+                    // Sanayi bölgesinde, karada ve kıyı tamponunda olmalı.
+                    if (!map.IsLand(tx, ty) || map.GetBiome(tx, ty) != 3) continue;
+                    if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) continue;
+
+                    // Yola değiyorsa dışarı doğru ittirerek yol-serbest bir konum bul; bulunamazsa atla.
+                    if (!TryFindRoadFreePosition(tx, ty, daySprite, scale, 4, industrialRoadEdgeMargin,
+                                                 out int fx, out int fy))
                         continue;
-                    }
+                    tx = fx; ty = fy;
+                    if (map.GetBiome(tx, ty) != 3 || !map.IsLand(tx, ty)) continue;
 
-                    if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) { y += advance; continue; }
-
-                    // Yoğunluk: bazı slotları boş bırakarak tam dolu görünümü kır.
-                    if (Random.value > density) { y += advance; continue; }
-
-                    // Yol kontrolü — special binalar gibi kaydırma yok, sadece reject.
-                    if (hasRoads && SpriteOverlapsRoad(tx, ty, daySprite, scale, cityMinRoadDistance))
-                    {
-                        y += advance;
-                        continue;
-                    }
-
-                    // Clearance'ı bina YÜKSEKLİK çemberine değil, packing GRID adımına bağla → kolonlar
-                    // omuz omuza paketlenir, dikey komşular da packing kadar yaklaşır/örtüşür. min(colStep,
-                    // advance)*0.45 → grid komşuları her zaman kabul, daha sıkışıklar (gross overlap) reddedilir.
-                    // industrialOverlapRadius taban (dünya birimi) olarak kalır.
-                    float stepTiles = Mathf.Min(colStep, advance);
-                    float effRadius = Mathf.Max(industrialOverlapRadius, (stepTiles * 0.45f) / pixelsPerUnit);
+                    float effRadius = (stepAlong * 0.45f) / pixelsPerUnit;
                     float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;
                     float wy = transform.position.y + (ty / pixelsPerUnit) - halfH;
 
-                    if (IsDenseOverlapping(wx, wy, effRadius)) { y += advance; continue; }
-                    denseOccupied.Add(new Vector3(wx, wy, effRadius));
+                    if (IsDenseOverlapping(wx, wy, effRadius)) continue;
+                    AddDense(wx, wy, effRadius);
 
                     float baseA   = 1f;
                     int sortOrder = 10 + (int)(wy * -100f);
@@ -177,7 +197,6 @@ public partial class MapDecorPlacer
                         daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder, entry.isIsometric);
                     go.name = "IndustrialBuilding";
 
-                    // Animasyonlu sanayi binası ise frame döngüsünü tak (gündüz + varsa gece).
                     AttachBuildingAnimators(daySR, nightSR, entry);
 
                     decorObjects.Add(go);
@@ -197,18 +216,16 @@ public partial class MapDecorPlacer
                     });
                     spriteCounts[pick]++;
                     placed++;
-                    anyInLane = true;
-
-                    y += advance;
+                    anyOnStreet = true;
                 }
             }
 
-            if (anyInLane) lanes++;
+            if (anyOnStreet) streets++;
         }
 
-        Debug.Log($"MapDecorPlacer: industrial layout — lanes={lanes}, placed={placed}, " +
-                  $"columns/lane={columns}, colStep={colStep:F1}, laneSpan={laneSpan:F1}, aisleSpan={aisleSpan:F1}, " +
-                  $"stride={stride:F1}, fp={fpW:F0}x{fpH:F0}, gap={gap}, packing={packing:F2}, tilt={industrialLaneTiltDegrees}°, " +
-                  $"wobble={wobbleAmp:F1}/{wobbleFreq:F3}, jitter={jitterAmp:F1}");
+        Debug.Log($"MapDecorPlacer: industrial layout (yol kenarı) — streets={streets}/{gridPaths.Count}, " +
+                  $"placed={placed}, stepAlong={stepAlong}, rows={rows}, roadClear={roadClear:F1}, fp={fpW:F0}, " +
+                  $"bothSides={industrialLineBothSides}, margin={industrialRoadEdgeMargin}, " +
+                  $"fillChance={density:F2}, alongJitter={jitterAmp:F1}");
     }
 }

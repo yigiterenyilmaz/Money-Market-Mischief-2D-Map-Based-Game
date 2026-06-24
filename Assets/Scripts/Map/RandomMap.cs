@@ -528,20 +528,27 @@ public class MapGenerator : MonoBehaviour
     {
         bool touchesEdge = false;
         Stack<Vector2Int> stack = new Stack<Vector2Int>();
-        stack.Push(new Vector2Int(startX, startY));
+
+        // Mark visited at push time (not pop) so a tile is never queued more than once.
+        void Push(int x, int y)
+        {
+            if (x < 0 || x >= width || y < 0 || y >= height) return;
+            if (visited[x, y] || landMap[x, y]) return;
+            visited[x, y] = true;
+            stack.Push(new Vector2Int(x, y));
+        }
+
+        Push(startX, startY);
         while (stack.Count > 0)
         {
             Vector2Int pos = stack.Pop();
             int x = pos.x, y = pos.y;
-            if (x < 0 || x >= width || y < 0 || y >= height) continue;
-            if (visited[x, y] || landMap[x, y]) continue;
-            visited[x, y] = true;
             region.Add(pos);
             if (x == 0 || x == width - 1 || y == 0 || y == height - 1) touchesEdge = true;
-            stack.Push(new Vector2Int(x + 1, y));
-            stack.Push(new Vector2Int(x - 1, y));
-            stack.Push(new Vector2Int(x, y + 1));
-            stack.Push(new Vector2Int(x, y - 1));
+            Push(x + 1, y);
+            Push(x - 1, y);
+            Push(x, y + 1);
+            Push(x, y - 1);
         }
         return touchesEdge;
     }
@@ -646,6 +653,8 @@ public class MapGenerator : MonoBehaviour
         float warpScale    = 0.05f;
         float noiseOffset  = Random.Range(0f, 1000f);
 
+        for (int i = 0; i < 5; i++) biomeTileCounts[i] = 0;
+
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -656,6 +665,7 @@ public class MapGenerator : MonoBehaviour
                 if (seaRockMap[x, y])
                 {
                     biomeMap[x, y] = 5;
+                    biomeTileCounts[4]++;
                     continue;
                 }
 
@@ -674,16 +684,9 @@ public class MapGenerator : MonoBehaviour
                 }
 
                 biomeMap[x, y] = nearestBiome;
+                if (nearestBiome >= 1 && nearestBiome <= 5) biomeTileCounts[nearestBiome - 1]++;
             }
         }
-
-        for (int i = 0; i < 5; i++) biomeTileCounts[i] = 0;
-        for (int x = 0; x < width; x++)
-            for (int y = 0; y < height; y++)
-            {
-                int b = biomeMap[x, y];
-                if (b >= 1 && b <= 5) biomeTileCounts[b - 1]++;
-            }
 
         Debug.Log($"Biomes - Forest(BG): {(finalRatios[0]*100):F1}%, " +
                   $"Desert: {biomeActive[0]} ({(finalRatios[1]*100):F1}%), " +
@@ -742,7 +745,8 @@ public class MapGenerator : MonoBehaviour
 
     Texture2D CreateTexture()
     {
-        Texture2D texture = new Texture2D(width, height);
+        // Point-filtered pixel map never samples mips → skip the mip chain (saves ~33% memory + Apply cost).
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
         texture.filterMode = FilterMode.Point;
         Color[] biomeColors = { biome1Color, biome2Color, biome3Color, biome4Color, biome5Color };
 
@@ -776,7 +780,8 @@ public class MapGenerator : MonoBehaviour
         OnMapGenerated?.Invoke();
     }
 
-    public void SetTile(int x, int y, bool isLand, int biome = 1)
+    // apply=false lets callers batch many edits and upload once (Apply() re-uploads the whole texture).
+    public void SetTile(int x, int y, bool isLand, int biome = 1, bool apply = true)
     {
         if (x < 0 || x >= width || y < 0 || y >= height) return;
         landMap[x, y]  = isLand;
@@ -788,7 +793,7 @@ public class MapGenerator : MonoBehaviour
             baseColor = Color.Lerp(baseColor, fogColor, fogMap[x, y]);
 
         mapTexture.SetPixel(x, y, baseColor);
-        mapTexture.Apply();
+        if (apply) mapTexture.Apply();
     }
 
     public int[,] GetBiomeMapCopy()

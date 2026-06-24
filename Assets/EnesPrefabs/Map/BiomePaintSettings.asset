@@ -23,9 +23,9 @@ MonoBehaviour:
   agriculturalLight: {r: 0.28235295, g: 0.46274513, b: 0.26666668, a: 1}
   citiesDark: {r: 0.3187549, g: 0.4490565, b: 0.297394, a: 1}
   citiesLight: {r: 0.38739765, g: 0.5471698, b: 0.35411176, a: 1}
-  industrialDark: {r: 0.2899468, g: 0.29803923, b: 0.18039216, a: 1}
-  industrialLight: {r: 0.42796475, g: 0.45882353, b: 0.2784314, a: 1}
-  industrialCrack: {r: 0.3056603, g: 0.21944104, b: 0.13322175, a: 1}
+  industrialDark: {r: 0.30257076, g: 0.3056603, b: 0.2624065, a: 1}
+  industrialLight: {r: 0.4418985, g: 0.4566037, b: 0.37131357, a: 1}
+  industrialCrack: {r: 0.3132075, g: 0.2520434, b: 0.19087929, a: 1}
   seaRockDark: {r: 0.38, g: 0.38, b: 0.4, a: 1}
   seaRockLight: {r: 0.56, g: 0.55, b: 0.54, a: 1}
   seaRockCrack: {r: 0.24, g: 0.23, b: 0.22, a: 1}
@@ -64,6 +64,7 @@ MonoBehaviour:
     style: 0
     scaleRange: {x: 0.6, y: 0.8}
     fillDensity: 0.974
+    thinning: 0
     overlapRadius: 0.08
     gridStep: 18
     scatterRate: 2
@@ -78,6 +79,7 @@ MonoBehaviour:
     style: 1
     scaleRange: {x: 0.42, y: 0.58}
     fillDensity: 0.353
+    thinning: 0
     overlapRadius: 0.14
     gridStep: 22
     scatterRate: 2
@@ -141,6 +143,7 @@ MonoBehaviour:
     style: 2
     scaleRange: {x: 0.28, y: 0.42}
     fillDensity: 0.808
+    thinning: 1
     overlapRadius: 0.02
     gridStep: 18
     scatterRate: 20
@@ -252,3 +255,5 @@ MonoBehaviour:
     - {fileID: -5747762080561553749, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
     - {fileID: -2178313058140480348, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
     frameRate: 4
+  urbanBuildings: []
+  agriculturalBuildings: []

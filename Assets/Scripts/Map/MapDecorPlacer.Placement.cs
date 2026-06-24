@@ -7,7 +7,7 @@ using UnityEngine;
 public partial class MapDecorPlacer
 {
     // Kenar seyrelmesi için: belediye tile'ı ve şehrin belediyeden en uzak tile mesafesi (tile).
-    private Vector2Int cityHallTileCached = new Vector2Int(-1, -1);
+        private Vector2Int cityHallTileCached = new Vector2Int(-1, -1);
     private float      cityRadiusTiles;
     // Her şehir tile'ının biome-2 bölge KENARINA tile cinsinden uzaklığı (BFS ile).
     // Bölge dışı / harita dışı = 0; kenara bitişik şehir tile'ı = 1; içeri doğru artar.
@@ -127,41 +127,87 @@ public partial class MapDecorPlacer
     // Kenara doğru seyrelme YOĞUNLUK çarpanı (0..1). Yoğun bölgede 1, kenarda (1-edgeThinning).
     // NOT: Tek başına yoğunluk düşürmek overlap'e doyan (Scatter) katmanlarda görünmez —
     // asıl seyrelme RadialSpacingMultiplier (aralık büyütme) ile sağlanır.
-    float RadialDensityMultiplier(int tx, int ty)
+    float RadialDensityMultiplier(int tx, int ty, bool enabled = true)
     {
-        if (edgeThinning <= 0f) return 1f;
+        if (!enabled || edgeThinning <= 0f) return 1f;
         return Mathf.Lerp(1f, 1f - edgeThinning, EdgeThinFactor(tx, ty));
     }
 
     // Kenara doğru bina ARALIĞI çarpanı (>= 1). Yoğun bölgede 1×, kenarda en fazla
     // (1 + edgeThinning*3)× — effRadius ile çarpılır → binalar kenara doğru fiziksel olarak
     // daha seyrek dizilir. Overlap'e doyan katmanlarda bile çalışan asıl mekanizma budur.
-    float RadialSpacingMultiplier(int tx, int ty)
+    float RadialSpacingMultiplier(int tx, int ty, bool enabled = true)
     {
-        if (edgeThinning <= 0f) return 1f;
+        if (!enabled || edgeThinning <= 0f) return 1f;
         return Mathf.Lerp(1f, 1f + edgeThinning * 3f, EdgeThinFactor(tx, ty));
+    }
+
+    // Yerleştirilmiş bina footprint'leri için düzgün ızgara (spatial hash). denseOccupied'ı
+    // doğrusal taramak yerine yalnızca komşu hücrelere bakar → yerleşim O(n²) yerine O(n·yerel).
+    // Sonuç doğrusal taramayla AYNI: hücre başına TAM per-item test çalışır; arama yarıçapı
+    // (myRadius + denseMaxRadius) hiçbir çakışan binayı atlamayı imkânsız kılar (behind faktörü
+    // mesafeyi yalnızca küçültür, asla büyütmez).
+    private readonly Dictionary<Vector2Int, List<int>> denseGrid = new Dictionary<Vector2Int, List<int>>();
+    private float denseCellSize  = 0f; // 0 = henüz başlatılmadı; ilk binanın çapından türetilir
+    private float denseMaxRadius = 0f;
+
+    Vector2Int DenseCell(float wx, float wy)
+        => new Vector2Int(Mathf.FloorToInt(wx / denseCellSize), Mathf.FloorToInt(wy / denseCellSize));
+
+    // denseOccupied.Add yerine bunu çağır — listeye ekler VE ızgaraya indeksler.
+    void AddDense(float wx, float wy, float radius)
+    {
+        int idx = denseOccupied.Count;
+        denseOccupied.Add(new Vector3(wx, wy, radius));
+
+        if (denseCellSize <= 0f) denseCellSize = Mathf.Max(0.05f, radius * 2f);
+        if (radius > denseMaxRadius) denseMaxRadius = radius;
+
+        Vector2Int cell = DenseCell(wx, wy);
+        if (!denseGrid.TryGetValue(cell, out var list)) { list = new List<int>(); denseGrid[cell] = list; }
+        list.Add(idx);
+    }
+
+    void ClearDenseGrid()
+    {
+        denseGrid.Clear();
+        denseCellSize  = 0f;
+        denseMaxRadius = 0f;
     }
 
     bool IsDenseOverlapping(float wx, float wy, float myRadius)
     {
-        for (int i = 0; i < denseOccupied.Count; i++)
+        if (denseGrid.Count == 0) return false;
+
+        float reach = myRadius + denseMaxRadius;
+        int minCx = Mathf.FloorToInt((wx - reach) / denseCellSize);
+        int maxCx = Mathf.FloorToInt((wx + reach) / denseCellSize);
+        int minCy = Mathf.FloorToInt((wy - reach) / denseCellSize);
+        int maxCy = Mathf.FloorToInt((wy + reach) / denseCellSize);
+
+        for (int cx = minCx; cx <= maxCx; cx++)
+        for (int cy = minCy; cy <= maxCy; cy++)
         {
-            var other = denseOccupied[i];
-            float minDist = myRadius + other.z; // iki sprite'ın yarıçapı toplamı
-            float dx = wx - other.x;
-            float dy = wy - other.y;
-            float distSq = dx * dx + dy * dy;
-
-            // Yarı-izometrik derinlik: aday bina, mevcut binanın ARKASINDA (yukarıda, +Y)
-            // ise o bina tarafından kısmen örtülür. Ne kadar "tam arkada" ise gerekli aralık
-            // o kadar azalır (behindClearanceFactor'a doğru). Yana/öne doğru tam aralık korunur.
-            if (behindClearanceFactor < 1f && distSq > 0.0000001f && dy > 0f)
+            if (!denseGrid.TryGetValue(new Vector2Int(cx, cy), out var list)) continue;
+            for (int k = 0; k < list.Count; k++)
             {
-                float upFraction = dy / Mathf.Sqrt(distSq);          // 0 = yanda, 1 = tam arkada
-                minDist *= Mathf.Lerp(1f, behindClearanceFactor, upFraction);
-            }
+                var other = denseOccupied[list[k]];
+                float minDist = myRadius + other.z; // iki sprite'ın yarıçapı toplamı
+                float dx = wx - other.x;
+                float dy = wy - other.y;
+                float distSq = dx * dx + dy * dy;
 
-            if (distSq < minDist * minDist) return true;
+                // Yarı-izometrik derinlik: aday bina, mevcut binanın ARKASINDA (yukarıda, +Y)
+                // ise o bina tarafından kısmen örtülür. Ne kadar "tam arkada" ise gerekli aralık
+                // o kadar azalır (behindClearanceFactor'a doğru). Yana/öne doğru tam aralık korunur.
+                if (behindClearanceFactor < 1f && distSq > 0.0000001f && dy > 0f)
+                {
+                    float upFraction = dy / Mathf.Sqrt(distSq);          // 0 = yanda, 1 = tam arkada
+                    minDist *= Mathf.Lerp(1f, behindClearanceFactor, upFraction);
+                }
+
+                if (distSq < minDist * minDist) return true;
+            }
         }
         return false;
     }

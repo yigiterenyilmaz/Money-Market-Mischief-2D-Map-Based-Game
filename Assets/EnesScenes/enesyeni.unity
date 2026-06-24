@@ -10721,6 +10721,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bfa8aed3e4a23de4c830d90cafb5a698, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapDecorPlacer
+  agriculturalPlaceBuildings: 1
+  agriculturalScaleRange: {x: 0.35, y: 0.55}
+  agriculturalFillDensity: 0.1
+  agriculturalScatterRate: 2
+  agriculturalSpacing: 1
   cellSize: 12
   pixelsPerUnit: 100
   spriteZ: -0.5
@@ -10739,6 +10744,9 @@ MonoBehaviour:
   shadowMidScale: 0.1
   daytimeSweepFraction: 0.098
   shadowSpeedSmoothing: 0.6
+  shadowLeanDegrees: 55
+  shadowProjectLength: 3
+  shadowBaseRaiseRatio: 0.15
   isoShadowAngleDegrees: 30
   isoShadowPivotOffsetRatio: 0.1
   isoShadowNearScale: 0.7
@@ -10752,17 +10760,6 @@ MonoBehaviour:
   specialBigCityTileCount: 3000
   edgeThinning: 0.5
   edgeThinningBorderTiles: 30
-  industrialScaleRange: {x: 0.5, y: 0.8}
-  industrialLaneDepth: 3
-  industrialAisleSpacing: 0.87
-  industrialBuildingGap: 0
-  industrialFillDensity: 1
-  industrialPacking: 0.406
-  industrialOverlapRadius: 0.003
-  industrialLaneTiltDegrees: 11
-  industrialLaneWobble: 3
-  industrialLaneWobbleFrequency: 0.015
-  industrialBuildingJitter: 0.14
   brokenBuildingSprites: []
   brokenBuildingTint: {r: 0.55, g: 0.45, b: 0.4, a: 1}
   brokenBuildingSpritesNight: []
@@ -10790,6 +10787,20 @@ MonoBehaviour:
   shipShoreAvoidanceWeight: 2.5
   shipTurnSpeed: 102
   shipPathSmoothingPasses: 3
+  industrialPlaceBuildings: 1
+  industrialLineBothSides: 1
+  industrialScaleRange: {x: 0.5, y: 0.8}
+  industrialRoadEdgeMargin: 1
+  industrialRowsPerSide: 1
+  industrialRowSpacing: 1
+  industrialAlongSpacing: 1
+  industrialFillChance: 1
+  industrialAlongJitter: 0.2
+  urbanPlaceBuildings: 1
+  urbanScaleRange: {x: 0.35, y: 0.55}
+  urbanFillDensity: 0.15
+  urbanScatterRate: 2
+  urbanSpacing: 0.8
 --- !u!114 &1710072564
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11014,6 +11025,16 @@ MonoBehaviour:
   citiesShoulder: {r: 0.4, g: 0.36, b: 0.3, a: 1}
   industrialShoulder: {r: 0.26, g: 0.22, b: 0.18, a: 1}
   urbanShoulder: {r: 0.4, g: 0.38, b: 0.32, a: 1}
+  enableIndustrialGrids: 1
+  industrialBlockWidth: 52
+  industrialBlockHeight: 51
+  industrialGridThickness: 2
+  industrialGridOutlineWidth: 1
+  industrialGridAngle: 3.7
+  industrialGridMinRegionTiles: 400
+  industrialGridConnectToNetwork: 1
+  industrialGridFill: {r: 0.32, g: 0.31, b: 0.29, a: 1}
+  industrialGridOutline: {r: 0.18, g: 0.17, b: 0.16, a: 1}
   enableJunctionPlateaus: 1
   junctionPlateauRadius: 2
   enableCenterStripes: 0
@@ -11038,6 +11059,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoadTrafficSystem
   mapPainter: {fileID: 1710072559}
   roadGenerator: {fileID: 1710072573}
+  mapDecorPlacer: {fileID: 0}
   carSprite: {fileID: -7011324565457971746, guid: 6601d8a1f536eb04fb2bba756b231ba9, type: 3}
   carSpriteNight: {fileID: 21300000, guid: 9bb349990f88427419f3d65f38ccdbf7, type: 3}
   carSpriteHeadlights: {fileID: 21300000, guid: 107c90563ab32fc4eb5add6fb2a2e0a2, type: 3}

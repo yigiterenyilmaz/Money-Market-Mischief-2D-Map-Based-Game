@@ -16,6 +16,9 @@ public class RoadTrafficSystem : MonoBehaviour
     [Header("References")]
     public MapPainter    mapPainter;
     public RoadGenerator roadGenerator;
+    [Tooltip("Araba gölgeleri bina gölge sistemiyle aynı renk/parametreleri kullanır. " +
+             "Atanmazsa araba gölgesi üretilmez.")]
+    public MapDecorPlacer mapDecorPlacer;
 
     [Header("Car Sprite")]
     public Sprite carSprite;
@@ -49,6 +52,19 @@ public class RoadTrafficSystem : MonoBehaviour
 
     private struct JunctionEntry { public int pathIndex; public int pixelIndex; }
 
+    // Araba gölgesi — bina (flat) gölgeleriyle aynı trapez mesh yaklaşımı. Arabalar döndüğü için
+    // gölge arabanın ALTINA değil, carParent (dönmeyen) altına ayrı bir GameObject olarak konur;
+    // her frame dünya-uzayında güneş yönünde konumlanır/uzatılır (binalar gibi).
+    private class CarShadow
+    {
+        public Transform    transform;
+        public Mesh         mesh;
+        public Material     material;
+        public Vector3[]    verts;
+        public float        halfWidth;
+        public float        halfHeight;
+    }
+
     private class Car
     {
         public int   pathIndex;
@@ -60,6 +76,7 @@ public class RoadTrafficSystem : MonoBehaviour
         public SpriteRenderer daySR;
         public SpriteRenderer nightSR;       // null if no night sprite assigned
         public SpriteRenderer headlightSR;   // null if no headlight sprite assigned
+        public CarShadow      shadow;        // null if mapDecorPlacer not assigned
         public Quaternion     currentRotation;
         public Vector2        smoothedDir;
         public Vector3        smoothedWorldPos;
@@ -93,6 +110,9 @@ public class RoadTrafficSystem : MonoBehaviour
 
     // crossfade tracking
     private float prevLightingRatio = -1f;
+
+    // gölge için cache'lenen DayNightCycle referansı
+    private DayNightCycle dayNight;
 
     // -------------------------------------------------------------------------
     // LIFECYCLE
@@ -163,6 +183,13 @@ public class RoadTrafficSystem : MonoBehaviour
             foreach (var seg in branches)
                 if (seg != null && seg.Count >= 10) allPaths.Add(seg);
 
+        // Sanayi izgara sokaklari — branch'ler gibi (highwayPathCount sonrasi) eklenir, boylece
+        // kavsaklarda her zaman donerler ve highway/branch agina BuildJunctions ile baglanir.
+        var gridPaths = roadGenerator.GetIndustrialGridPaths();
+        if (gridPaths != null)
+            foreach (var seg in gridPaths)
+                if (seg != null && seg.Count >= 10) allPaths.Add(seg);
+
         BuildJunctions();
         SpawnCars();
 
@@ -208,6 +235,9 @@ public class RoadTrafficSystem : MonoBehaviour
                 car.currentRotation = DirToRotation(car.smoothedDir);
 
                 car.go = GetFromPool();
+
+                // --- Shadow (bina flat gölgesiyle aynı görünüm) ---
+                car.shadow = (mapDecorPlacer != null) ? CreateCarShadow() : null;
 
                 // --- Day renderer (first child or root SpriteRenderer) ---
                 car.daySR = car.go.GetComponent<SpriteRenderer>();
@@ -284,6 +314,9 @@ public class RoadTrafficSystem : MonoBehaviour
         // Apply initial crossfade
         var dn = DayNightCycle.Instance;
         if (dn != null) ApplyCarCrossfade(dn.LightingRatio);
+
+        // Apply initial shadow placement
+        UpdateCarShadows();
     }
 
     Color PickCarColor()
@@ -307,6 +340,9 @@ public class RoadTrafficSystem : MonoBehaviour
 
         // --- Smooth crossfade ---
         UpdateCarCrossfade();
+
+        // --- Dynamic shadows (bina sistemiyle aynı) ---
+        UpdateCarShadows();
 
         float dt = Time.deltaTime;
         float fadeSpeed = 2f; //saniyede alpha değişim hızı (0.5sn tam geçiş)
@@ -604,6 +640,192 @@ public class RoadTrafficSystem : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
+    // CAR SHADOWS  (bina flat gölge sistemiyle birebir aynı: trapez mesh, güneş yönü,
+    //               aynı shadowColor + gündüz/gece alpha fade)
+    // -------------------------------------------------------------------------
+
+    // Bina AddShadow flat dalının araba sürümü. Mesh sprite siluetini (carSprite UV) trapez'e
+    // basar; UpdateCarShadows her frame vertex + pozisyon + flip günceller.
+    CarShadow CreateCarShadow()
+    {
+        Sprite sprite = carSprite;
+
+        GameObject go = new GameObject("CarShadow");
+        go.transform.SetParent(carParent, false);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localRotation = Quaternion.identity;
+        go.transform.localScale    = Vector3.one;
+
+        float halfWidth  = sprite.rect.width  / sprite.pixelsPerUnit * 0.5f;
+        float halfHeight = sprite.rect.height / sprite.pixelsPerUnit * 0.5f;
+
+        // Başlangıç vertex'leri — UpdateCarShadows her frame yeniden yazar.
+        Vector3[] verts = new Vector3[4];
+        verts[0] = new Vector3(0f,             -halfHeight, 0f);
+        verts[1] = new Vector3(0f,             +halfHeight, 0f);
+        verts[2] = new Vector3(halfWidth * 2f, +halfHeight * mapDecorPlacer.shadowTipRatio, 0f);
+        verts[3] = new Vector3(halfWidth * 2f, -halfHeight * mapDecorPlacer.shadowTipRatio, 0f);
+
+        // Flat UV — sprite atlas rect'i trapez'e olduğu yönde basılır (bina flat dalı ile aynı).
+        Rect r   = sprite.rect;
+        float tw = sprite.texture.width;
+        float th = sprite.texture.height;
+        Vector2 uvMin = new Vector2(r.x / tw, r.y / th);
+        Vector2 uvMax = new Vector2((r.x + r.width) / tw, (r.y + r.height) / th);
+
+        Vector2[] uvs = new Vector2[4];
+        uvs[0] = new Vector2(uvMin.x, uvMin.y);
+        uvs[1] = new Vector2(uvMin.x, uvMax.y);
+        uvs[2] = new Vector2(uvMax.x, uvMax.y);
+        uvs[3] = new Vector2(uvMax.x, uvMin.y);
+
+        int[] tris = new int[] { 0, 1, 2, 0, 2, 3 };
+
+        Mesh mesh = new Mesh { name = "CarShadowTrapezoid" };
+        mesh.MarkDynamic();
+        mesh.vertices  = verts;
+        mesh.uv        = uvs;
+        mesh.triangles = tris;
+        mesh.RecalculateBounds();
+
+        go.AddComponent<MeshFilter>().sharedMesh = mesh;
+
+        MeshRenderer mr = go.AddComponent<MeshRenderer>();
+        Material mat = new Material(Shader.Find("Sprites/Default"));
+        mat.mainTexture   = sprite.texture;
+        mat.color         = mapDecorPlacer.shadowColor;
+        mr.sharedMaterial = mat;
+        mr.sortingLayerName = carSortingLayer;
+        mr.sortingOrder     = carSortingOrder - 1; // arabanın altında
+
+        go.SetActive(false); // ilk UpdateCarShadows konumlandırana kadar gizli
+
+        return new CarShadow
+        {
+            transform  = go.transform,
+            mesh       = mesh,
+            material   = mat,
+            verts      = verts,
+            halfWidth  = halfWidth,
+            halfHeight = halfHeight,
+        };
+    }
+
+    // Bina UpdateShadows ile aynı güneş matematiği (flat dal). Tüm güneş-türevi değerler frame
+    // başına bir kez hesaplanır, sonra her arabanın gölge trapezi güncellenir.
+    void UpdateCarShadows()
+    {
+        if (mapDecorPlacer == null) return;
+        if (dayNight == null) dayNight = DayNightCycle.Instance;
+        if (dayNight == null) return;
+
+        float sunProgress = dayNight.SunProgress;
+        bool  isNight     = sunProgress < 0f;
+
+        float lightingRatio = dayNight.LightingRatio;
+        float alphaFactor   = 1f - lightingRatio;
+
+        if (isNight || alphaFactor <= 0.001f)
+        {
+            for (int i = 0; i < activeCars.Count; i++)
+                if (activeCars[i].shadow != null)
+                    activeCars[i].shadow.transform.gameObject.SetActive(false);
+            return;
+        }
+
+        // -- Süpürme yeniden eşlemesi (MapDecorPlacer.UpdateShadows ile birebir) -----------------
+        float sweep01;
+        if (mapDecorPlacer.daytimeSweepFraction > 0f)
+        {
+            float a = dayNight.SunDayStart;
+            float b = dayNight.SunDayEnd;
+
+            float naturalDay = Mathf.Clamp01(b - a);
+            float frac = Mathf.Max(Mathf.Clamp01(mapDecorPlacer.daytimeSweepFraction), naturalDay);
+            float half = frac * 0.5f;
+            float lo   = 0.5f - half;
+            float hi   = 0.5f + half;
+
+            float dawnLine = (a > 1e-4f) ? Mathf.Lerp(0f, lo, sunProgress / a) : lo;
+            float dayLine  = Mathf.Lerp(lo, hi, (sunProgress - a) / Mathf.Max(1e-4f, b - a));
+            float duskLine = Mathf.Lerp(hi, 1f, (sunProgress - b) / Mathf.Max(1e-4f, 1f - b));
+
+            float k     = Mathf.Clamp01(mapDecorPlacer.shadowSpeedSmoothing);
+            float bandA = 0.5f * k * Mathf.Min(a,      b - a);
+            float bandB = 0.5f * k * Mathf.Min(1f - b, b - a);
+            float sA = (bandA > 1e-5f) ? Mathf.SmoothStep(0f, 1f, (sunProgress - (a - bandA)) / (2f * bandA))
+                                       : (sunProgress >= a ? 1f : 0f);
+            float sB = (bandB > 1e-5f) ? Mathf.SmoothStep(0f, 1f, (sunProgress - (b - bandB)) / (2f * bandB))
+                                       : (sunProgress >= b ? 1f : 0f);
+
+            sweep01 = Mathf.Lerp(Mathf.Lerp(dawnLine, dayLine, sA), duskLine, sB);
+        }
+        else
+        {
+            sweep01 = Mathf.Clamp01(sunProgress);
+        }
+
+        float shadowDir = sweep01 * 2f - 1f;
+        float dirSign   = shadowDir >= 0f ? 1f : -1f;
+        float altitude  = Mathf.Sin(Mathf.PI * sweep01);
+
+        float lenT         = Mathf.Pow(altitude, mapDecorPlacer.shadowHeightRatio);
+        float lengthFactor = Mathf.Lerp(mapDecorPlacer.shadowMaxLength, mapDecorPlacer.shadowMidScale, lenT);
+
+        Color baseCol = mapDecorPlacer.shadowColor;
+        float baseA   = mapDecorPlacer.shadowColor.a * alphaFactor;
+
+        for (int i = 0; i < activeCars.Count; i++)
+        {
+            Car car = activeCars[i];
+            CarShadow sh = car.shadow;
+            if (sh == null || sh.transform == null) continue;
+
+            sh.transform.gameObject.SetActive(true);
+
+            float scale = car.scaleFactor;
+
+            // Pivot = gölgenin arabaya bitişik kenarı; container scale.x işareti = flip (bina flat dalı).
+            // carParent dönmediği için bu birebir bina davranışıdır; gölge dünya-uzayında güneş yönüne uzar.
+            Vector3 cp = car.smoothedWorldPos;
+            sh.transform.position   = new Vector3(cp.x + shadowDir * sh.halfWidth * scale, cp.y, cp.z);
+            sh.transform.localScale = new Vector3(dirSign * scale, scale, 1f);
+
+            float near   = sh.halfHeight * mapDecorPlacer.shadowNearScale;
+            float far    = near * mapDecorPlacer.shadowTipRatio;
+            float length = sh.halfWidth * 2f * lengthFactor;
+
+            sh.verts[0] = new Vector3(0f,     -near, 0f);
+            sh.verts[1] = new Vector3(0f,     +near, 0f);
+            sh.verts[2] = new Vector3(length, +far, 0f);
+            sh.verts[3] = new Vector3(length, -far, 0f);
+            sh.mesh.vertices = sh.verts;
+            sh.mesh.RecalculateBounds();
+
+            // Alpha — bina ile aynı (gündüz/gece fade) + arabanın spawn/despawn fade'i.
+            if (sh.material != null)
+            {
+                baseCol.a = baseA * car.fadeAlpha;
+                sh.material.color = baseCol;
+            }
+        }
+    }
+
+    void DestroyCarShadow(Car car)
+    {
+        if (car.shadow != null && car.shadow.transform != null)
+            Destroy(car.shadow.transform.gameObject);
+        car.shadow = null;
+    }
+
+    void SetCarShadowsVisible(bool visible)
+    {
+        for (int i = 0; i < activeCars.Count; i++)
+            if (activeCars[i].shadow != null && activeCars[i].shadow.transform != null)
+                activeCars[i].shadow.transform.gameObject.SetActive(visible);
+    }
+
+    // -------------------------------------------------------------------------
     // ROAD BREAKING
     // -------------------------------------------------------------------------
 
@@ -805,6 +1027,8 @@ public class RoadTrafficSystem : MonoBehaviour
 
     void ReturnToPool(Car car)
     {
+        // Gölge GO'su araba GO'sundan ayrı (carParent altında) — pool'a girmez, yok edilir.
+        DestroyCarShadow(car);
         if (car.go == null) return;
         car.go.SetActive(false);
         pool.Enqueue(car.go);
@@ -936,6 +1160,7 @@ public class RoadTrafficSystem : MonoBehaviour
     {
         active = false;
         foreach (var car in activeCars) if (car.go != null) car.go.SetActive(false);
+        SetCarShadowsVisible(false);
     }
 
     public void ResumeTraffic()
@@ -943,6 +1168,7 @@ public class RoadTrafficSystem : MonoBehaviour
         if (activeCars.Count == 0) return;
         foreach (var car in activeCars) if (car.go != null) car.go.SetActive(true);
         active = true;
+        // Gölgeler bir sonraki UpdateCarShadows'ta gündüz/gece durumuna göre tekrar açılır.
     }
 
     public void Reinitialize() { StopTraffic(); Initialize(); }

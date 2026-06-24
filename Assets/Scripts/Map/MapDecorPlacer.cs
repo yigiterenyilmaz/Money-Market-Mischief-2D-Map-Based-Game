@@ -49,6 +49,12 @@ public partial class MapDecorPlacer : MonoBehaviour
     [Range(0f, 0.95f)] public float daytimeSweepFraction = 0.6f;
     [Tooltip("Gündüz↔şafak/akşam HIZ geçişi ne kadar yumuşatılsın? Gölge süpürme hızı faz sınırında (gündüz başı/sonu) ani değişir. Bu oran o sınırda hızı smoothstep ile harmanlar; bant genişliği komşu faz uzunluklarından türetilir. 0 = ani (sert köşe), 1 = en yumuşak.")]
     [Range(0f, 1f)] public float shadowSpeedSmoothing = 0.6f;
+    [Tooltip("Flat projeksiyon gölge: öğleden (düz aşağı) sabaha/akşama doğru yana en fazla eğilme açısı (derece). shadowDir = -1 sol, +1 sağ.")]
+    [Range(0f, 85f)] public float shadowLeanDegrees = 55f;
+    [Tooltip("Flat projeksiyon gölge: lengthFactor'ı dikey ölçeğe (gölge uzunluğu) çeviren çarpan. Büyük = alçak güneşte gölge daha uzun uzar.")]
+    [Range(0.5f, 8f)] public float shadowProjectLength = 3f;
+    [Tooltip("Flat projeksiyon gölge taban yüksekliği: 0 = sprite en alt kenarı, 1 = sprite merkezi. Gölge dönme/uzama noktasını bu kadar yukarı taşır (halfHeight oranı).")]
+    [Range(0f, 1f)] public float shadowBaseRaiseRatio = 0.35f;
 
     [Header("Isometric Shadow — İzometrik İkonlar İçin")]
     [Tooltip("İzometrik açı (derece). Gölge bu yönde diyagonal uzar. 30 = klasik iso.")]
@@ -98,36 +104,6 @@ public partial class MapDecorPlacer : MonoBehaviour
              "0 = bölge kenarına göre seyrelme yok (yalnızca belediyeye uzaklık bazlı seyrelme). " +
              "Mahalle outerRadius'u büyük olduğunda asıl kenar bu olduğundan etkili olan budur.")]
     [Range(0, 120)] public int edgeThinningBorderTiles = 30;
-
-    [Header("Industrial Layout — Sanayi Bölgesi (Dikey Lane Düzeni)")]
-    [Tooltip("Sanayi binalarının ölçek aralığı (min, max).")]
-    public Vector2 industrialScaleRange = new Vector2(0.5f, 0.8f);
-    [Tooltip("Bir stripe (lane) kaç bina KOLONU geniş. Yan yana paketlenir → stripe'ın kalınlığı. 3-5 ≈ tipik.")]
-    [Range(1, 12)] public int industrialLaneDepth = 4;
-    [Tooltip("Lane'ler arası boş koridor (aisle) — BİNA GENİŞLİĞİ KATI olarak. 1 = ~1 bina genişliği boşluk. " +
-             "Büyük = stripe'lar birbirinden çok ayrık. TILE değil!")]
-    [Range(0f, 6f)] public float industrialAisleSpacing = 1.5f;
-    [Tooltip("Aynı lane içinde üst üste binalar arasındaki ek boşluk (tile). 0 = bitişik paketleme.")]
-    [Range(0, 12)] public int industrialBuildingGap = 0;
-    [Tooltip("Lane doluluk yoğunluğu. 1 = tıka basa dolu, 0.5 = slotların yarısı boş.")]
-    [Range(0.1f, 1f)] public float industrialFillDensity = 1f;
-    [Tooltip("Sıkılık çarpanı. Hem dikey ilerlemeyi hem overlap yarıçapını küçültür → daha YOĞUN. " +
-             "1 = binalar tam yan yana, <1 = birbirine girer/örtüşür (kalabalık sanayi). 0.7 ≈ sıkı.")]
-    [Range(0.3f, 1f)] public float industrialPacking = 0.5f;
-    [Tooltip("Minimum bina aralığı tabanı — DÜNYA BİRİMİ, yarıçap (TILE DEĞİL!). 1 tile = 1/pixelsPerUnit " +
-             "(ör. ppu=100 → 0.1 ≈ 10 tile yarıçap). Sprite yarıçapından küçük değerlerin etkisi yoktur; " +
-             "BÜYÜK değerler binaları AŞIRI seyreltir. Sıkı paketleme için 0.05–0.1 arası tutun.")]
-    [Range(0f, 0.25f)] public float industrialOverlapRadius = 0.06f;
-    [Tooltip("Lane eğimi (derece). Tüm lane'ler dikeyden bu kadar yatar → paralel-diyagonal sanayi hissi. " +
-             "0 = tam dikey, +/- ile sola/sağa yatar.")]
-    [Range(-45f, 45f)] public float industrialLaneTiltDegrees = 12f;
-    [Tooltip("Stripe omurgasının organik kıvrım genliği (tile). Stripe'ı cetvel gibi düz olmaktan çıkarır. " +
-             "0 = düz. Aisle'dan (bina-genişliği × spacing) küçük tutun, yoksa stripe'lar birbirine girer.")]
-    [Range(0f, 12f)] public float industrialLaneWobble = 0.4f;
-    [Tooltip("Kıvrım frekansı. Düşük = uzun, yumuşak dalgalar; yüksek = sık, dişli kıvrımlar.")]
-    [Range(0.005f, 0.3f)] public float industrialLaneWobbleFrequency = 0.04f;
-    [Tooltip("Bina başına küçük yatay sapma genliği (tile). Sıralamayı hafifçe bozar → daha doğal. 0 = hizalı.")]
-    [Range(0f, 4f)] public float industrialBuildingJitter = 0.2f;
 
     [Header("Broken Building Sprites")]
     [Tooltip("Sprites randomly picked when a city building is cracked by an earthquake.")]
@@ -204,11 +180,14 @@ public partial class MapDecorPlacer : MonoBehaviour
 
     private class ShadowHandle
     {
-        public Transform    transform;
-        public MeshRenderer renderer;
-        public Mesh         mesh;
-        public Material     material;
-        public Vector3[]    verts;
+        public Transform    transform;   // pivot node (bina origin = zemin temas çizgisi, y=0)
+        public MeshRenderer renderer;    // iso modda mesh renderer (flat modda null)
+        public Mesh         mesh;        // iso (flat modda null)
+        public Material     material;    // iso (flat modda null)
+        public Vector3[]    verts;       // iso (flat modda null)
+        // Flat projeksiyon modu: binanın kendi sprite'ı koyu tonlanıp tabandan eğilip yassılır.
+        public SpriteRenderer spriteRenderer; // flat (iso modda null)
+        public Transform      spriteChild;     // flat: ayaklar pivot node'da, sprite yukarı durur
         public float        halfWidth;
         public float        halfHeight;
         public bool         isIsometric;
@@ -295,6 +274,7 @@ public partial class MapDecorPlacer : MonoBehaviour
 
     private DayNightCycle dayNight;
     private float         prevRatio = -1f;
+    private float         prevSunProgress = float.NaN; // shadows recompute only when the sun has moved perceptibly
 
     // Ship spawning timer
     private float shipSpawnTimer;
@@ -385,34 +365,6 @@ public partial class MapDecorPlacer : MonoBehaviour
         // Şehir bölgesi (biome 2) kenarına uzaklık alanını kur — kenara doğru seyrelme için.
         BuildCityEdgeDistance(map);
 
-        // --- TEŞHİS: kenar seyrelmesi değerleri canlı mı? (sorun çözülünce kaldırılabilir) ---
-        {
-            int maxEdgeDist = 0;
-            if (cityEdgeDist != null)
-                for (int x = 0; x < map.width; x++)
-                for (int y = 0; y < map.height; y++)
-                    if (cityEdgeDist[x, y] > maxEdgeDist && cityEdgeDist[x, y] != int.MaxValue)
-                        maxEdgeDist = cityEdgeDist[x, y];
-
-            float fHall = (cityHallTile.x >= 0) ? EdgeThinFactor(cityHallTile.x, cityHallTile.y) : -1f;
-            // En uzak (kenar) tile'da faktör
-            float fEdge = -1f;
-            if (allCityTiles.Count > 0 && cityHallTile.x >= 0)
-            {
-                Vector2Int far = allCityTiles[0]; float fd = -1f;
-                for (int i = 0; i < allCityTiles.Count; i++)
-                {
-                    float d = Vector2Int.Distance(allCityTiles[i], cityHallTile);
-                    if (d > fd) { fd = d; far = allCityTiles[i]; }
-                }
-                fEdge = EdgeThinFactor(far.x, far.y);
-            }
-            Debug.Log($"[EdgeThinning] edgeThinning={edgeThinning}, borderTiles={edgeThinningBorderTiles}, " +
-                      $"cityRadiusTiles={cityRadiusTiles:F0}, maxEdgeDist={maxEdgeDist}, " +
-                      $"EdgeThinFactor@hall={fHall:F2}, EdgeThinFactor@farEdge={fEdge:F2} " +
-                      $"→ spacing@hall={RadialSpacingMultiplier(cityHallTile.x, cityHallTile.y):F2}x");
-        }
-
         // 2) Tile'ları katmanlara ayır (clearing zone dışındakiler)
         var layerPools = ClassifyLayers(allCityTiles, cityHallTile, settings.cityLayers);
 
@@ -435,6 +387,15 @@ public partial class MapDecorPlacer : MonoBehaviour
         //     Doğa dekorundan ÖNCE çalışsın ki footprint'ler denseOccupied'a yazılsın.
         if (biomeTilePools.TryGetValue(3, out var industrialTiles))
             PlaceIndustrialLayout(map, settings, industrialTiles, halfW, halfH);
+
+        // 5c) Urban bölgesi (biome 4) — seyrek bina dağılımı. Doğa dekorundan ÖNCE çalışsın
+        //     ki footprint'ler denseOccupied'a yazılsın.
+        if (biomeTilePools.TryGetValue(4, out var urbanTiles))
+            PlaceUrbanLayout(map, settings, urbanTiles, halfW, halfH);
+
+        // 5d) Tarım bölgesi (biome 1) — seyrek bina dağılımı. Doğa dekorundan ÖNCE.
+        if (biomeTilePools.TryGetValue(1, out var agriculturalTiles))
+            PlaceAgriculturalLayout(map, settings, agriculturalTiles, halfW, halfH);
 
         foreach (var kvp in biomeTilePools)
         {
@@ -505,9 +466,15 @@ public partial class MapDecorPlacer : MonoBehaviour
             }
         }
 
-        // Dinamik gölge güncelle
+        // Dinamik gölge güncelle — yalnızca güneş hissedilir şekilde hareket ettiyse yeniden hesapla.
+        // Eşik döngü hızına göre kendini ayarlar: hızlı döngüde her frame, yavaş/duraklamış döngüde
+        // imperceptible frame'leri atlar. Bina başına trig + mesh yeniden kurmayı boşa harcamaz.
         float sunProgress = (dayNight != null) ? dayNight.SunProgress : 0.5f;
-        UpdateShadows(sunProgress);
+        if (float.IsNaN(prevSunProgress) || Mathf.Abs(sunProgress - prevSunProgress) > 0.0005f)
+        {
+            prevSunProgress = sunProgress;
+            UpdateShadows(sunProgress);
+        }
 
         // Ship tick
         UpdateShips(ratio);
@@ -606,6 +573,8 @@ public partial class MapDecorPlacer : MonoBehaviour
         cityBuildings.Clear();
         ports.Clear();
         prevRatio = -1f;
+        prevSunProgress = float.NaN;
+        ClearDenseGrid();
         dayNightLookedUp = false;
         cachedMap = null;
         navGrid   = null;
