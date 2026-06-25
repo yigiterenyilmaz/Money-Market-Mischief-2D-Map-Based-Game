@@ -29,10 +29,35 @@ public partial class MapDecorPlacer : MonoBehaviour
     [Header("Shore & Border")]
     [Range(0, 20)]     public int   cityShoreBuffer             = 3;
     [Range(0, 20)]     public int   cityRegionBorderBuffer      = 5;
+    [Tooltip("Bir biyom bölgesinin (şehir/sanayi/kent/tarım) bina üretebilmesi için gereken " +
+             "minimum bağlı tile sayısı. Bu eşiğin altındaki bölgeler/küçük adalar TAMAMEN boş " +
+             "bırakılır — bina yok, dolayısıyla onlara çekilen bağlantı yolları da yok. " +
+             "RoadGenerator.industrialGridMinRegionTiles sanayi YOL ızgarasını ayrıca eşikler.")]
+    [Range(0, 5000)]   public int   minRegionTiles              = 900;
     [Tooltip("Yoldan minimum uzaklık — sprite'ların yol üstüne taşmasını önler.")]
     [Range(1, 10)]     public int   cityMinRoadDistance         = 2;
 
+    // Gölge üretim modu. Projection = eski (SpriteRenderer'ı 180° döndürüp yassılt — tek pivot
+    // etrafında afin izdüşüm; karmaşık siluetlerde baca gibi yüksek+yana kaçık pikseller uzun
+    // yarıçapta savrulur). Trace = yeni (mesh quad + SHEAR: taban satırı sabit, her piksel KENDİ
+    // yüksekliğiyle orantılı yana kayar → siluet birebir izlenir, baca binadan kopmaz; ayrıca
+    // dikey yansıma ile yatay yön doğru kalır).
+    public enum ShadowMode { Projection, Trace }
+
     [Header("City Building Shadow — Dinamik Güneş Gölgesi")]
+    [Tooltip("Flat gölge üretim modu. Projection = eski tek-pivot afin izdüşüm (karşılaştırma için). " +
+             "Trace = per-pixel shadow smear: her opak piksel ışık yönünde bir iz bırakır, birleşimi " +
+             "gölge olur (baca+fabrika gibi parçalar birbirine bağlanır, tabandan kopmaz).")]
+    public ShadowMode shadowMode = ShadowMode.Trace;
+    [Tooltip("Trace gölge shader'ı her fragment için ışık yönünde kaç örnek alsın (kalite/maliyet). " +
+             "Yüksek = daha pürüzsüz uzun gölge ama daha pahalı. 48 iyi bir denge.")]
+    [Range(8, 128)] public int shadowTraceSteps = 48;
+    [Tooltip("Trace gölge kenar yumuşaklığı (texel). 0 = keskin, büyük = daha bulanık (yumuşak kenar).")]
+    [Range(0f, 4f)] public float shadowTraceBlur = 1.2f;
+    [Tooltip("Trace gölge: bir caster pikselinin 3x3 komşuluğunda bu orandan az opak varsa GÖLGE " +
+             "VERMEZ → bedenden kopmuş ince/küçük parçalar (duman vb.) gölge bırakmaz. Büyük = daha " +
+             "agresif temizleme (ama beden kenarları da incelir).")]
+    [Range(0f, 0.7f)] public float shadowTraceStrayCut = 0.35f;
     [Tooltip("Gölge rengi ve saydamlığı.")]
     public Color shadowColor = new Color(0f, 0f, 0f, 0.35f);
     [Tooltip("Near edge (binaya yakın kenar) Y ölçeği. 1 = bina kenarı kadar tam yükseklik.")]
@@ -55,6 +80,10 @@ public partial class MapDecorPlacer : MonoBehaviour
     [Range(0.5f, 8f)] public float shadowProjectLength = 3f;
     [Tooltip("Flat projeksiyon gölge taban yüksekliği: 0 = sprite en alt kenarı, 1 = sprite merkezi. Gölge dönme/uzama noktasını bu kadar yukarı taşır (halfHeight oranı).")]
     [Range(0f, 1f)] public float shadowBaseRaiseRatio = 0.35f;
+    [Tooltip("Gölgeyi dünya birimi cinsinden dikey kaydırır (yukarı = pozitif). Taban/pivot " +
+             "noktasını değiştirmeden gölgeyi biraz yukarı nudge etmek için. shadowBaseRaiseRatio " +
+             "dönme pivotunu da kaydırır; bu ise saf konum ofsetidir.")]
+    [Range(-1f, 1f)] public float shadowVerticalOffset = 0.05f;
 
     [Header("Isometric Shadow — İzometrik İkonlar İçin")]
     [Tooltip("İzometrik açı (derece). Gölge bu yönde diyagonal uzar. 30 = klasik iso.")]
@@ -178,7 +207,9 @@ public partial class MapDecorPlacer : MonoBehaviour
     // NESTED TYPES
     // -------------------------------------------------------------------------
 
-    private class ShadowHandle
+    // Public — StreetLampPlacer / RoadTrafficSystem aynı flat gölge (Projection/Trace) mantığını
+    // CreateFlatShadow + UpdateFlatShadow ile yeniden kullanır.
+    public class ShadowHandle
     {
         public Transform    transform;   // pivot node (bina origin = zemin temas çizgisi, y=0)
         public MeshRenderer renderer;    // iso modda mesh renderer (flat modda null)
@@ -191,6 +222,10 @@ public partial class MapDecorPlacer : MonoBehaviour
         public float        halfWidth;
         public float        halfHeight;
         public bool         isIsometric;
+        // Trace modu (flat, per-pixel smear mesh): mesh/material kullanılır, spriteRenderer null.
+        public bool         isTrace;
+        public float        uvW, uvH;     // sprite atlas sub-rect normalize genişlik/yükseklik
+        public float        traceMargin;  // quad'ın sprite çevresine eklenen pay (local birim) = max smear
     }
 
     private struct BuildingData
@@ -335,7 +370,28 @@ public partial class MapDecorPlacer : MonoBehaviour
             }
         }
 
-        Debug.Log($"MapDecorPlacer: allCityTiles={allCityTiles.Count} (biome 2, sis/kıyı/yol filtreleri sonrası).");
+        // Çok küçük bölgeleri/adaları ele: bir biyom bölgesi minRegionTiles'tan az bağlı tile
+        // içeriyorsa o bölgeye HİÇ BİNA koyma (dolayısıyla ona çekilen bağlantı yolları da oluşmaz).
+        // Tüm biyomlara aynı eşik uygulanır → küçük adalar bina/yol açısından tertemiz kalır.
+        // NOT: yalnızca BİNA yerleşimi eşiklenir; doğa dekoru (ağaç vb.) için biomeTilePools'un
+        // FİLTRELENMEMİŞ hali kullanılmaya devam eder (küçük adalar çıplak kalmasın).
+        if (minRegionTiles > 1)
+        {
+            int beforeCity = allCityTiles.Count;
+            allCityTiles = FilterSmallRegions(map, allCityTiles, 2, minRegionTiles);
+            if (allCityTiles.Count != beforeCity)
+                Debug.Log($"MapDecorPlacer: küçük şehir bölgeleri elendi — {beforeCity} → {allCityTiles.Count} tile " +
+                          $"(minRegionTiles={minRegionTiles}).");
+        }
+
+        // Bina katmanlarına verilecek FİLTRELENMİŞ biyom havuzları (doğa dekoru hariç).
+        var buildPools = new Dictionary<int, List<Vector2Int>>();
+        foreach (var kvp in biomeTilePools)
+            buildPools[kvp.Key] = minRegionTiles > 1
+                ? FilterSmallRegions(map, kvp.Value, kvp.Key, minRegionTiles)
+                : kvp.Value;
+
+        Debug.Log($"MapDecorPlacer: allCityTiles={allCityTiles.Count} (biome 2, sis/kıyı/yol/küçük-bölge filtreleri sonrası).");
 
         // 1) Belediye binasını yerleştir ve 3 yol çek
         Vector2Int cityHallTile = FindCityHallTile(allCityTiles);
@@ -385,16 +441,16 @@ public partial class MapDecorPlacer : MonoBehaviour
 
         // 5b) Sanayi bölgesi (biome 3) — lane düzeninde fabrika/sanayi binaları.
         //     Doğa dekorundan ÖNCE çalışsın ki footprint'ler denseOccupied'a yazılsın.
-        if (biomeTilePools.TryGetValue(3, out var industrialTiles))
+        if (buildPools.TryGetValue(3, out var industrialTiles))
             PlaceIndustrialLayout(map, settings, industrialTiles, halfW, halfH);
 
-        // 5c) Urban bölgesi (biome 4) — seyrek bina dağılımı. Doğa dekorundan ÖNCE çalışsın
+        // 5c) Urban bölgesi (biome 1) — seyrek bina dağılımı. Doğa dekorundan ÖNCE çalışsın
         //     ki footprint'ler denseOccupied'a yazılsın.
-        if (biomeTilePools.TryGetValue(4, out var urbanTiles))
+        if (buildPools.TryGetValue(1, out var urbanTiles))
             PlaceUrbanLayout(map, settings, urbanTiles, halfW, halfH);
 
-        // 5d) Tarım bölgesi (biome 1) — seyrek bina dağılımı. Doğa dekorundan ÖNCE.
-        if (biomeTilePools.TryGetValue(1, out var agriculturalTiles))
+        // 5d) Tarım bölgesi (biome 4) — seyrek bina dağılımı. Doğa dekorundan ÖNCE.
+        if (buildPools.TryGetValue(4, out var agriculturalTiles))
             PlaceAgriculturalLayout(map, settings, agriculturalTiles, halfW, halfH);
 
         foreach (var kvp in biomeTilePools)
@@ -421,6 +477,66 @@ public partial class MapDecorPlacer : MonoBehaviour
         shipSpawnTimer = 0f;
 
         Debug.Log($"MapDecorPlacer: decor={decorObjects.Count}, cityBuildings={cityBuildings.Count}, ports={ports.Count}");
+
+        // Binalar + dekor yerleştikten SONRA bildir. Sokak lambalari gibi sistemler bina
+        // footprint'lerini (denseOccupied) gormeli — yoksa lambalar binalarin ustune duser.
+        OnDecorPlaced?.Invoke();
+    }
+
+    /// <summary>Repaint TAMAMLANDIKTAN sonra (binalar + dekor yerleşince) tetiklenir.</summary>
+    public static event System.Action OnDecorPlaced;
+
+    /// <summary>
+    /// Küçük biyom bölgelerini eler. Bölge boyutu, HARİTANIN GERÇEK biyom bağlılığı üzerinden
+    /// ölçülür (map.IsLand + GetBiome==biome ile flood-fill) — verilen listenin kendi üyeliği
+    /// DEĞİL. Bu önemli: allCityTiles yol/kıyı/sınır filtreleriyle delik deşik olmuştur; liste
+    /// üyeliğiyle kümeleme tek bir şehri sahte küçük parçalara böler ve büyük şehri yanlışlıkla
+    /// siler. Gerçek landmass boyutunu sayıp, yalnızca minTiles altındaki bölgelerdeki tile'ları
+    /// listeden çıkarırız → küçük adalar gider, büyük şehir delik olsa bile kalır.
+    /// </summary>
+    List<Vector2Int> FilterSmallRegions(MapGenerator map, List<Vector2Int> tiles, int biome, int minTiles)
+    {
+        if (tiles == null || tiles.Count == 0 || minTiles <= 1) return tiles;
+
+        // Her giriş tile'ı için ait olduğu gerçek biyom bölgesinin boyutunu hesapla (memoize).
+        var regionVisited = new HashSet<Vector2Int>(); // bu biyomda flood edilmiş tüm harita tile'ları
+        var smallTiles    = new HashSet<Vector2Int>(); // küçük bölgeye ait harita tile'ları
+        var queue         = new Queue<Vector2Int>();
+        int[] dx4 = { 1, -1, 0, 0 };
+        int[] dy4 = { 0, 0, 1, -1 };
+
+        foreach (var seed in tiles)
+        {
+            if (regionVisited.Contains(seed)) continue;
+
+            var region = new List<Vector2Int>();
+            queue.Enqueue(seed);
+            regionVisited.Add(seed);
+            while (queue.Count > 0)
+            {
+                var pos = queue.Dequeue();
+                region.Add(pos);
+                for (int i = 0; i < 4; i++)
+                {
+                    int nx = pos.x + dx4[i], ny = pos.y + dy4[i];
+                    var nb = new Vector2Int(nx, ny);
+                    if (regionVisited.Contains(nb)) continue;
+                    if (!map.IsLand(nx, ny) || map.GetBiome(nx, ny) != biome) continue;
+                    regionVisited.Add(nb);
+                    queue.Enqueue(nb);
+                }
+            }
+
+            if (region.Count < minTiles)
+                foreach (var t in region) smallTiles.Add(t);
+        }
+
+        if (smallTiles.Count == 0) return tiles;
+
+        var kept = new List<Vector2Int>(tiles.Count);
+        foreach (var t in tiles)
+            if (!smallTiles.Contains(t)) kept.Add(t);
+        return kept;
     }
 
     int GetSpawnRate(int biome)

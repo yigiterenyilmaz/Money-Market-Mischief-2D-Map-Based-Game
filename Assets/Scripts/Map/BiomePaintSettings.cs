@@ -158,7 +158,7 @@ public class BiomePaintSettings : ScriptableObject
     // =========================================================================
 
     [Header("Urban Buildings — Şehir/Kasaba Yapıları (Seyrek)")]
-    [Tooltip("Urban bölgesinde (biome 4) seyrek dağılımla yerleştirilen küçük yapı/evler. " +
+    [Tooltip("Urban bölgesinde (biome 1) seyrek dağılımla yerleştirilen küçük yapı/evler. " +
              "Boş bırakılabilir — sonradan doldurun.")]
     public List<CityBuildingEntry> urbanBuildings = new List<CityBuildingEntry>();
 
@@ -167,7 +167,7 @@ public class BiomePaintSettings : ScriptableObject
     // =========================================================================
 
     [Header("Agricultural Buildings — Tarım/Çiftlik Yapıları (Seyrek)")]
-    [Tooltip("Tarım bölgesinde (biome 1) seyrek dağılımla yerleştirilen çiftlik/ambar/ev yapıları. " +
+    [Tooltip("Tarım bölgesinde (biome 4) seyrek dağılımla yerleştirilen çiftlik/ambar/ev yapıları. " +
              "Boş bırakılabilir — sonradan doldurun.")]
     public List<CityBuildingEntry> agriculturalBuildings = new List<CityBuildingEntry>();
 

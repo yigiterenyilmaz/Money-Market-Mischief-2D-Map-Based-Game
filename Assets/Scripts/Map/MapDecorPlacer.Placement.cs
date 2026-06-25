@@ -175,6 +175,14 @@ public partial class MapDecorPlacer
         denseMaxRadius = 0f;
     }
 
+    /// <summary>
+    /// Verilen DUNYA konumu yerlestirilmis bir bina footprint'ine (clearance yariçapi kadar)
+    /// degiyor mu? Sokak lambasi gibi harici sistemler binalarin uzerine/yakinina yerlesmesin
+    /// diye kullanir. clearance = lambanin binalardan istenen minimum dunya birimi uzakligi.
+    /// </summary>
+    public bool IsNearBuilding(float wx, float wy, float clearance)
+        => IsDenseOverlapping(wx, wy, Mathf.Max(0f, clearance));
+
     bool IsDenseOverlapping(float wx, float wy, float myRadius)
     {
         if (denseGrid.Count == 0) return false;

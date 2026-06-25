@@ -255,6 +255,28 @@ public partial class MapDecorPlacer
                 sh.mesh.vertices = sh.verts;
                 sh.mesh.RecalculateBounds();
             }
+            else if (sh.isTrace)
+            {
+                // Flat branch — TRACE (per-pixel smear): geometri sabit, sadece smear yönünü güncelle.
+                // Her opak piksel KENDİ yerinden ışık yönünde iz bırakır → gölge parçaları kendi
+                // konumlarından başlar. Smear vektörü: aşağı (cos) + yana (sin), |dir| ile büyür.
+                float length = sh.halfHeight * 2f * lengthFactor * shadowProjectLength;
+                length = Mathf.Min(length, sh.traceMargin); // quad'ı aşma → kenardan kesilmesin
+                float theta = shadowDir * shadowLeanDegrees * Mathf.Deg2Rad;
+                float vx = length * Mathf.Sin(theta);   // yana (sabah sol, akşam sağ)
+                float vy = -length * Mathf.Cos(theta);  // aşağı (izleyiciye doğru)
+
+                // Local birim smear → UV birim smear (shader UV uzayında yürür).
+                float du = (vx / (sh.halfWidth  * 2f)) * sh.uvW;
+                float dv = (vy / (sh.halfHeight * 2f)) * sh.uvH;
+
+                if (sh.material != null)
+                {
+                    sh.material.SetVector("_SmearDir", new Vector4(du, dv, 0f, 0f));
+                    sh.material.color = col;
+                }
+                continue;
+            }
             else
             {
                 // Flat branch — PROJEKSIYON: binanın kendi sprite'ı tabandan (y=0, pivot node)
@@ -282,6 +304,132 @@ public partial class MapDecorPlacer
             if (sh.material != null)
                 sh.material.color = col;
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // SHARED FLAT SHADOW HELPERS — lamba/araba sistemleri için
+    // -------------------------------------------------------------------------
+
+    // UpdateShadows'ın güneş matematiğinin (sweep remap + yön + uzunluk + renk) frame başına
+    // bir kez hesaplanmış hali. StreetLampPlacer / RoadTrafficSystem bunu çağırıp her gölgeyi
+    // UpdateFlatShadow ile günceller → güneş matematiği TEK yerde, bina ile birebir.
+    public struct ShadowSunParams
+    {
+        public bool  visible;       // false → gölgeleri gizle (gece / tam ışık)
+        public float shadowDir;     // -1 sabah(sol) .. +1 akşam(sağ)
+        public float dirSign;
+        public float lengthFactor;
+        public Color color;         // shadowColor * gündüz alpha
+    }
+
+    public ShadowSunParams ComputeShadowSunParams(float sunProgress)
+    {
+        ShadowSunParams p = default;
+
+        bool  isNight       = sunProgress < 0f;
+        float lightingRatio = (dayNight != null) ? dayNight.LightingRatio : 0f;
+        float alphaFactor   = 1f - lightingRatio;
+
+        if (isNight || alphaFactor <= 0.001f) { p.visible = false; return p; }
+        p.visible = true;
+
+        // -- Süpürme yeniden eşlemesi (UpdateShadows ile birebir) --
+        float sweep01;
+        if (dayNight != null && daytimeSweepFraction > 0f)
+        {
+            float a = dayNight.SunDayStart;
+            float b = dayNight.SunDayEnd;
+
+            float naturalDay = Mathf.Clamp01(b - a);
+            float frac = Mathf.Max(Mathf.Clamp01(daytimeSweepFraction), naturalDay);
+            float half = frac * 0.5f;
+            float lo   = 0.5f - half;
+            float hi   = 0.5f + half;
+
+            float dawnLine = (a > 1e-4f) ? Mathf.Lerp(0f, lo, sunProgress / a) : lo;
+            float dayLine  = Mathf.Lerp(lo, hi, (sunProgress - a) / Mathf.Max(1e-4f, b - a));
+            float duskLine = Mathf.Lerp(hi, 1f, (sunProgress - b) / Mathf.Max(1e-4f, 1f - b));
+
+            float k     = Mathf.Clamp01(shadowSpeedSmoothing);
+            float bandA = 0.5f * k * Mathf.Min(a,      b - a);
+            float bandB = 0.5f * k * Mathf.Min(1f - b, b - a);
+            float sA = (bandA > 1e-5f) ? Mathf.SmoothStep(0f, 1f, (sunProgress - (a - bandA)) / (2f * bandA))
+                                       : (sunProgress >= a ? 1f : 0f);
+            float sB = (bandB > 1e-5f) ? Mathf.SmoothStep(0f, 1f, (sunProgress - (b - bandB)) / (2f * bandB))
+                                       : (sunProgress >= b ? 1f : 0f);
+
+            sweep01 = Mathf.Lerp(Mathf.Lerp(dawnLine, dayLine, sA), duskLine, sB);
+        }
+        else
+        {
+            sweep01 = Mathf.Clamp01(sunProgress);
+        }
+
+        p.shadowDir = sweep01 * 2f - 1f;
+        p.dirSign   = p.shadowDir >= 0f ? 1f : -1f;
+
+        float altitude = Mathf.Sin(Mathf.PI * sweep01);
+        float lenT     = Mathf.Pow(altitude, shadowHeightRatio);
+        p.lengthFactor = Mathf.Lerp(shadowMaxLength, shadowMidScale, lenT);
+
+        Color col = shadowColor;
+        col.a = shadowColor.a * alphaFactor;
+        p.color = col;
+
+        return p;
+    }
+
+    // CreateFlatShadow ile üretilmiş bir handle'ı güneş parametrelerine göre günceller (bina flat
+    // dalı ile birebir). Handle dönmeyen bir node altında, tabanı obje origin'inde olmalı.
+    // extraAlpha: araba spawn/despawn fade gibi ek çarpan (1 = etkisiz).
+    public void UpdateFlatShadow(ShadowHandle sh, in ShadowSunParams p, float extraAlpha = 1f)
+    {
+        if (sh == null || sh.transform == null) return;
+
+        if (!p.visible)
+        {
+            sh.transform.gameObject.SetActive(false);
+            return;
+        }
+        sh.transform.gameObject.SetActive(true);
+
+        Color col = p.color;
+        col.a *= extraAlpha;
+
+        if (sh.isTrace)
+        {
+            // TRACE — geometri sabit; sadece smear yönünü (UV uzayı) güncelle.
+            float length = sh.halfHeight * 2f * p.lengthFactor * shadowProjectLength;
+            length = Mathf.Min(length, sh.traceMargin);
+            float theta = p.shadowDir * shadowLeanDegrees * Mathf.Deg2Rad;
+            float vx = length * Mathf.Sin(theta);
+            float vy = -length * Mathf.Cos(theta);
+
+            float du = (vx / (sh.halfWidth  * 2f)) * sh.uvW;
+            float dv = (vy / (sh.halfHeight * 2f)) * sh.uvH;
+
+            if (sh.material != null)
+            {
+                sh.material.SetVector("_SmearDir", new Vector4(du, dv, 0f, 0f));
+                sh.material.color = col;
+            }
+        }
+        else
+        {
+            // PROJEKSIYON — sprite tabandan eğilip yassıltılır.
+            float leanZ = 180f - p.shadowDir * shadowLeanDegrees;
+            sh.transform.localRotation = Quaternion.Euler(0f, 0f, leanZ);
+
+            float lenScale = p.lengthFactor * shadowProjectLength;
+            sh.transform.localScale = new Vector3(1f, lenScale, 1f);
+
+            if (sh.spriteRenderer != null) sh.spriteRenderer.color = col;
+        }
+    }
+
+    public void DestroyShadow(ShadowHandle sh)
+    {
+        if (sh != null && sh.transform != null) Destroy(sh.transform.gameObject);
     }
 
     // -------------------------------------------------------------------------
@@ -373,9 +521,14 @@ public partial class MapDecorPlacer
         }
     }
 
-    ShadowHandle AddShadow(GameObject parent, Sprite sprite, int sortOrder, bool isIsometric)
+    // Ortak FLAT gölge (Projection/Trace) — bina, lamba ve araba aynı mantığı paylaşır.
+    // shadowMode==Trace → per-pixel smear mesh; aksi halde sprite'ı tabandan eğip yassıltan
+    // projeksiyon. sortingLayerName null ise renderer default sorting layer'da kalır (bina);
+    // lamba/araba kendi layer'ını geçer. UpdateFlatShadow her frame bu handle'ı güneşe göre günceller.
+    public ShadowHandle CreateFlatShadow(GameObject parent, Sprite sprite, int sortOrder, string sortingLayerName)
     {
-        // Container — bina merkezinde sabit; UpdateShadows localPosition + scale.x (flip) günceller.
+        // Container — origin sabit; UpdateFlatShadow localRotation/scale (projeksiyon) veya
+        // _SmearDir (trace) günceller.
         GameObject containerGo = new GameObject("Shadow");
         containerGo.transform.SetParent(parent.transform, false);
         containerGo.transform.localPosition = Vector3.zero;
@@ -385,44 +538,140 @@ public partial class MapDecorPlacer
         float halfWidth  = sprite.rect.width  / sprite.pixelsPerUnit * 0.5f;
         float halfHeight = sprite.rect.height / sprite.pixelsPerUnit * 0.5f;
 
-        // -- FLAT PROJEKSIYON GÖLGE --------------------------------------------------------
-        // ESKİ trapez mesh karmaşık/L-şekilli siluetlerde silueti döndürüp esnetip binadan
-        // KOPARIYORDU. ŞİMDİ: binanın KENDİ sprite'ını koyu tonlayıp tabandan (zemin temas
-        // çizgisi = bina origin, y=0) eğip yassıltarak "yansıtırız" → siluet binayla BİREBİR
-        // aynı, hep bitişik. Pivot node bina origin'inde; sprite child'ı ayakları pivot'a
-        // gelecek şekilde yukarı kaydırılır, böylece UpdateShadows pivot node'u döndürünce
-        // gölge tabandan döner (sprite merkezi pivot olsaydı orta etrafında dönerdi → yanlış).
-        if (!isIsometric)
+        if (shadowMode == ShadowMode.Trace)
         {
-            // Bina izometrik → görsel TABAN sprite'ın EN ALT kenarına yakın (merkezde değil).
-            // Pivot node'u sprite alt kenarından yukarı taşı: -halfHeight tam alt kenar,
-            // shadowBaseRaiseRatio kadar (halfHeight oranı) yukarı kaldırılır → gölge dönme/
-            // uzama noktası binanın gerçek temas noktasına oturur (tam alt kenar biraz fazla düşük).
-            containerGo.transform.localPosition =
-                new Vector3(0f, -halfHeight + halfHeight * shadowBaseRaiseRatio, 0f);
+            // -- TRACE GÖLGE (per-pixel long-shadow smear) --------------------------------
+            // Sprite'ı YASSILTMAYIZ. Her opak piksel KENDİ konumundan ışık yönünde bir iz
+            // bırakır; izlerin birleşimi gölgedir → bir gölge parçasının TABANI her zaman
+            // o parçanın olduğu yerdedir (üst/uzak kısım tepeden başlar, ön tabana sürüklenmez).
+            // Quad sprite + her yöne 'margin' (max smear) kadar büyütülür; shader her fragment'te
+            // _SmearDir boyunca geri yürür. Trace modu: yükseklik ofseti YOK — container sprite
+            // ile tam çakışık (her piksel kendi yerinden gölge verir).
+            containerGo.transform.localPosition = Vector3.zero;
 
-            GameObject spriteGo = new GameObject("ShadowSprite");
-            spriteGo.transform.SetParent(containerGo.transform, false);
-            // Sprite pivot'u merkezde (alignment=Center) → ayakları pivot node'a (sprite alt
-            // kenarı) getirmek için merkezi +halfHeight yukarı: sprite pivot node üstünde
-            // binayla birebir çakışır, ayak ucu pivot node'da durur.
-            spriteGo.transform.localPosition = new Vector3(0f, halfHeight, 0f);
+            // Margin = mümkün olan en uzun smear (alçak güneş). lengthFactor tavanı shadowMaxLength.
+            float margin = halfHeight * 2f * shadowMaxLength * shadowProjectLength * 1.1f;
 
-            SpriteRenderer shadowSR = spriteGo.AddComponent<SpriteRenderer>();
-            shadowSR.sprite       = sprite;
-            shadowSR.color        = shadowColor;
-            shadowSR.sortingOrder = sortOrder - 1;
+            Rect tr   = sprite.rect;
+            float ttw = sprite.texture.width;
+            float tth = sprite.texture.height;
+            Vector2 tUvMin = new Vector2(tr.x / ttw, tr.y / tth);
+            Vector2 tUvMax = new Vector2((tr.x + tr.width) / ttw, (tr.y + tr.height) / tth);
+            float uvW = tUvMax.x - tUvMin.x;
+            float uvH = tUvMax.y - tUvMin.y;
+
+            // Quad: sprite [-hw,hw]x[-hh,hh] + margin (yanlar/alt; üst gölge yukarı gitmez → hh).
+            float xL = -halfWidth  - margin, xR = halfWidth + margin;
+            float yB = -halfHeight - margin, yT = halfHeight;
+            Vector3[] tverts = new Vector3[4];
+            tverts[0] = new Vector3(xL, yB, 0f);
+            tverts[1] = new Vector3(xR, yB, 0f);
+            tverts[2] = new Vector3(xR, yT, 0f);
+            tverts[3] = new Vector3(xL, yT, 0f);
+
+            // UV = sprite konumunun lineer haritası: sprite bölgesi [-hw,hw]x[-hh,hh] → sub-rect.
+            // Quad sprite dışına taştığı için kenarlarda UV sub-rect dışına çıkar (shader reddeder).
+            System.Func<float, float> uvX = x => tUvMin.x + (x + halfWidth)  / (2f * halfWidth)  * uvW;
+            System.Func<float, float> uvY = y => tUvMin.y + (y + halfHeight) / (2f * halfHeight) * uvH;
+            Vector2[] tuvs = new Vector2[4];
+            tuvs[0] = new Vector2(uvX(xL), uvY(yB));
+            tuvs[1] = new Vector2(uvX(xR), uvY(yB));
+            tuvs[2] = new Vector2(uvX(xR), uvY(yT));
+            tuvs[3] = new Vector2(uvX(xL), uvY(yT));
+
+            Mesh tmesh = new Mesh { name = "ShadowTrace" };
+            tmesh.vertices  = tverts;
+            tmesh.uv        = tuvs;
+            tmesh.triangles = new int[] { 0, 1, 2, 0, 2, 3 };
+            tmesh.RecalculateBounds();
+
+            MeshFilter tmf = containerGo.AddComponent<MeshFilter>();
+            tmf.sharedMesh = tmesh;
+
+            MeshRenderer tmr = containerGo.AddComponent<MeshRenderer>();
+            // Per-pixel smear shader: her fragment _SmearDir boyunca geri yürür, caster izlerini birleştirir.
+            // Shader yoksa (ör. Always Included'da değil) Sprites/Default'a düş.
+            Shader traceShader = Shader.Find("Custom/MapShadowSmear");
+            Material tmat = new Material(traceShader != null ? traceShader : Shader.Find("Sprites/Default"));
+            tmat.mainTexture = sprite.texture;
+            tmat.color       = shadowColor;
+            if (traceShader != null)
+            {
+                tmat.SetVector("_UvRect", new Vector4(tUvMin.x, tUvMin.y, uvW, uvH));
+                tmat.SetFloat("_Steps", shadowTraceSteps);
+                tmat.SetFloat("_BlurRadius", shadowTraceBlur);
+                // Stray-cut = coverage low; high (solid) bir miktar üstünde → ramp = yumuşak kenar.
+                tmat.SetFloat("_EdgeLow", shadowTraceStrayCut);
+                tmat.SetFloat("_EdgeHigh", Mathf.Clamp01(shadowTraceStrayCut + 0.45f));
+            }
+            tmr.sharedMaterial = tmat;
+            tmr.sortingOrder   = sortOrder - 1;
+            if (sortingLayerName != null) tmr.sortingLayerName = sortingLayerName;
 
             return new ShadowHandle
             {
-                transform      = containerGo.transform,
-                spriteRenderer = shadowSR,
-                spriteChild    = spriteGo.transform,
-                halfWidth      = halfWidth,
-                halfHeight     = halfHeight,
-                isIsometric    = false,
+                transform   = containerGo.transform,
+                renderer    = tmr,
+                mesh        = tmesh,
+                material    = tmat,
+                verts       = tverts,
+                halfWidth   = halfWidth,
+                halfHeight  = halfHeight,
+                isIsometric = false,
+                isTrace     = true,
+                uvW         = uvW,
+                uvH         = uvH,
+                traceMargin = margin,
             };
         }
+
+        // -- FLAT PROJEKSIYON GÖLGE --------------------------------------------------------
+        // Sprite'ı koyu tonlayıp tabandan (zemin temas çizgisi, y=0) eğip yassıltarak "yansıtırız"
+        // → siluet birebir aynı, hep bitişik. Pivot node origin'de; sprite child'ı ayakları pivot'a
+        // gelecek şekilde yukarı kaydırılır, böylece UpdateFlatShadow pivot node'u döndürünce gölge
+        // tabandan döner.
+        containerGo.transform.localPosition =
+            new Vector3(0f, -halfHeight + halfHeight * shadowBaseRaiseRatio + shadowVerticalOffset, 0f);
+
+        GameObject spriteGo = new GameObject("ShadowSprite");
+        spriteGo.transform.SetParent(containerGo.transform, false);
+        // Sprite pivot'u merkezde (alignment=Center) → ayakları pivot node'a getirmek için merkezi
+        // +halfHeight yukarı: sprite pivot node üstünde birebir çakışır, ayak ucu pivot node'da durur.
+        spriteGo.transform.localPosition = new Vector3(0f, halfHeight, 0f);
+
+        SpriteRenderer shadowSR = spriteGo.AddComponent<SpriteRenderer>();
+        shadowSR.sprite       = sprite;
+        shadowSR.color        = shadowColor;
+        shadowSR.sortingOrder = sortOrder - 1;
+        if (sortingLayerName != null) shadowSR.sortingLayerName = sortingLayerName;
+
+        return new ShadowHandle
+        {
+            transform      = containerGo.transform,
+            spriteRenderer = shadowSR,
+            spriteChild    = spriteGo.transform,
+            halfWidth      = halfWidth,
+            halfHeight     = halfHeight,
+            isIsometric    = false,
+        };
+    }
+
+    ShadowHandle AddShadow(GameObject parent, Sprite sprite, int sortOrder, bool isIsometric)
+    {
+        // Flat (Projection/Trace) gölge ortak public CreateFlatShadow'da — lamba/araba birebir
+        // aynı mantığı kullanır. Iso gölge bu sınıfa özel kalır (aşağıda).
+        if (!isIsometric)
+            return CreateFlatShadow(parent, sprite, sortOrder, null);
+
+        // Container — bina merkezinde sabit; UpdateShadows localPosition + scale.x (flip) günceller.
+        GameObject containerGo = new GameObject("Shadow");
+        containerGo.transform.SetParent(parent.transform, false);
+        containerGo.transform.localPosition = Vector3.zero;
+        containerGo.transform.localScale    = Vector3.one;
+        containerGo.transform.localRotation = Quaternion.identity;
+
+        float halfWidth  = sprite.rect.width  / sprite.pixelsPerUnit * 0.5f;
+        float halfHeight = sprite.rect.height / sprite.pixelsPerUnit * 0.5f;
 
         // Başlangıç vertex'leri — UpdateShadows zaten her frame yeniden yazıyor, sadece bounds için.
         // Iso modda kalınlık halfWidth, uzunluk halfHeight üzerinden hesaplanır.

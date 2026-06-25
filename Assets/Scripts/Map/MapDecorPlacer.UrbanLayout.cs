@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// Urban BUILDING placement over the urban biome (biome 4). Unlike the city core (biome 2,
+// Urban BUILDING placement over the urban biome (biome 1). Unlike the city core (biome 2,
 // MapDecorPlacer.CityLayout) and the road-lined industrial zone (biome 3), the urban region is
 // filled with a SPARSE SCATTER of small structures/houses — buildings are dropped at random
 // tiles, kept far apart, and the fill is intentionally LOW DENSITY so the region reads as open
@@ -17,7 +17,7 @@ public partial class MapDecorPlacer
     // -------------------------------------------------------------------------
 
     [Header("Urban Layout — Seyrek Bina Dağılımı")]
-    [Tooltip("Urban binalarını yerleştir (biome 4). Kapalıysa hiç bina konmaz.")]
+    [Tooltip("Urban binalarını yerleştir (biome 1). Kapalıysa hiç bina konmaz.")]
     public bool urbanPlaceBuildings = true;
 
     [Tooltip("Urban binalarının ölçek aralığı (min, max).")]
@@ -39,7 +39,7 @@ public partial class MapDecorPlacer
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Urban binalarını biome 4 tile'larına SEYREK dağılımla yerleştirir. Şehir çekirdeğinin
+    /// Urban binalarını biome 1 tile'larına SEYREK dağılımla yerleştirir. Şehir çekirdeğinin
     /// aksine ızgara/sokak yapısı yoktur; binalar rastgele tile'lara, birbirinden uzak (urbanSpacing)
     /// ve düşük yoğunlukta (urbanFillDensity) dağıtılır. Yola değen ve kıyıya yakın adaylar elenir.
     /// Tüm ayarlar yukarıda + MapDecorPlacer'da serileştirilir.
@@ -82,7 +82,7 @@ public partial class MapDecorPlacer
             int tx = t.x, ty = t.y;
 
             if (!map.IsLand(tx, ty)) continue;
-            if (map.GetBiome(tx, ty) != 4) continue;
+            if (map.GetBiome(tx, ty) != 1) continue;
             if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) continue;
 
             int pick      = PickBalancedSpriteIndex(spriteCounts);
@@ -97,7 +97,7 @@ public partial class MapDecorPlacer
             if (newTx != tx || newTy != ty)
             {
                 if (!map.IsLand(newTx, newTy)) continue;
-                if (map.GetBiome(newTx, newTy) != 4) continue;
+                if (map.GetBiome(newTx, newTy) != 1) continue;
                 if (cityShoreBuffer > 0 && !HasShoreBuffer(map, newTx, newTy)) continue;
             }
             tx = newTx; ty = newTy;

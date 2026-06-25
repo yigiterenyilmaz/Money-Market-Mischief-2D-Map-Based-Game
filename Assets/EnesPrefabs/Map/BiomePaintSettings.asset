@@ -29,8 +29,7 @@ MonoBehaviour:
   seaRockDark: {r: 0.38, g: 0.38, b: 0.4, a: 1}
   seaRockLight: {r: 0.56, g: 0.55, b: 0.54, a: 1}
   seaRockCrack: {r: 0.24, g: 0.23, b: 0.22, a: 1}
-  urbanDecor:
-  - {fileID: 7944620761231817343, guid: 2102a7978623df343a343c25ecaa185c, type: 3}
+  urbanDecor: []
   agriculturalDecor: []
   industrialDecor: []
   cityHallEntry:
@@ -255,5 +254,33 @@ MonoBehaviour:
     - {fileID: -5747762080561553749, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
     - {fileID: -2178313058140480348, guid: c691cf6353749284aa3ccfff7be1dace, type: 3}
     frameRate: 4
-  urbanBuildings: []
-  agriculturalBuildings: []
+  urbanBuildings:
+  - daySprite: {fileID: -8146139296701401314, guid: 7c3e1cff67c10fb4aa3b3fb0d8fff391, type: 3}
+    nightSprite: {fileID: -8146139296701401314, guid: 7c3e1cff67c10fb4aa3b3fb0d8fff391, type: 3}
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: 7179033777383653414, guid: e9b8a72d86e3fcf4194e03340a5ba5a8, type: 3}
+    nightSprite: {fileID: 7179033777383653414, guid: e9b8a72d86e3fcf4194e03340a5ba5a8, type: 3}
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: 3986092380361519301, guid: 6372a4b1542a1744eac25e23c261e684, type: 3}
+    nightSprite: {fileID: 3986092380361519301, guid: 6372a4b1542a1744eac25e23c261e684, type: 3}
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0
+  agriculturalBuildings:
+  - daySprite: {fileID: 7316261953078464129, guid: 22438357521497b4a8a995f22ec96cd7, type: 3}
+    nightSprite: {fileID: 7316261953078464129, guid: 22438357521497b4a8a995f22ec96cd7, type: 3}
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0

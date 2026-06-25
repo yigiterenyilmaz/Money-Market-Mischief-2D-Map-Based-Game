@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// Agricultural BUILDING placement over the agricultural biome (biome 1). Like the urban region
+// Agricultural BUILDING placement over the agricultural biome (biome 4). Like the urban region
 // (MapDecorPlacer.UrbanLayout) — and unlike the packed city core (biome 2) or the road-lined
 // industrial zone (biome 3) — the farmland is filled with a SPARSE SCATTER of farm structures
 // (barns/houses/silos). Buildings are dropped at random tiles, kept far apart, and the fill is
@@ -17,7 +17,7 @@ public partial class MapDecorPlacer
     // -------------------------------------------------------------------------
 
     [Header("Agricultural Layout — Seyrek Bina Dağılımı")]
-    [Tooltip("Tarım binalarını yerleştir (biome 1). Kapalıysa hiç bina konmaz.")]
+    [Tooltip("Tarım binalarını yerleştir (biome 4). Kapalıysa hiç bina konmaz.")]
     public bool agriculturalPlaceBuildings = true;
 
     [Tooltip("Tarım binalarının ölçek aralığı (min, max).")]
@@ -39,7 +39,7 @@ public partial class MapDecorPlacer
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Tarım binalarını biome 1 tile'larına SEYREK dağılımla yerleştirir. Şehir çekirdeğinin
+    /// Tarım binalarını biome 4 tile'larına SEYREK dağılımla yerleştirir. Şehir çekirdeğinin
     /// aksine ızgara/sokak yapısı yoktur; binalar rastgele tile'lara, birbirinden uzak
     /// (agriculturalSpacing) ve düşük yoğunlukta (agriculturalFillDensity) dağıtılır. Yola değen
     /// ve kıyıya yakın adaylar elenir. Tüm ayarlar yukarıda + MapDecorPlacer'da serileştirilir.
@@ -82,7 +82,7 @@ public partial class MapDecorPlacer
             int tx = t.x, ty = t.y;
 
             if (!map.IsLand(tx, ty)) continue;
-            if (map.GetBiome(tx, ty) != 1) continue;
+            if (map.GetBiome(tx, ty) != 4) continue;
             if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) continue;
 
             int pick      = PickBalancedSpriteIndex(spriteCounts);
@@ -97,7 +97,7 @@ public partial class MapDecorPlacer
             if (newTx != tx || newTy != ty)
             {
                 if (!map.IsLand(newTx, newTy)) continue;
-                if (map.GetBiome(newTx, newTy) != 1) continue;
+                if (map.GetBiome(newTx, newTy) != 4) continue;
                 if (cityShoreBuffer > 0 && !HasShoreBuffer(map, newTx, newTy)) continue;
             }
             tx = newTx; ty = newTy;

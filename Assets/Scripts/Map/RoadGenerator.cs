@@ -51,8 +51,10 @@ public class RoadGenerator : MonoBehaviour
     [Header("Dallanma — Kapsama Tabanlı")]
     [Tooltip("Herhangi bir yoldan bu kadar piksel uzaktaki kara alanları dallanma hedefi olur.")]
     [Range(15, 80)] public int branchMinCoverageDistance = 35;
-    [Tooltip("Maksimum dal sayısı (güvenlik limiti).")]
+    [Tooltip("Maksimum dal sayısı (güvenlik limiti). Harita alaniyla olceklenir (scaleWithMapSize).")]
     [Range(5, 40)] public int branchMaxCount = 25;
+    [Tooltip("Bir dal yerlesince cevresinde 'kapsanmis' sayilan yaricap (tile). YUKSEK = daha az/seyrek yol, DUSUK = daha sik yol. Spawn esigi (branchMinCoverageDistance) ile arasindaki oran yogunlugu belirler.")]
+    [Range(30, 200)] public int branchCoverageRadius = 75;
     [Tooltip("Dal kıvrım oranı. 0 = dümdüz, 0.2 = doğal kıvrım.")]
     [Range(0f, 0.3f)] public float branchCurviness = 0.08f;
     [Tooltip("Dal başlangıç kalınlığı (highway'e yakın uç).")]
@@ -96,6 +98,13 @@ public class RoadGenerator : MonoBehaviour
     [Tooltip("Urban (Biome 4) — kentsel yol omuz tonu.")]
     public Color urbanShoulder = new Color(0.40f, 0.38f, 0.32f);
 
+    [Header("Bolge Esigi")]
+    [Tooltip("Bir biyom bolgesinin (kume) YOL/bolge-merkezi alabilmesi icin gereken minimum " +
+             "bagli tile sayisi. Bu esigin altindaki bolgeler bolge-merkezi (highway/branch hedefi) " +
+             "olamaz. MapDecorPlacer.minRegionTiles BINA esigini ayri tutar; sanayi izgarasi icin " +
+             "industrialGridMinRegionTiles gecerlidir.")]
+    [Range(50, 5000)] public int minRegionTiles = 900;
+
     // -------------------------------------------------------------------------
     // SANAYI YOL IZGARASI — duz, duzenli, yapay
     // -------------------------------------------------------------------------
@@ -114,7 +123,7 @@ public class RoadGenerator : MonoBehaviour
     [Tooltip("Izgaranin acisi (derece). Yollar DUZ kalir, sadece bu acida doner. 0 = eksen-hizali.")]
     [Range(-90f, 90f)] public float industrialGridAngle = 20f;
     [Tooltip("Bir biome-3 kumesinin izgara almasi icin gereken minimum tile sayisi.")]
-    [Range(50, 5000)] public int industrialGridMinRegionTiles = 400;
+    [Range(50, 5000)] public int industrialGridMinRegionTiles = 800;
     [Tooltip("Izgarayi mevcut yol agina BFS connector ile bagla.")]
     public bool industrialGridConnectToNetwork = true;
     [Tooltip("Izgara yol govde (fill) rengi.")]
@@ -477,7 +486,7 @@ public class RoadGenerator : MonoBehaviour
                     }
                 }
 
-                if (cluster.Count < 500) continue;
+                if (cluster.Count < minRegionTiles) continue;
 
                 long sumX = 0, sumY = 0;
                 foreach (var p in cluster) { sumX += p.x; sumY += p.y; }
@@ -903,11 +912,14 @@ public class RoadGenerator : MonoBehaviour
         }
 
         int placed = 0;
+        // Buyuk haritada ayni yogunlugu korumak icin dal sayisini alan ile olcekle.
+        // (areaScale = sqrt(alan / 256^2); kucuk haritada >=1 kalsin diye Max(1f,...)).
+        int scaledMaxCount = Mathf.RoundToInt(branchMaxCount * Mathf.Max(1f, areaScale));
         // Sanayi bolgesini gecip reddedilen branch'ler iter sayacini TUKETMEZ (iter--). Sonsuz
         // donguyu onlemek icin ayri bir guvenlik siniri tutulur.
         int rejectedCrossings = 0;
-        int maxRejects = branchMaxCount * 4;
-        for (int iter = 0; iter < branchMaxCount; iter++)
+        int maxRejects = scaledMaxCount * 4;
+        for (int iter = 0; iter < scaledMaxCount; iter++)
         {
             int maxDist = 0;
             Vector2Int target = Vector2Int.zero;
@@ -1106,8 +1118,7 @@ public class RoadGenerator : MonoBehaviour
                 roadDist[bp.x, bp.y] = 0;
                 bfsQueue.Enqueue(bp);
             }
-            //branch kapsama yarıçapı — çok yüksek olursa az branch üretilir
-            int branchCoverageRadius = 150;
+            //branch kapsama yarıçapı — inspector'dan ayarlanir. YUKSEK = az/seyrek yol.
             while (bfsQueue.Count > 0)
             {
                 var pos = bfsQueue.Dequeue();
@@ -1289,7 +1300,7 @@ public class RoadGenerator : MonoBehaviour
 
         // Mevcut aga bagla (zaten degmiyorsa).
         if (industrialGridConnectToNetwork)
-            ConnectGridToNetwork(map, candidate, minX, minY, maxX, maxY, thickness, outW);
+            ConnectGridToNetwork(map, candidate, thickness, outW);
 
         // Trafik path'lerini cikar: her ham cizgiyi, budamadan SAG kalan bitisik kosumlara
         // bol; yeterince uzun olanlari grid path olarak kaydet. Arabalar bunlari surer ve
@@ -1359,54 +1370,117 @@ public class RoadGenerator : MonoBehaviour
     }
 
     /// <summary>
-    /// Izgarayi mevcut yol agina baglar. Zaten bir ag tile'ina degiyorsa hicbir sey yapmaz.
-    /// Aksi halde kume bbox'i cevresinde en yakin ag tile'ini bulup oraya BFS ile duz-ish bir
-    /// connector ceker (type-2 izgara renginde kaydedilir).
+    /// Izgarayi mevcut yol agina baglar. Budama sonrasi izgara BIRDEN COK kopuk parcaya
+    /// bolunmus olabilir; bu yuzden once 8-komsu baglantili bilesenlere ayrilir ve HER bilesen
+    /// ayri ayri aga baglanir. Boylece "kumelenmis/yalitik" izgara parcalari kalmaz.
+    ///
+    /// Bagli olmayan her bilesen icin, bilesen tile'larindan baslayan SINIRSIZ (kara uzerinde)
+    /// bir BFS ile en yakin izgara-disi yol tile'i bulunur — bbox cevresinde sabit bir pad ile
+    /// sinirlandirma YOK; merkezdeki uzak sanayi bolgesi de highway'e ulasabilir. Cizilen
+    /// connector da type-2 yol olur, dolayisiyla sonraki bilesenler ona da baglanabilir.
     /// </summary>
-    void ConnectGridToNetwork(MapGenerator map, HashSet<Vector2Int> gridTiles,
-                              int minX, int minY, int maxX, int maxY, float thickness, int outW)
+    void ConnectGridToNetwork(MapGenerator map, HashSet<Vector2Int> gridTiles, float thickness, int outW)
     {
-        // Zaten aga degiyor mu?
-        foreach (var t in gridTiles)
+        foreach (var comp in ConnectedComponents(gridTiles))
+        {
+            // Bu bilesen zaten (izgara-disi) bir yola degiyor mu?
+            if (ComponentTouchesNetwork(comp, gridTiles)) continue;
+
+            // Sinirsiz BFS ile en yakin izgara-disi yol tile'ini bul.
+            if (!FindNearestNetworkTile(map, comp, gridTiles, out Vector2Int roadTile, out Vector2Int gridTile))
+                continue; // adada hic baska yol yok (ya da kara baglantisi yok)
+
+            var path = BFSPathOnLandSimple(map, roadTile, gridTile);
+            if (path.Count < 2) continue;
+            foreach (var p in path)
+                RegisterRoadTile(p, 2, thickness, outW, industrialGridFill, industrialGridOutline);
+        }
+    }
+
+    /// <summary>Tile setini 8-komsu baglantili bilesenlere ayirir.</summary>
+    List<List<Vector2Int>> ConnectedComponents(HashSet<Vector2Int> tiles)
+    {
+        int[] dx8 = { 1, -1, 0, 0, 1, 1, -1, -1 };
+        int[] dy8 = { 0, 0, 1, -1, 1, -1, 1, -1 };
+        var comps = new List<List<Vector2Int>>();
+        var seen = new HashSet<Vector2Int>();
+        foreach (var start in tiles)
+        {
+            if (seen.Contains(start)) continue;
+            var comp = new List<Vector2Int>();
+            var q = new Queue<Vector2Int>();
+            q.Enqueue(start); seen.Add(start);
+            while (q.Count > 0)
+            {
+                var p = q.Dequeue();
+                comp.Add(p);
+                for (int d = 0; d < 8; d++)
+                {
+                    var n = new Vector2Int(p.x + dx8[d], p.y + dy8[d]);
+                    if (tiles.Contains(n) && !seen.Contains(n)) { seen.Add(n); q.Enqueue(n); }
+                }
+            }
+            comps.Add(comp);
+        }
+        return comps;
+    }
+
+    /// <summary>Bilesen, izgara-disi (highway/branch/onceki connector) bir yola 4-komsu degiyor mu?</summary>
+    bool ComponentTouchesNetwork(List<Vector2Int> comp, HashSet<Vector2Int> gridTiles)
+    {
+        foreach (var t in comp)
             for (int i = 0; i < 4; i++)
             {
                 int nx = t.x + dx4[i], ny = t.y + dy4[i];
                 if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
-                // Izgaranin kendisi de type-2; sadece BASKA (izgara-disi) yol komsusu sayilsin.
-                if (roadTypeMap[nx, ny] > 0 && !gridTiles.Contains(new Vector2Int(nx, ny))) return;
+                if (roadTypeMap[nx, ny] > 0 && !gridTiles.Contains(new Vector2Int(nx, ny))) return true;
             }
+        return false;
+    }
 
-        // En yakin (izgara-disi) ag tile'ini bbox cevresinde ara.
-        int pad = 140;
-        int bestSq = int.MaxValue;
-        Vector2Int bestRoad = new Vector2Int(-1, -1), bestGrid = new Vector2Int(-1, -1);
-        int cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-        for (int yy = minY - pad; yy <= maxY + pad; yy++)
-        for (int xx = minX - pad; xx <= maxX + pad; xx++)
+    /// <summary>
+    /// Bilesen tile'larindan baslayan cok-kaynakli, sinirsiz (kara) BFS ile en yakin izgara-disi
+    /// yol tile'ini bulur. roadTile = bulunan ag tile'i, gridTile = ona en yakin bilesen tile'i.
+    /// </summary>
+    bool FindNearestNetworkTile(MapGenerator map, List<Vector2Int> comp, HashSet<Vector2Int> gridTiles,
+                                out Vector2Int roadTile, out Vector2Int gridTile)
+    {
+        roadTile = new Vector2Int(-1, -1);
+        gridTile = new Vector2Int(-1, -1);
+
+        bool[,] visited = new bool[_w, _h];
+        Vector2Int[,] seedOf = new Vector2Int[_w, _h];
+        Queue<Vector2Int> q = new Queue<Vector2Int>();
+        foreach (var t in comp)
         {
-            if (xx < 0 || xx >= _w || yy < 0 || yy >= _h) continue;
-            if (roadTypeMap[xx, yy] == 0) continue;
-            if (gridTiles.Contains(new Vector2Int(xx, yy))) continue;
-            int ddx = xx - cx, ddy = yy - cy;
-            int sq = ddx * ddx + ddy * ddy;
-            if (sq < bestSq) { bestSq = sq; bestRoad = new Vector2Int(xx, yy); }
+            if (visited[t.x, t.y]) continue;
+            visited[t.x, t.y] = true;
+            seedOf[t.x, t.y] = t;
+            q.Enqueue(t);
         }
-        if (bestRoad.x < 0) return; // cevrede ag yok
 
-        // Bu ag tile'ina en yakin izgara tile'i.
-        bestSq = int.MaxValue;
-        foreach (var t in gridTiles)
+        while (q.Count > 0)
         {
-            int ddx = t.x - bestRoad.x, ddy = t.y - bestRoad.y;
-            int sq = ddx * ddx + ddy * ddy;
-            if (sq < bestSq) { bestSq = sq; bestGrid = t; }
+            var pos = q.Dequeue();
+            // izgara-disi bir yol tile'ina ulastik mi?
+            if (roadTypeMap[pos.x, pos.y] > 0 && !gridTiles.Contains(pos))
+            {
+                roadTile = pos;
+                gridTile = seedOf[pos.x, pos.y];
+                return true;
+            }
+            for (int i = 0; i < 4; i++)
+            {
+                int nx = pos.x + dx4[i], ny = pos.y + dy4[i];
+                if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
+                if (visited[nx, ny]) continue;
+                if (!map.IsLand(nx, ny)) continue;
+                visited[nx, ny] = true;
+                seedOf[nx, ny] = seedOf[pos.x, pos.y];
+                q.Enqueue(new Vector2Int(nx, ny));
+            }
         }
-        if (bestGrid.x < 0) return;
-
-        var path = BFSPathOnLandSimple(map, bestRoad, bestGrid);
-        if (path.Count < 2) return;
-        foreach (var p in path)
-            RegisterRoadTile(p, 2, thickness, outW, industrialGridFill, industrialGridOutline);
+        return false;
     }
 
     /// <summary>

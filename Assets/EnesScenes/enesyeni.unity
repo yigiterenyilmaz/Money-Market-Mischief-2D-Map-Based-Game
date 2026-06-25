@@ -10723,9 +10723,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MapDecorPlacer
   agriculturalPlaceBuildings: 1
   agriculturalScaleRange: {x: 0.35, y: 0.55}
-  agriculturalFillDensity: 0.1
-  agriculturalScatterRate: 2
-  agriculturalSpacing: 1
+  agriculturalFillDensity: 0.5
+  agriculturalScatterRate: 4
+  agriculturalSpacing: 0.7
   cellSize: 12
   pixelsPerUnit: 100
   spriteZ: -0.5
@@ -10735,7 +10735,12 @@ MonoBehaviour:
   spriteScaleRange: {x: 0.75, y: 1.25}
   cityShoreBuffer: 10
   cityRegionBorderBuffer: 11
+  minRegionTiles: 900
   cityMinRoadDistance: 3
+  shadowMode: 1
+  shadowTraceSteps: 48
+  shadowTraceBlur: 1.2
+  shadowTraceStrayCut: 0.35
   shadowColor: {r: 0, g: 0, b: 0, a: 0.52156866}
   shadowNearScale: 1
   shadowTipRatio: 0.3
@@ -10747,6 +10752,7 @@ MonoBehaviour:
   shadowLeanDegrees: 55
   shadowProjectLength: 3
   shadowBaseRaiseRatio: 0.15
+  shadowVerticalOffset: 0.05
   isoShadowAngleDegrees: 30
   isoShadowPivotOffsetRatio: 0.1
   isoShadowNearScale: 0.7
@@ -10798,9 +10804,9 @@ MonoBehaviour:
   industrialAlongJitter: 0.2
   urbanPlaceBuildings: 1
   urbanScaleRange: {x: 0.35, y: 0.55}
-  urbanFillDensity: 0.15
-  urbanScatterRate: 2
-  urbanSpacing: 0.8
+  urbanFillDensity: 0.5
+  urbanScatterRate: 4
+  urbanSpacing: 0.6
 --- !u!114 &1710072564
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11008,10 +11014,11 @@ MonoBehaviour:
   highwayNoiseScale: 0.35
   highwayNoiseStrength: 0.05
   highwayGrainStrength: 0.02
-  branchMinCoverageDistance: 35
-  branchMaxCount: 35
-  branchCurviness: 0.085
-  branchStartThickness: 3
+  branchMinCoverageDistance: 20
+  branchMaxCount: 9
+  branchCoverageRadius: 49
+  branchCurviness: 0.049
+  branchStartThickness: 2
   branchEndThickness: 2
   branchOutlineWidth: 0
   branchShoreBuffer: 12
@@ -11025,6 +11032,7 @@ MonoBehaviour:
   citiesShoulder: {r: 0.4, g: 0.36, b: 0.3, a: 1}
   industrialShoulder: {r: 0.26, g: 0.22, b: 0.18, a: 1}
   urbanShoulder: {r: 0.4, g: 0.38, b: 0.32, a: 1}
+  minRegionTiles: 900
   enableIndustrialGrids: 1
   industrialBlockWidth: 52
   industrialBlockHeight: 51
@@ -11239,14 +11247,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StreetLampPlacer
   mapPainter: {fileID: 1710072559}
   roadGenerator: {fileID: 1710072573}
+  mapDecorPlacer: {fileID: 0}
+  lampSprite: {fileID: 2599969905456701152, guid: 06357002e85b91f4b9dd756302e71a87, type: 3}
   highwayLampInterval: 40
   branchLampInterval: 51
   roadEdgeOffset: 7
-  lampScale: 0.0102
-  haloScaleMultiplier: 1.08
-  haloAlphaMultiplier: 0.5
-  haloSpriteRadius: 16
-  poleColor: {r: 0.4566037, g: 0.41266638, b: 0.41266638, a: 1}
+  buildingClearance: 0.06
+  lampScale: 0.114
+  haloScaleMultiplier: 0.69
+  haloAlphaMultiplier: 0.467
+  haloSpriteRadius: 7
+  lightVerticalOffset: 0.04
+  haloVerticalSquash: 0.5
+  lightSwitchSpread: 0.25
   highwayLightColor: {r: 1, g: 0.95, b: 0.7, a: 0.6}
   agriculturalLightColor: {r: 1, g: 0.85, b: 0.4, a: 0.5}
   citiesLightColor: {r: 1, g: 0.95, b: 0.8, a: 0.7}
@@ -11254,7 +11267,7 @@ MonoBehaviour:
   urbanLightColor: {r: 0.9, g: 0.9, b: 1, a: 0.65}
   sortingLayer: Default
   sortingOrder: 30
-  haloSortingOrder: 1000
+  haloSortingOrder: 30000
 --- !u!1 &1711406226
 GameObject:
   m_ObjectHideFlags: 0
