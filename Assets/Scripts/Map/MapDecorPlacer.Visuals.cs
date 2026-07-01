@@ -93,6 +93,10 @@ public partial class MapDecorPlacer
                 ship.nightRenderer.color = crossfadeTemp;
             }
         }
+
+        // Ekili tarlalar (crop fields) — gece kararması. Debug overlay modunda dokunma.
+        if (!debugOverlayDayNight)
+            ApplyCropFieldNightDarken(Mathf.Clamp01(ratio));
     }
 
     // -------------------------------------------------------------------------
@@ -182,10 +186,15 @@ public partial class MapDecorPlacer
         Color col = shadowColor;
         col.a = shadowColor.a * alphaFactor;
 
+        // Zoom LOD tier 2: tüm gölgeler zaten SetShadowLod ile gizlendi → döngüyü tamamen atla.
+        if (shadowLod >= 2) return;
+
         for (int i = 0; i < cityBuildings.Count; i++)
         {
             BuildingData bd = cityBuildings[i];
             if (bd.shadow == null || bd.shadow.transform == null) continue;
+            // Zoom LOD tier 1: ağaç gölgeleri gizli tutulur — en pahalı ve en büyük grup.
+            if (shadowLod >= 1 && bd.isTree) continue;
             ShadowHandle sh = bd.shadow;
 
             if (isNight || alphaFactor <= 0.001f)

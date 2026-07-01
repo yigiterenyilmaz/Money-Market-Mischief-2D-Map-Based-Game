@@ -47,9 +47,16 @@ public partial class MapDecorPlacer
     [Tooltip("Komşu tarlaların aynı yöne hizalanma eğilimi (0 = bağımsız rastgele açı, 1 = bölge açısı).")]
     [Range(0f, 1f)] public float agriculturalFieldAlignment = 0.5f;
 
+    [Tooltip("Ekili tarlalar GECE ne kadar kararsın (0 = kararma yok, 0.6 = gece %60 daha koyu). " +
+             "Gündüz↔gece geçişinde LightingRatio ile yumuşak harmanlanır.")]
+    [Range(0f, 1f)] public float agriculturalFieldNightDarken = 0.6f;
+
     // Cleanup of the procedurally generated texture/materials between Repaint() calls.
     Texture2D cropFieldTexture;
     readonly List<Material> cropFieldMaterials = new List<Material>();
+    // Her tarla materyalinin GÜNDÜZ (temel) rengi — gece kararmasını buradan türetiriz.
+    // cropFieldMaterials ile indeks eşleşir. Repaint başına temizlenir.
+    readonly List<Color> cropFieldBaseColors = new List<Color>();
 
     // Tarla tile'larının kümesi (key = x + y*w) — tarım binalarının tarla ÜSTÜNE yerleşmesini
     // engellemek için (PlaceAgriculturalLayout bunu okur). Repaint başına temizlenir.
@@ -287,8 +294,10 @@ public partial class MapDecorPlacer
         // Tüm tarlalar AYNI ekin görünür → tint neredeyse beyaz (renk/doku değişimi dokudan gelir).
         // Yalnızca çok hafif parlaklık sapması (tarlalar birbirinin kopyası gibi olmasın).
         float bright = Random.Range(0.94f, 1.04f);
-        mat.color = new Color(bright, bright, bright, 1f);
+        var baseColor = new Color(bright, bright, bright, 1f);
+        mat.color = baseColor;
         cropFieldMaterials.Add(mat);
+        cropFieldBaseColors.Add(baseColor);
         mr.sharedMaterial = mat;
 
         float worldMaxWy = maxWy + transform.position.y;
@@ -365,9 +374,29 @@ public partial class MapDecorPlacer
         for (int i = 0; i < cropFieldMaterials.Count; i++)
             if (cropFieldMaterials[i] != null) Destroy(cropFieldMaterials[i]);
         cropFieldMaterials.Clear();
+        cropFieldBaseColors.Clear();
 
         if (cropFieldTexture != null) { Destroy(cropFieldTexture); cropFieldTexture = null; }
 
         cropFieldTiles.Clear();
+    }
+
+    /// <summary>
+    /// Ekili tarlaları gündüz↔gece döngüsüne bağlar: LightingRatio (0=gündüz, 1=gece) arttıkça
+    /// tarla materyallerinin RGB'sini agriculturalFieldNightDarken oranında karartır. ApplyCrossfade
+    /// içinden her ışık değişiminde çağrılır.
+    /// </summary>
+    void ApplyCropFieldNightDarken(float ratio)
+    {
+        if (cropFieldMaterials.Count == 0) return;
+        // ratio=0 → çarpan 1 (gündüz), ratio=1 → çarpan (1 - darken) (gece).
+        float mul = Mathf.Lerp(1f, 1f - Mathf.Clamp01(agriculturalFieldNightDarken), Mathf.Clamp01(ratio));
+        for (int i = 0; i < cropFieldMaterials.Count; i++)
+        {
+            var m = cropFieldMaterials[i];
+            if (m == null) continue;
+            Color b = cropFieldBaseColors[i];
+            m.color = new Color(b.r * mul, b.g * mul, b.b * mul, b.a);
+        }
     }
 }

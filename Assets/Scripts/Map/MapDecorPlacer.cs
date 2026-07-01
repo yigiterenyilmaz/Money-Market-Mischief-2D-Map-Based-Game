@@ -44,6 +44,20 @@ public partial class MapDecorPlacer : MonoBehaviour
     // dikey yansıma ile yatay yön doğru kalır).
     public enum ShadowMode { Projection, Trace }
 
+    [Header("Shadow LOD — Uzaklaşınca Gölge Kalitesi (Performans)")]
+    [Tooltip("Kamera uzaklaştıkça (zoom out) gölgeleri kademeli kıs. Ağaç sayısı çok yüksek olduğu " +
+             "için tüm harita görünürken her ağacın dinamik gölgesini her frame yeniden kurmak en " +
+             "pahalı iştir; bu ölçekte gölgeler zaten piksel-altıdır. Kapalıysa her zaman tam kalite.")]
+    public bool shadowLodEnabled = true;
+    [Tooltip("Ölçek-bağımsız eşik: ekranda BİR DÜNYA BİRİMİNİN kapladığı piksel sayısı bu değerin " +
+             "altına düşünce (yeterince uzaklaşınca) AĞAÇ gölgeleri gizlenir ve güncelleme döngüsünden " +
+             "çıkarılır. Büyük = ağaç gölgeleri daha erken (daha az uzaklaşınca) kapanır.")]
+    [Range(2f, 64f)] public float treeShadowMinPixels = 16f;
+    [Tooltip("Bir dünya biriminin ekran pikseli bu değerin de altına inince (iyice uzaklaşınca) TÜM " +
+             "gölgeler (binalar dâhil) gizlenir → gölge güncelleme döngüsü tamamen atlanır. " +
+             "treeShadowMinPixels'ten küçük olmalı.")]
+    [Range(1f, 32f)] public float allShadowMinPixels = 5f;
+
     [Header("City Building Shadow — Dinamik Güneş Gölgesi")]
     [Tooltip("Flat gölge üretim modu. Projection = eski tek-pivot afin izdüşüm (karşılaştırma için). " +
              "Trace = per-pixel shadow smear: her opak piksel ışık yönünde bir iz bırakır, birleşimi " +
@@ -60,8 +74,6 @@ public partial class MapDecorPlacer : MonoBehaviour
     [Range(0f, 0.7f)] public float shadowTraceStrayCut = 0.35f;
     [Tooltip("Gölge rengi ve saydamlığı.")]
     public Color shadowColor = new Color(0f, 0f, 0f, 0.35f);
-    [Tooltip("Near edge (binaya yakın kenar) Y ölçeği. 1 = bina kenarı kadar tam yükseklik.")]
-    [Range(0.2f, 1.2f)] public float shadowNearScale = 1f;
     [Tooltip("Far edge (uzak uç) trapez incelme oranı. 0 = sivri uç, 1 = dikdörtgen.")]
     [Range(0f, 1f)] public float shadowTipRatio = 0.3f;
     [Tooltip("Binanın sanal yükseklik çarpanı. Uzunluk = yükseklik/tan(elev).")]
@@ -200,9 +212,6 @@ public partial class MapDecorPlacer : MonoBehaviour
     [Tooltip("How fast ships turn toward their heading (degrees/sec). Lower = smoother, more graceful turns.")]
     [Range(15f, 360f)] public float shipTurnSpeed = 45f;
 
-    [Tooltip("Chaikin corner-cutting passes applied to the path. More = rounder curves. 0 = raw A* path.")]
-    [Range(0, 6)] public int shipPathSmoothingPasses = 3;
-
     // -------------------------------------------------------------------------
     // NESTED TYPES
     // -------------------------------------------------------------------------
@@ -237,6 +246,7 @@ public partial class MapDecorPlacer : MonoBehaviour
         public int             tileX, tileY;
         public bool            isBroken;
         public bool            isSpecial;
+        public bool            isTree;      // urban ağaç — zoom LOD'da gölgesi ilk kısılan grup
         public int             spriteIndex;
         public int             brokenIndex;
         public float           baseAlpha;
@@ -310,6 +320,11 @@ public partial class MapDecorPlacer : MonoBehaviour
     private DayNightCycle dayNight;
     private float         prevRatio = -1f;
     private float         prevSunProgress = float.NaN; // shadows recompute only when the sun has moved perceptibly
+
+    // Zoom-based shadow LOD. shadowLod: 0 = full, 1 = tree shadows off, 2 = all shadows off.
+    // -1 = "henüz uygulanmadı" (Repaint sonrası yeni binalara mevcut seviyeyi zorla uygula).
+    private Camera lodCamera;
+    private int    shadowLod = -1;
 
     // Ship spawning timer
     private float shipSpawnTimer;
@@ -570,8 +585,8 @@ public partial class MapDecorPlacer : MonoBehaviour
 
         float ratio = (dayNight != null) ? dayNight.LightingRatio : 0f;
 
-        // Crossfade buildings + ports
-        if (cityBuildings.Count > 0 || ports.Count > 0)
+        // Crossfade buildings + ports (+ crop-field gece kararması)
+        if (cityBuildings.Count > 0 || ports.Count > 0 || cropFieldMaterials.Count > 0)
         {
             // DEBUG overlap test: show both sprites every frame, bypassing the ratio gate
             // (otherwise a stable ratio would skip re-applying after the toggle is flipped).
@@ -587,11 +602,19 @@ public partial class MapDecorPlacer : MonoBehaviour
             }
         }
 
+        // Zoom LOD — kamera uzaklaştıkça gölge seviyesini ayarla (ağaç gölgelerini, sonra tüm
+        // gölgeleri kıs). Seviye değişince gizlenecekleri gizler + bir sonraki UpdateShadows'u
+        // zorlar (görünenleri yeniden aktive etmek için).
+        UpdateShadowLod();
+
         // Dinamik gölge güncelle — yalnızca güneş hissedilir şekilde hareket ettiyse yeniden hesapla.
         // Eşik döngü hızına göre kendini ayarlar: hızlı döngüde her frame, yavaş/duraklamış döngüde
         // imperceptible frame'leri atlar. Bina başına trig + mesh yeniden kurmayı boşa harcamaz.
+        // Uzaklaşınca (LOD >= 1) gölge ekranda neredeyse hiç kaymadığı için eşiği büyütüp güncellemeyi
+        // seyrekleştir → daha az mesh yeniden kurma.
         float sunProgress = (dayNight != null) ? dayNight.SunProgress : 0.5f;
-        if (float.IsNaN(prevSunProgress) || Mathf.Abs(sunProgress - prevSunProgress) > 0.0005f)
+        float sunEps      = (shadowLod >= 1) ? 0.004f : 0.0005f;
+        if (float.IsNaN(prevSunProgress) || Mathf.Abs(sunProgress - prevSunProgress) > sunEps)
         {
             prevSunProgress = sunProgress;
             UpdateShadows(sunProgress);
@@ -600,6 +623,75 @@ public partial class MapDecorPlacer : MonoBehaviour
         // Ship tick
         UpdateShips(ratio);
 
+    }
+
+    // -------------------------------------------------------------------------
+    // ZOOM SHADOW LOD
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Kamera zoom'una göre gölge LOD seviyesini seçer (histerezisli, titremesin diye) ve değişince
+    /// uygular. Ölçek-bağımsız metrik: bir dünya biriminin ekranda kapladığı piksel = Screen.height /
+    /// (2 * orthographicSize). Uzaklaştıkça bu değer küçülür.
+    /// </summary>
+    void UpdateShadowLod()
+    {
+        if (!shadowLodEnabled) { if (shadowLod != 0) SetShadowLod(0); return; }
+
+        if (lodCamera == null)
+        {
+            lodCamera = Camera.main != null ? Camera.main : FindAnyObjectByType<Camera>();
+            if (lodCamera == null) return; // kamera yok → LOD atlanır (tam kalite)
+        }
+        if (!lodCamera.orthographic) return;
+
+        float px = Screen.height / (2f * Mathf.Max(0.0001f, lodCamera.orthographicSize));
+
+        const float band = 0.12f; // histerezis payı — sınırda ileri-geri titremeyi önler
+        int desired;
+        if (shadowLod < 0)
+        {
+            // İlk uygulama (Repaint sonrası) — düz eşik, histerezis yok.
+            desired = px < allShadowMinPixels ? 2 : (px < treeShadowMinPixels ? 1 : 0);
+        }
+        else
+        {
+            desired = shadowLod;
+            switch (shadowLod)
+            {
+                case 0:
+                    if      (px < allShadowMinPixels)  desired = 2;
+                    else if (px < treeShadowMinPixels) desired = 1;
+                    break;
+                case 1:
+                    if      (px < allShadowMinPixels)               desired = 2;
+                    else if (px > treeShadowMinPixels * (1f + band)) desired = 0;
+                    break;
+                case 2:
+                    if (px > allShadowMinPixels * (1f + band))
+                        desired = px > treeShadowMinPixels * (1f + band) ? 0 : 1;
+                    break;
+            }
+        }
+
+        if (desired != shadowLod) SetShadowLod(desired);
+    }
+
+    /// <summary>
+    /// LOD seviyesini uygular: bu seviyede kısılan gölgeleri gizler ve UpdateShadows'u zorlar
+    /// (görünür kalanları/yeniden açılanları bir sonraki tick'te doğru güncellesin diye).
+    /// </summary>
+    void SetShadowLod(int newLod)
+    {
+        shadowLod = newLod;
+        for (int i = 0; i < cityBuildings.Count; i++)
+        {
+            var sh = cityBuildings[i].shadow;
+            if (sh == null || sh.transform == null) continue;
+            bool hide = newLod >= 2 || (newLod >= 1 && cityBuildings[i].isTree);
+            if (hide) sh.transform.gameObject.SetActive(false);
+        }
+        prevSunProgress = float.NaN; // UpdateShadows'u zorla → görünür gölgeler yeniden hesaplanır/açılır
     }
 
     // -------------------------------------------------------------------------
@@ -696,6 +788,7 @@ public partial class MapDecorPlacer : MonoBehaviour
         ports.Clear();
         prevRatio = -1f;
         prevSunProgress = float.NaN;
+        shadowLod = -1; // yeni binalara mevcut zoom seviyesini yeniden uygula
         ClearDenseGrid();
         dayNightLookedUp = false;
         cachedMap = null;

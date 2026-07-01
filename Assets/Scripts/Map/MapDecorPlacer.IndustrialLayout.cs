@@ -135,17 +135,25 @@ public partial class MapDecorPlacer
             if (path == null || path.Count < 2) continue;
             bool anyOnStreet = false;
 
-            for (int p = 0; p < path.Count; p += stepAlong)
-            {
-                Vector2Int c = path[p];
+            // Serit yonu: tek komsu ciftinden alinca rasterize edilmis EGIK seritte kuantalama
+            // gurultusu olusuyor (perp 45°'ye kadar sekip binalari yola sokuyordu). Grid lane'leri
+            // DUZ oldugu icin yonu UC NOKTALARDAN al = gercek serit yonu, tilt'ten bagimsiz kararli.
+            Vector2 tangent = ((Vector2)(path[path.Count - 1] - path[0]));
+            if (tangent.sqrMagnitude < 1e-4f) tangent = Vector2.right;
+            tangent.Normalize();
+            Vector2 perp = new Vector2(-tangent.y, tangent.x);
 
-                // Sokak teğeti (komşu path noktalarından) ve dik yön.
-                int a = Mathf.Max(0, p - 1);
-                int b = Mathf.Min(path.Count - 1, p + 1);
-                Vector2 tangent = ((Vector2)(path[b] - path[a]));
-                if (tangent.sqrMagnitude < 1e-4f) tangent = Vector2.right;
-                tangent.Normalize();
-                Vector2 perp = new Vector2(-tangent.y, tangent.x);
+            // Adimlamayi TILE-index yerine ARC-UZUNLUK ile yap: egik serit birim uzunlukta ~1.41x
+            // fazla tile icerir; index-adimlama binalari egik seritlerde sikistiriyordu. Kumulatif
+            // mesafe stepAlong'u her astiginda bir slot ac (eksen-hizali seritte p-adimlama ile ayni).
+            float accS = 0f, nextS = 0f;
+            for (int p = 0; p < path.Count; p++)
+            {
+                if (p > 0) accS += Vector2.Distance(path[p], path[p - 1]);
+                if (accS < nextS) continue;
+                nextS += stepAlong;
+
+                Vector2Int c = path[p];
 
                 // Sokak boyunca (teğet yönünde) rastgele kaydırma — yola uzaklığı bozmaz.
                 float jAlong = jitterAmp > 0f ? (Random.value - 0.5f) * 2f * jitterAmp : 0f;

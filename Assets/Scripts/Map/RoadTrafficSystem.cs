@@ -50,7 +50,6 @@ public class RoadTrafficSystem : MonoBehaviour
     [Header("Rotation")]
     [Range(1,   40)]  public int   directionLookahead   = 10;
     [Range(1f, 30f)]  public float directionSmoothSpeed = 10f;
-    [Range(0f, 720f)] public float flipRotationSpeed    = 0f;
 
     // -------------------------------------------------------------------------
 

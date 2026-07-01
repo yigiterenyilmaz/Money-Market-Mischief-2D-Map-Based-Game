@@ -23,12 +23,8 @@ public class RoadGenerator : MonoBehaviour
     // -------------------------------------------------------------------------
 
     [Header("Highway — Ana Arter")]
-    [Tooltip("Kontrol noktası sayısı (eğri yumuşaklığı).")]
-    [Range(1, 8)] public int highwayControlPoints = 4;
     [Tooltip("Kontrol noktası sapma oranı. Düşük = daha düz.")]
     [Range(0.01f, 0.5f)] public float highwayCurviness = 0.30f;
-    [Tooltip("Spline çözünürlüğü (segment başına).")]
-    [Range(8, 40)] public int highwaySplineResolution = 20;
     [Tooltip("Highway kalınlığı.")]
     [Range(2, 8)] public int highwayThickness = 4;
     [Tooltip("Highway outline genişliği.")]
@@ -123,7 +119,12 @@ public class RoadGenerator : MonoBehaviour
     [Range(1, 6)] public int industrialGridThickness = 2;
     [Tooltip("Izgara yol outline genisligi (tile).")]
     [Range(0, 2)] public int industrialGridOutlineWidth = 1;
-    [Tooltip("Izgaranin acisi (derece). Yollar DUZ kalir, sadece bu acida doner. 0 = eksen-hizali.")]
+    [Tooltip("Izgarayi her sanayi bolgesinin ASAL EKSENINE (PCA) hizala. ACIK: izgara bolgenin dogal " +
+             "uzanim yonunu takip eder ve industrialGridAngle bunun uzerine EKLENEN bir sapmadir " +
+             "(saf hizalama icin 0 yap). KAPALI: industrialGridAngle mutlak (eksen-hizali) acidir — eski davranis.")]
+    public bool industrialGridAlignToRegion = true;
+    [Tooltip("Izgaranin acisi (derece). Yollar DUZ kalir, sadece bu acida doner. " +
+             "industrialGridAlignToRegion ACIKken bolgenin asal eksenine EKLENEN sapma; KAPALIyken mutlak aci (0 = eksen-hizali).")]
     [Range(-90f, 90f)] public float industrialGridAngle = 20f;
     [Tooltip("Bir biome-3 kumesinin izgara almasi icin gereken minimum tile sayisi.")]
     [Range(50, 5000)] public int industrialGridMinRegionTiles = 800;
@@ -1292,8 +1293,24 @@ public class RoadGenerator : MonoBehaviour
         float pivotX = (float)sumX / cluster.Count;
         float pivotY = (float)sumY / cluster.Count;
 
+        // Izgara acisi. industrialGridAlignToRegion ACIKken kumenin ASAL EKSENINI (PCA) hesapla —
+        // izgara bolgenin dogal uzanim yonunu takip etsin (sabit global aci degil). Kovaryans
+        // matrisinin baskin ozvektor acisi: 0.5*atan2(2*Cxy, Cxx-Cyy). industrialGridAngle bunun
+        // uzerine eklenen sapma olur. KAPALIyken eski davranis (mutlak aci).
+        float baseAng = 0f;
+        if (industrialGridAlignToRegion)
+        {
+            double cxx = 0, cyy = 0, cxy = 0;
+            for (int i = 0; i < cluster.Count; i++)
+            {
+                double ddx = cluster[i].x - pivotX, ddy = cluster[i].y - pivotY;
+                cxx += ddx * ddx; cyy += ddy * ddy; cxy += ddx * ddy;
+            }
+            baseAng = 0.5f * Mathf.Atan2(2f * (float)cxy, (float)(cxx - cyy));
+        }
+
         // donmus cerceve: u =  dx*cos + dy*sin ; v = -dx*sin + dy*cos
-        float ang = industrialGridAngle * Mathf.Deg2Rad;
+        float ang = baseAng + industrialGridAngle * Mathf.Deg2Rad;
         float cos = Mathf.Cos(ang), sin = Mathf.Sin(ang);
 
         float startU = UnityEngine.Random.value * blockU;
@@ -1461,8 +1478,13 @@ public class RoadGenerator : MonoBehaviour
             if (!FindNearestNetworkTile(map, comp, gridTiles, out Vector2Int roadTile, out Vector2Int gridTile))
                 continue; // adada hic baska yol yok (ya da kara baglantisi yok)
 
-            var path = BFSPathOnLandSimple(map, roadTile, gridTile);
-            if (path.Count < 2) continue;
+            var raw = BFSPathOnLandSimple(map, roadTile, gridTile);
+            if (raw.Count < 2) continue;
+            // Ham 4-yonlu BFS bir Manhattan merdiveni (zig-zag) uretir — dallar gibi yumusat ki
+            // izgaraya girisi merdiven yerine akici bir egri olsun. SmoothBranchPath uc noktalari
+            // (yol tile'i + izgara tile'i) korur, boylece baglanti kopmaz.
+            var path = SmoothBranchPath(map, raw);
+            if (path.Count < 2) path = raw;
             foreach (var p in path)
                 RegisterRoadTile(p, 2, thickness, outW, industrialGridFill, industrialGridOutline);
         }

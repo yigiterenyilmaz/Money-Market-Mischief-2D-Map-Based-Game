@@ -570,11 +570,16 @@ public partial class MapDecorPlacer
             float overlapR     = targetLayer != null ? targetLayer.overlapRadius : 0.3f;
 
             int placed = 0;
-            int maxAttempts = pool.Count * 2;
 
-            for (int attempt = 0; attempt < maxAttempts && placed < targetCount; attempt++)
+            // Havuzu bir kez karıştırıp her tile'ı EN FAZLA bir kez dene. Rastgele-yerine-koymalı
+            // örnekleme (Random.Range ile) geçerli tile azınlıktayken (yol/kıyı çoğu halkayı yerken)
+            // aynı geçersiz tile'lara takılıp yerleşen=0 bırakabiliyordu; sıralı tarama, geçerli tek
+            // bir tile bile varsa landmark'ı garanti yerleştirir.
+            var candidates = new List<Vector2Int>(pool);
+            ShuffleList(candidates);
+            for (int c = 0; c < candidates.Count && placed < targetCount; c++)
             {
-                Vector2Int tile = pool[Random.Range(0, pool.Count)];
+                Vector2Int tile = candidates[c];
                 if (TryPlaceSpecialBuilding(map, special, tile.x, tile.y, scaleRange, overlapR, halfW, halfH))
                 {
                     placed++;
@@ -676,9 +681,23 @@ public partial class MapDecorPlacer
     {
         Sprite sprite = PickDecorSprite(biome, settings);
         if (sprite == null) return;
+
+        // Ekili tarla (crop field) ÜSTÜNE doğa dekoru koyma — tarlalar temiz kalmalı.
+        if (cropFieldTiles.Count > 0 && cropFieldTiles.Contains(tx + ty * map.width)) return;
+
         float scale = Random.Range(spriteScaleRange.x, spriteScaleRange.y);
+
+        // Yol üstüne/kenarına dekor koyma — sprite footprint'i yola değiyorsa ele.
+        if (SpriteOverlapsRoad(tx, ty, sprite, scale, cityMinRoadDistance)) return;
+
         float wx    = transform.position.x + (tx / pixelsPerUnit) - halfW;
         float wy    = transform.position.y + (ty / pixelsPerUnit) - halfH;
+
+        // Bina footprint'lerinin (denseOccupied) üstüne dekor koyma — doğa dekoru en son
+        // çalıştığı için tüm bina/fabrika/tarım footprint'leri zaten kayıtlıdır.
+        float radius = ComputeBuildingRadius(sprite, scale, 0f);
+        if (IsDenseOverlapping(wx, wy, radius)) return;
+
         PlaceSimpleSprite("Decor", sprite, wx, wy, scale, Random.value > 0.5f, 2);
     }
 
