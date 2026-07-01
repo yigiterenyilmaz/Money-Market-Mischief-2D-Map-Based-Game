@@ -67,6 +67,9 @@ public class RoadGenerator : MonoBehaviour
     [Range(2, 30)] public int branchShoreBuffer = 12;
     [Tooltip("Highway -> biyom rengine gecis sertligi. 1 = lineer (yumusak), yuksek = dar gecis bandi (sert).")]
     [Range(1f, 20f)] public float branchColorTransitionSharpness = 4f;
+    [Tooltip("Ozel bina konnektoru: bina zaten bu kadar tile icinde bir yola yakinsa AYRI konnektor " +
+             "yol cizilmez (sehir kivrimli konnektorlerle tikanmasin). 0 = her binaya konnektor cek.")]
+    [Range(0, 40)] public int buildingConnectMinDistance = 10;
 
     // -------------------------------------------------------------------------
     // DALLANMA UNIFIYE RENGI (tum biyomlarda ayni yol govdesi rengi)
@@ -919,6 +922,8 @@ public class RoadGenerator : MonoBehaviour
         // donguyu onlemek icin ayri bir guvenlik siniri tutulur.
         int rejectedCrossings = 0;
         int maxRejects = scaledMaxCount * 4;
+        // DIAGNOSTIK: branch'lerin neden uretilemedigini say.
+        int dbgNoTarget = 0, dbgPathBroken = 0, dbgTruncatedShort = 0, dbgIndustrial = 0;
         for (int iter = 0; iter < scaledMaxCount; iter++)
         {
             int maxDist = 0;
@@ -935,10 +940,12 @@ public class RoadGenerator : MonoBehaviour
                     for (int y = 0; y < _h; y += 3)
                     {
                         if (!map.IsLand(x, y)) continue;
-                        // Sanayi (biome 3) bolgeleri kendi DUZ yol izgarasini kullanir; branch
-                        // (normal kivrimli yol) HEDEFI olamazlar. Branch'ler bu bolgeyi baska bir
-                        // hedefe giderken yine de GECEBILIR (BFS biome-3 tile'larini kullanabilir).
-                        if (map.GetBiome(x, y) == 3) continue;
+                        // Sanayi (biome 3) kendi DUZ izgarasini, sehir (biome 2) kendi Manhattan
+                        // sokak gridini + cityHall konnektorunu kullanir; ikisi de branch (kivrimli
+                        // yol) HEDEFI olamaz — aksi halde sehir kivrimli yollarla tikaniyor. Branch'ler
+                        // bu bolgeleri baska bir hedefe giderken yine de GECEBILIR.
+                        int tb = map.GetBiome(x, y);
+                        if (tb == 3 || tb == 2) continue;
                         int d = roadDist[x, y];
                         if (d == int.MaxValue) continue;
                         int shore = shoreDistCache[x, y];
@@ -961,7 +968,7 @@ public class RoadGenerator : MonoBehaviour
                 }
             }
 
-            if (!found || maxDist < 10) break;
+            if (!found || maxDist < 10) { dbgNoTarget++; break; }
 
             float bestHwDist = float.MaxValue;
             int bestHwIdx = 0;
@@ -1020,6 +1027,7 @@ public class RoadGenerator : MonoBehaviour
 
             if (pathBroken || rawPath.Count < 10)
             {
+                dbgPathBroken++;
                 roadDist[target.x, target.y] = 0;
                 continue;
             }
@@ -1050,6 +1058,7 @@ public class RoadGenerator : MonoBehaviour
             {
                 if (truncateAt < 10)
                 {
+                    dbgTruncatedShort++;
                     roadDist[target.x, target.y] = 0;
                     continue;
                 }
@@ -1059,13 +1068,17 @@ public class RoadGenerator : MonoBehaviour
                 PadPathToNearestCenterline(map, smoothed, roadDist);
             }
 
-            // Sanayi bolgesinden (biome 3) GECEN branch'leri reddet — bu bolge kendi DUZ
-            // izgarasini kullanir, normal kivrimli yol icinden gecmemeli. Yolu uretme; hedef
-            // bolgesini kapsanmis isaretle (ayni yere tekrar yonelmeyelim) ve baska yere yonel.
-            bool crossesIndustrial = false;
+            // Sanayi (biome 3) VEYA sehir (biome 2) icinden GECEN branch'leri reddet — bu bolgeler
+            // kendi yol yapisini kullanir, kivrimli yol icinden gecip onlari tikamamali. Yolu
+            // uretme; hedef bolgesini kapsanmis isaretle (ayni yere tekrar yonelmeyelim) ve baska
+            // yere yonel.
+            bool crossesRestricted = false;
             for (int p = 0; p < smoothed.Count; p++)
-                if (map.GetBiome(smoothed[p].x, smoothed[p].y) == 3) { crossesIndustrial = true; break; }
-            if (crossesIndustrial)
+            {
+                int cb = map.GetBiome(smoothed[p].x, smoothed[p].y);
+                if (cb == 3 || cb == 2) { crossesRestricted = true; break; }
+            }
+            if (crossesRestricted)
             {
                 bfsQueue.Clear();
                 roadDist[target.x, target.y] = 0;
@@ -1086,6 +1099,7 @@ public class RoadGenerator : MonoBehaviour
                     }
                 }
                 // Bu deneme bir branch yerlestirmedigi icin iter'i geri al — retry sayilmasin.
+                dbgIndustrial++;
                 if (++rejectedCrossings <= maxRejects) iter--;
                 continue;
             }
@@ -1136,10 +1150,67 @@ public class RoadGenerator : MonoBehaviour
             }
         }
 
+        // FALLBACK: Sansiz seed'lerde normal dongu HIC dal yerlestiremeyebilir (kisa/parcali
+        // highway, her hedefin sanayiyi gecmesi, vb.). Haritayi tamamen yolsuz birakmamak icin
+        // kati esikleri ve industrial-crossing/truncation reddini TAMAMEN birak, highway'den en
+        // uzak birkac kara noktasina zorla dal cek. Yalnizca placed==0 iken calisir — iyi
+        // seed'leri etkilemez.
         if (placed == 0)
-            Debug.LogWarning($"RoadGenerator: HİÇ BRANCH YOL ÜRETİLEMEDİ! branchMinCoverage={branchMinCoverageDistance}, shoreBuffer={branchShoreBuffer}, branchMaxCount={branchMaxCount}");
+        {
+            var cand = new List<Vector2Int>();
+            for (int x = 0; x < _w; x += 3)
+                for (int y = 0; y < _h; y += 3)
+                {
+                    if (!map.IsLand(x, y)) continue;
+                    int fb = map.GetBiome(x, y);
+                    if (fb == 3 || fb == 2) continue;                 // sanayi/sehir kendi yapisini alir
+                    if (roadDist[x, y] == int.MaxValue || roadDist[x, y] < 6) continue;
+                    cand.Add(new Vector2Int(x, y));
+                }
+            cand.Sort((a, b) => roadDist[b.x, b.y].CompareTo(roadDist[a.x, a.y]));
+
+            int want = Mathf.Min(Mathf.Max(3, scaledMaxCount / 2), cand.Count);
+            var usedTargets = new List<Vector2Int>();
+            foreach (var target in cand)
+            {
+                if (placed >= want) break;
+                // Dagilim icin onceki fallback hedeflerine cok yakin olanlari atla.
+                bool tooClose = false;
+                foreach (var u in usedTargets)
+                    if (Vector2Int.Distance(u, target) < branchCoverageRadius) { tooClose = true; break; }
+                if (tooClose) continue;
+
+                Vector2Int hwStart = allRoadNodes[0];
+                float best = float.MaxValue;
+                int hstep = Mathf.Max(1, allRoadNodes.Count / 200);
+                for (int i = 0; i < allRoadNodes.Count; i += hstep)
+                {
+                    float dd = Vector2Int.Distance(allRoadNodes[i], target);
+                    if (dd < best) { best = dd; hwStart = allRoadNodes[i]; }
+                }
+
+                var raw = BFSPathOnLandSimple(map, hwStart, target, roadDist, BRANCH_CLEARANCE);
+                if (raw.Count < 10) raw = BFSPathOnLandSimple(map, hwStart, target); // clearance'siz son care
+                if (raw.Count < 10) continue;
+
+                var sm = SmoothBranchPath(map, raw);
+                if (sm.Count < 10) sm = raw;
+
+                branchPaths.Add(new List<Vector2Int>(sm));
+                RegisterBranchPixels(map, sm, 0.3f, 1f, roadDist, BRANCH_PAINT_SKIP_DIST);
+                for (int ri = 0; ri < sm.Count; ri += 5) allRoadNodes.Add(sm[ri]);
+                usedTargets.Add(target);
+                placed++;
+            }
+            if (placed > 0)
+                Debug.Log($"RoadGenerator: FALLBACK ile {placed} dal zorla yerlestirildi (kati esikler birakildi).");
+        }
+
+        string dbg = $"[reject breakdown] industrial-crossing={dbgIndustrial}, path-broken={dbgPathBroken}, truncated-short={dbgTruncatedShort}, no-target={dbgNoTarget} | scaledMaxCount={scaledMaxCount}, maxRejects={maxRejects}, rejectedCrossings={rejectedCrossings}";
+        if (placed == 0)
+            Debug.LogWarning($"RoadGenerator: HİÇ BRANCH YOL ÜRETİLEMEDİ! branchMinCoverage={branchMinCoverageDistance}, shoreBuffer={branchShoreBuffer}, branchMaxCount={branchMaxCount}\n{dbg}");
         else
-            Debug.Log($"RoadGenerator: {placed} dal yerleştirildi (kapsama tabanlı, eşik={branchMinCoverageDistance}px).");
+            Debug.Log($"RoadGenerator: {placed} dal yerleştirildi (kapsama tabanlı, eşik={branchMinCoverageDistance}px).\n{dbg}");
     }
 
     // =========================================================================
@@ -2481,6 +2552,10 @@ public class RoadGenerator : MonoBehaviour
         }
 
         if (bestDist == 0 || bestDist == int.MaxValue) return;
+        // Bina zaten bir yola yeterince yakinsa AYRI konnektor cizme — sehrin kivrimli
+        // konnektorlerle tikanmasini onler (kullanici: "per-building connector'lari azalt").
+        if (buildingConnectMinDistance > 0 &&
+            bestDist <= buildingConnectMinDistance * buildingConnectMinDistance) return;
 
         //BFS ile doğal yol bul — clearance ile mevcut yollari KESEMEZ
         List<Vector2Int> rawPath = BFSPathOnLandSimple(map, bestRoadTile, buildingTile, roadDistanceField, BRANCH_CLEARANCE);

@@ -10721,6 +10721,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bfa8aed3e4a23de4c830d90cafb5a698, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapDecorPlacer
+  agriculturalPlaceCropFields: 1
+  agriculturalFieldCoverage: 0.85
+  agriculturalFieldGapTiles: 14
+  agriculturalFieldRoadClearTiles: 9
+  agriculturalFieldLengthTiles: {x: 22, y: 55}
+  agriculturalFieldWidthTiles: {x: 13, y: 32}
+  agriculturalCropRowPeriodTiles: 4
+  agriculturalFieldIrregularity: 0.5
+  agriculturalFieldAlignment: 0.7
   agriculturalPlaceBuildings: 1
   agriculturalScaleRange: {x: 0.35, y: 0.55}
   agriculturalFillDensity: 0.5
@@ -10738,21 +10747,21 @@ MonoBehaviour:
   minRegionTiles: 900
   cityMinRoadDistance: 3
   shadowMode: 1
-  shadowTraceSteps: 48
-  shadowTraceBlur: 1.2
-  shadowTraceStrayCut: 0.35
+  shadowTraceSteps: 29
+  shadowTraceBlur: 0.69
+  shadowTraceStrayCut: 0.164
   shadowColor: {r: 0, g: 0, b: 0, a: 0.52156866}
-  shadowNearScale: 1
-  shadowTipRatio: 0.3
-  shadowHeightRatio: 1
-  shadowMaxLength: 0.53
-  shadowMidScale: 0.1
-  daytimeSweepFraction: 0.098
-  shadowSpeedSmoothing: 0.6
-  shadowLeanDegrees: 55
-  shadowProjectLength: 3
-  shadowBaseRaiseRatio: 0.15
-  shadowVerticalOffset: 0.05
+  shadowNearScale: 0.489
+  shadowTipRatio: 0.225
+  shadowHeightRatio: 0.82
+  shadowMaxLength: 0.34
+  shadowMidScale: 0.072
+  daytimeSweepFraction: 0.081
+  shadowSpeedSmoothing: 0.442
+  shadowLeanDegrees: 75
+  shadowProjectLength: 2.77
+  shadowBaseRaiseRatio: 0.137
+  shadowVerticalOffset: -0.14
   isoShadowAngleDegrees: 30
   isoShadowPivotOffsetRatio: 0.1
   isoShadowNearScale: 0.7
@@ -10807,6 +10816,11 @@ MonoBehaviour:
   urbanFillDensity: 0.5
   urbanScatterRate: 4
   urbanSpacing: 0.6
+  urbanPlaceNature: 1
+  urbanNatureScaleRange: {x: 0.3, y: 0.5}
+  urbanNatureFillDensity: 0.9
+  urbanNatureScatterRate: 3
+  urbanNatureSpacing: 0.03
 --- !u!114 &1710072564
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11023,6 +11037,7 @@ MonoBehaviour:
   branchOutlineWidth: 0
   branchShoreBuffer: 12
   branchColorTransitionSharpness: 2.3
+  buildingConnectMinDistance: 10
   branchFill: {r: 0.42, g: 0.36, b: 0.26, a: 1}
   branchOutline: {r: 0.22, g: 0.18, b: 0.12, a: 1}
   shoulderWidth: 1
@@ -11067,7 +11082,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoadTrafficSystem
   mapPainter: {fileID: 1710072559}
   roadGenerator: {fileID: 1710072573}
-  mapDecorPlacer: {fileID: 0}
+  mapDecorPlacer: {fileID: 1710072562}
   carSprite: {fileID: -7011324565457971746, guid: 6601d8a1f536eb04fb2bba756b231ba9, type: 3}
   carSpriteNight: {fileID: 21300000, guid: 9bb349990f88427419f3d65f38ccdbf7, type: 3}
   carSpriteHeadlights: {fileID: 21300000, guid: 107c90563ab32fc4eb5add6fb2a2e0a2, type: 3}
@@ -11078,6 +11093,7 @@ MonoBehaviour:
   branchCarDensity: 2.11
   carScale: 0.301
   carScaleVariation: 0.094
+  shadowVerticalRaise: 0.015
   carColors:
   - color: {r: 0.5924529, g: 0.5924529, b: 0.5924529, a: 1}
     spawnWeight: 1
@@ -11247,15 +11263,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StreetLampPlacer
   mapPainter: {fileID: 1710072559}
   roadGenerator: {fileID: 1710072573}
-  mapDecorPlacer: {fileID: 0}
+  mapDecorPlacer: {fileID: 1710072562}
   lampSprite: {fileID: 2599969905456701152, guid: 06357002e85b91f4b9dd756302e71a87, type: 3}
   highwayLampInterval: 40
   branchLampInterval: 51
   roadEdgeOffset: 7
   buildingClearance: 0.06
   lampScale: 0.114
-  haloScaleMultiplier: 0.69
-  haloAlphaMultiplier: 0.467
+  shadowVerticalRaise: 0.02
+  haloScaleMultiplier: 0.33
+  haloAlphaMultiplier: 0.29
   haloSpriteRadius: 7
   lightVerticalOffset: 0.04
   haloVerticalSquash: 0.5

@@ -162,6 +162,11 @@ public class BiomePaintSettings : ScriptableObject
              "Boş bırakılabilir — sonradan doldurun.")]
     public List<CityBuildingEntry> urbanBuildings = new List<CityBuildingEntry>();
 
+    [Header("Urban Nature — Ağaçlar/Doğa (Seyrek)")]
+    [Tooltip("Urban bölgesine (biome 1) binaların arasına seyrek dağılımla yerleştirilen ağaçlar/doğa " +
+             "öğeleri. Gündüz/gece sprite'larıyla crossfade + gölge alır. Boş bırakılabilir — sonradan doldurun.")]
+    public List<CityBuildingEntry> urbanNature = new List<CityBuildingEntry>();
+
     // =========================================================================
     // TARIM (AGRICULTURAL) BİNALARI
     // =========================================================================

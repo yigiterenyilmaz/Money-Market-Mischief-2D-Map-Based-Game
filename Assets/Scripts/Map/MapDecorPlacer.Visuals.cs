@@ -525,7 +525,11 @@ public partial class MapDecorPlacer
     // shadowMode==Trace → per-pixel smear mesh; aksi halde sprite'ı tabandan eğip yassıltan
     // projeksiyon. sortingLayerName null ise renderer default sorting layer'da kalır (bina);
     // lamba/araba kendi layer'ını geçer. UpdateFlatShadow her frame bu handle'ı güneşe göre günceller.
-    public ShadowHandle CreateFlatShadow(GameObject parent, Sprite sprite, int sortOrder, string sortingLayerName)
+    // localBaseRaise: gölge tabanını parent'ın LOKAL biriminde yukarı kaydırır. shadowVerticalOffset
+    // sprite-lokal birimdedir; lamba/araba çok küçük ölçekli (0.01/0.05) olduğundan o nudge dünyada
+    // ezilir. Lamba/araba bu parametreyle dünya-uzayı bir kaldırma geçirip gölgeyi objeye hizalar.
+    public ShadowHandle CreateFlatShadow(GameObject parent, Sprite sprite, int sortOrder, string sortingLayerName,
+                                         float localBaseRaise = 0f)
     {
         // Container — origin sabit; UpdateFlatShadow localRotation/scale (projeksiyon) veya
         // _SmearDir (trace) günceller.
@@ -546,8 +550,9 @@ public partial class MapDecorPlacer
             // o parçanın olduğu yerdedir (üst/uzak kısım tepeden başlar, ön tabana sürüklenmez).
             // Quad sprite + her yöne 'margin' (max smear) kadar büyütülür; shader her fragment'te
             // _SmearDir boyunca geri yürür. Trace modu: yükseklik ofseti YOK — container sprite
-            // ile tam çakışık (her piksel kendi yerinden gölge verir).
-            containerGo.transform.localPosition = Vector3.zero;
+            // ile tam çakışık (her piksel kendi yerinden gölge verir). localBaseRaise lamba/araba
+            // gibi küçük ölçekli objelerde gölgeyi objeye hizalamak için tabanı yukarı nudge eder.
+            containerGo.transform.localPosition = new Vector3(0f, localBaseRaise, 0f);
 
             // Margin = mümkün olan en uzun smear (alçak güneş). lengthFactor tavanı shadowMaxLength.
             float margin = halfHeight * 2f * shadowMaxLength * shadowProjectLength * 1.1f;
@@ -631,7 +636,7 @@ public partial class MapDecorPlacer
         // gelecek şekilde yukarı kaydırılır, böylece UpdateFlatShadow pivot node'u döndürünce gölge
         // tabandan döner.
         containerGo.transform.localPosition =
-            new Vector3(0f, -halfHeight + halfHeight * shadowBaseRaiseRatio + shadowVerticalOffset, 0f);
+            new Vector3(0f, -halfHeight + halfHeight * shadowBaseRaiseRatio + shadowVerticalOffset + localBaseRaise, 0f);
 
         GameObject spriteGo = new GameObject("ShadowSprite");
         spriteGo.transform.SetParent(containerGo.transform, false);

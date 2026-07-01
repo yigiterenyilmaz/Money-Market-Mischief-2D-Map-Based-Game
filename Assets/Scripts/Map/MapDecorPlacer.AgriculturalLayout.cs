@@ -47,6 +47,10 @@ public partial class MapDecorPlacer
     void PlaceAgriculturalLayout(MapGenerator map, BiomePaintSettings settings,
                                  List<Vector2Int> tiles, float halfW, float halfH)
     {
+        // Ekin tarlalarını (dokulu buğday subregion'ları) binalardan ÖNCE çiz — binalar tarlaların
+        // üstüne otursun. Tarlalar bina ayarından bağımsızdır (agriculturalPlaceCropFields).
+        PlaceAgriculturalFields(map, tiles, halfW, halfH);
+
         if (!agriculturalPlaceBuildings) return;
         if (tiles == null || tiles.Count == 0) return;
 
@@ -101,6 +105,9 @@ public partial class MapDecorPlacer
                 if (cityShoreBuffer > 0 && !HasShoreBuffer(map, newTx, newTy)) continue;
             }
             tx = newTx; ty = newTy;
+
+            // Tarla (crop field) ÜSTÜNE bina koyma — ekili alanlar bina/yol/lambadan temiz kalmalı.
+            if (cropFieldTiles.Count > 0 && cropFieldTiles.Contains(tx + ty * map.width)) continue;
 
             float effRadius = ComputeBuildingRadius(daySprite, scale, overlapR);
             float wx = transform.position.x + (tx / pixelsPerUnit) - halfW;

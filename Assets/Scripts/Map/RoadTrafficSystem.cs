@@ -37,6 +37,10 @@ public class RoadTrafficSystem : MonoBehaviour
     [Header("Car Appearance")]
     [Range(0.01f, 2f)]  public float carScale          = 0.05f;
     [Range(0f,  0.3f)]  public float carScaleVariation = 0.1f;
+    [Tooltip("Araba golgesini dunya birimi cinsinden yukari kaydirir — golge araba altina otursun. " +
+             "Bina golgesi ~1 olcekte shadowVerticalOffset'i gorur; araba kucuk olcekli oldugundan " +
+             "o nudge ezilir, ayri dunya-uzayi kaldirma gerekir.")]
+    [Range(0f, 0.2f)]   public float shadowVerticalRaise = 0.015f;
     public List<CarColorEntry> carColors = new List<CarColorEntry>();
 
     [Header("Speed")]
@@ -52,10 +56,10 @@ public class RoadTrafficSystem : MonoBehaviour
 
     private struct JunctionEntry { public int pathIndex; public int pixelIndex; }
 
-    // Araba gölgesi — bina ile AYNI ortak flat gölge (Projection/Trace). Arabalar döndüğü için gölge
-    // arabanın altına konamaz (dönerdi); bunun yerine carParent altında DÖNMEYEN bir "holder" GO'su
-    // her frame arabanın dünya pozisyonuna yerleşir, gölge handle'ı bu holder'ın çocuğudur → bina
-    // davranışı birebir korunur (gölge güneş yönüne uzar, arabayla dönmez).
+    // Araba gölgesi — bina ile AYNI ortak flat gölge (Projection/Trace). carParent altında bir
+    // "holder" GO'su her frame arabanın dünya pozisyonuna + dönüşüne yerleşir; gölge handle'ı bu
+    // holder'ın çocuğudur. Holder arabayla döndüğü için gölge silueti araba yönünü takip eder,
+    // güneş eğimi (UpdateFlatShadow leanZ) bunun üstüne lokal uygulanır.
     private class CarShadow
     {
         public Transform holder;
@@ -649,8 +653,10 @@ public class RoadTrafficSystem : MonoBehaviour
         holder.transform.SetParent(carParent, false);
         holder.transform.localScale = new Vector3(scale, scale, 1f);
 
+        // localBaseRaise = dunya kaldirma / scale (holder olcegiyle ezilmesin).
+        float shadowLocalRaise = scale > 0f ? shadowVerticalRaise / scale : 0f;
         MapDecorPlacer.ShadowHandle handle =
-            mapDecorPlacer.CreateFlatShadow(holder, carSprite, carSortingOrder, carSortingLayer);
+            mapDecorPlacer.CreateFlatShadow(holder, carSprite, carSortingOrder, carSortingLayer, shadowLocalRaise);
 
         holder.SetActive(false); // ilk UpdateCarShadows konumlandırana kadar gizli
 
@@ -681,6 +687,9 @@ public class RoadTrafficSystem : MonoBehaviour
 
             sh.holder.gameObject.SetActive(true);
             sh.holder.position = car.smoothedWorldPos;
+            // Holder araba yönüne döner → gölge silueti arabayla birlikte döner; güneş eğimi
+            // (UpdateFlatShadow'daki leanZ) bunun üstüne lokal olarak uygulanır.
+            sh.holder.rotation = car.currentRotation;
 
             // extraAlpha = arabanın spawn/despawn fade'i (gündüz/gece fade'i p.color içinde).
             mapDecorPlacer.UpdateFlatShadow(sh.handle, p, car.fadeAlpha);

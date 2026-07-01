@@ -39,6 +39,10 @@ public class StreetLampPlacer : MonoBehaviour
     [Header("Appearance")]
     [Tooltip("Lamba diregi sprite olcegi.")]
     [Range(0.001f, 0.2f)] public float lampScale = 0.01f;
+    [Tooltip("Golgeyi dunya birimi cinsinden yukari kaydirir — golge tabani lamba dibine otursun. " +
+             "Bina golgesi ~1 olcekte oldugundan shadowVerticalOffset'i gorur; lamba cok kucuk " +
+             "olcekli oldugundan o nudge ezilir, bu yuzden ayri bir dunya-uzayi kaldirma gerekir.")]
+    [Range(0f, 0.2f)] public float shadowVerticalRaise = 0.02f;
     [Tooltip("Isik halo sprite olcegi (direge gore carpan).")]
     [Range(0.05f, 8f)] public float haloScaleMultiplier = 0.4f;
     [Tooltip("Halo saydamlik carpani — 1=renkteki alpha aynen, 0.3=cok saydam.")]
@@ -363,8 +367,10 @@ public class StreetLampPlacer : MonoBehaviour
 
         // Golge — bina flat golge (Projection/Trace) mantigi birebir. Sprite siluetinden uretilir;
         // lamba GO'su (lampScale) altinda durdugu icin olcek otomatik miras alinir.
+        // localBaseRaise = dunya kaldirma / lampScale (sprite-lokal birime cevir; lightLocalY ile ayni mantik).
+        float shadowLocalRaise = lampScale > 0f ? shadowVerticalRaise / lampScale : 0f;
         MapDecorPlacer.ShadowHandle shadow =
-            hasShadows ? mapDecorPlacer.CreateFlatShadow(go, lampSprite, sortingOrder, sortingLayer) : null;
+            hasShadows ? mapDecorPlacer.CreateFlatShadow(go, lampSprite, sortingOrder, sortingLayer, shadowLocalRaise) : null;
 
         // Her lamba 0.5 etrafinda rastgele bir esikte acilsin → lambalar ayni anda degil,
         // dusk/dawn boyunca tek tek yanip soner. Esik [0.05, 0.95] araliginda tutulur.

@@ -467,6 +467,11 @@ public partial class MapDecorPlacer : MonoBehaviour
             }
         }
 
+        // 6) Urban ağaçları/doğa — DİĞER TÜM dekorlardan SONRA çalışır ki urban arazinin büyük
+        //    kısmını yoğun ağaçlarla doldursun (sadece kendi aralarında aralıklanır, binalara değil).
+        if (urbanTiles != null)
+            PlaceUrbanNature(map, settings, urbanTiles, halfW, halfH);
+
         // --- Build navigation grid for ships ---
         BuildNavGrid(map);
 
@@ -684,6 +689,7 @@ public partial class MapDecorPlacer : MonoBehaviour
         foreach (var go in decorObjects)
             if (go != null) Destroy(go);
         decorObjects.Clear();
+        CleanupCropFieldAssets();
         occupiedCenters.Clear();
         denseOccupied.Clear();
         cityBuildings.Clear();

@@ -276,6 +276,42 @@ MonoBehaviour:
     animationFrames: []
     nightAnimationFrames: []
     frameRate: 0
+  urbanNature:
+  - daySprite: {fileID: 1149190418031304704, guid: 5bdf0b156e3cbb445a5a35d3bfeafb9a, type: 3}
+    nightSprite: {fileID: -2025162773709335931, guid: 14755546d1f2dc74a922e39cb6c642df, type: 3}
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: -2541579827414792756, guid: c794b0040db4ff443ba95f7a389f6836, type: 3}
+    nightSprite: {fileID: 4163268031856544548, guid: c58f2ce867cb18a4e81aa7e03bc0f1b3, type: 3}
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: -6861365922197683907, guid: 9a26a2117cb863f49a269638819647e0, type: 3}
+    nightSprite: {fileID: -158775599707599783, guid: 6d23322b94d7a7a4cae114f15cfea81c, type: 3}
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: -4579556511493083371, guid: 54a63264f53864e4e8201327c9044816, type: 3}
+    nightSprite: {fileID: 4987598990935818331, guid: 462c1d29f8e351e45a58935853d7127f, type: 3}
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0
+  - daySprite: {fileID: 6472635081343213132, guid: d459bbd77927c344d918d20dce7811f7, type: 3}
+    nightSprite: {fileID: 6082510349697196636, guid: 1e9730e1970b61b4ba81f5760308d3ae, type: 3}
+    isIsometric: 0
+    isAnimated: 0
+    animationFrames: []
+    nightAnimationFrames: []
+    frameRate: 0
   agriculturalBuildings:
   - daySprite: {fileID: 7316261953078464129, guid: 22438357521497b4a8a995f22ec96cd7, type: 3}
     nightSprite: {fileID: 7316261953078464129, guid: 22438357521497b4a8a995f22ec96cd7, type: 3}
