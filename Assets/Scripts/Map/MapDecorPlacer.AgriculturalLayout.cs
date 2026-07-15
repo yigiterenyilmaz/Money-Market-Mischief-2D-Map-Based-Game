@@ -75,14 +75,34 @@ public partial class MapDecorPlacer
         float density = Mathf.Clamp01(agriculturalFillDensity);
         int rate      = Mathf.Clamp(agriculturalScatterRate, 1, 8);
         float overlapR = Mathf.Max(0.1f, agriculturalSpacing);
-        int attempts  = Mathf.Max(1, Mathf.RoundToInt(tiles.Count * density * rate));
+
+        // Parsel mozaiği bölgenin çoğunu kapladığı için rastgele tile örneklemek artık çoğunlukla
+        // ekili alana düşer → adayları EKİLMEMİŞ (boş parsel/yol koridoru) tile'lardan seç. Deneme
+        // sayısı yine TÜM bölge boyutuna oranlı → bina sayısı tarla kaplamasından bağımsız kalır.
+        List<Vector2Int> freeTiles;
+        if (cropFieldTiles.Count > 0)
+        {
+            freeTiles = new List<Vector2Int>(tiles.Count - cropFieldTiles.Count);
+            for (int i = 0; i < tiles.Count; i++)
+                if (!cropFieldTiles.Contains(tiles[i].x + tiles[i].y * map.width))
+                    freeTiles.Add(tiles[i]);
+            if (freeTiles.Count == 0)
+            {
+                Debug.LogWarning("MapDecorPlacer: agricultural layout — ekilmemiş tile kalmadı " +
+                                 "(agriculturalParcelEmptyChance'i artırın).");
+                return;
+            }
+        }
+        else freeTiles = tiles;
+
+        int attempts = Mathf.Max(1, Mathf.RoundToInt(tiles.Count * density * rate));
 
         int placed = 0;
         int[] spriteCounts = new int[valid.Count];
 
         for (int attempt = 0; attempt < attempts; attempt++)
         {
-            Vector2Int t = tiles[Random.Range(0, tiles.Count)];
+            Vector2Int t = freeTiles[Random.Range(0, freeTiles.Count)];
             int tx = t.x, ty = t.y;
 
             if (!map.IsLand(tx, ty)) continue;

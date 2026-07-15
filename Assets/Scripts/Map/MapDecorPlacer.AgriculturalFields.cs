@@ -1,78 +1,101 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Agricultural CROP FIELDS — textured "wheat" subregions painted INSIDE the agricultural biome
-// (biome 4), underneath the sparse farm buildings (MapDecorPlacer.AgriculturalLayout). Real
-// farmland here reads as a FEW large, smooth, organic crop plots scattered with green gaps
-// between them — not a packed mosaic. Each plot is a smooth blob (many-sided polygon whose radius
-// is modulated by a couple of sine harmonics, so the outline is curvy with no sharp corners), and
-// is drawn as a fan mesh sampling one shared, COLOURED, tiling wheat texture: sharp golden furrow
-// rows + greenish/amber blotches give every field the SAME crop look but with rich internal colour
-// variation. Spacing is enforced between plot centres so the region stays sparse.
+// Agricultural CROP FIELDS — a rice-paddy style PARCEL MOSAIC painted over the agricultural biome
+// (biome 4), underneath the sparse farm buildings (MapDecorPlacer.AgriculturalLayout). Reference
+// look: farmland is an almost continuous patchwork of rectangular-ish parcels in many shades of
+// green (lime → deep green → yellow-green → maturing gold, rare plowed brown), separated by THIN
+// pale earth paths/dikes. Boundaries are mostly straight but slightly wonky.
+//
+// Implementation: the biome is partitioned by a ROTATED IRREGULAR GRID — strips of varying width
+// along one axis, each strip independently cut into parcels of varying length along the other.
+// A low-frequency Perlin warp bends the grid lines a little so nothing is laser-straight. Each
+// parcel hashes to its own colour + brightness + crop-row phase; pixels near a parcel boundary
+// become path-coloured. A random fraction of parcels stays EMPTY (transparent → underlying grass)
+// so farm buildings keep room to spawn. The whole mosaic renders as ONE quad with ONE generated
+// texture (a few pixels per tile) — far cheaper than the old per-blob meshes/materials.
 public partial class MapDecorPlacer
 {
     // -------------------------------------------------------------------------
     // CROP FIELD — serialized tuning
     // -------------------------------------------------------------------------
 
-    [Header("Agricultural Layout — Ekili Tarlalar (Wheat Fields)")]
-    [Tooltip("Tarım bölgesine (biome 4) dokulu ekin tarlaları (buğday) çiz. Kapalıysa hiç tarla konmaz.")]
+    [Header("Agricultural Layout — Tarla Mozaiği (Parcel Mosaic)")]
+    [Tooltip("Tarım bölgesine (biome 4) parsel mozaiği (çeltik/ekin tarlaları) çiz. Kapalıysa hiç tarla konmaz.")]
     public bool agriculturalPlaceCropFields = true;
 
-    [Tooltip("Bölgenin EN FAZLA ne kadarı tarlalarla kaplansın (0..1). Aralarındaki boşluk " +
-             "agriculturalFieldGapTiles ile de sınırlanır → SEYREK görünüm için düşük tutun.")]
-    [Range(0.02f, 1f)] public float agriculturalFieldCoverage = 0.18f;
+    [Tooltip("Parsel ŞERİT genişliği aralığı (tile). Şeritler bölge açısı boyunca uzanır; " +
+             "her şeridin genişliği bu aralıktan rastgele seçilir → değişken parsel boyları.")]
+    public Vector2 agriculturalParcelWidthTiles = new Vector2(9f, 22f);
 
-    [Tooltip("Tarla merkezleri arasında bırakılacak EK boşluk (tile). Büyük = tarlalar birbirinden " +
-             "uzak, aralarında bol yeşil → daha az tarla.")]
-    [Range(0f, 60f)] public float agriculturalFieldGapTiles = 14f;
+    [Tooltip("Bir şerit İÇİNDEKİ parsel uzunluğu aralığı (tile). Genişlikten büyük tutun → " +
+             "dikdörtgenimsi, uzunlamasına parseller (referans görünüm).")]
+    public Vector2 agriculturalParcelLengthTiles = new Vector2(14f, 42f);
 
-    [Tooltip("Tarlaların yoldan (ve yol kenarı lambalarından) uzak duracağı tile mesafesi. Lambalar " +
-             "yol merkezinden ~7 tile açıkta durduğu için bunu 8+ tutun → tarla yol/lamba üstüne taşmaz.")]
-    [Range(0f, 30f)] public float agriculturalFieldRoadClearTiles = 9f;
+    [Tooltip("Bir parselin BOŞ (ekilmemiş, altındaki çim görünür) kalma olasılığı. Çiftlik " +
+             "binaları yalnızca boş parsellere yerleşebildiği için 0 yapmayın.")]
+    [Range(0f, 1f)] public float agriculturalParcelEmptyChance = 0.3f;
 
-    [Tooltip("Bir tarla plot'unun UZUN ekseni çapı aralığı (tile).")]
-    public Vector2 agriculturalFieldLengthTiles = new Vector2(34f, 64f);
+    [Tooltip("Parseller arasındaki açık toprak PATİKA genişliği (tile). Referans görüntüdeki " +
+             "ince açık çizgiler. 0 = patika yok.")]
+    [Range(0f, 3f)] public float agriculturalParcelPathTiles = 0.8f;
 
-    [Tooltip("Bir tarla plot'unun KISA ekseni çapı aralığı (tile).")]
-    public Vector2 agriculturalFieldWidthTiles = new Vector2(24f, 44f);
+    [Tooltip("Tarlaların yol merkezinden uzak duracağı tile mesafesi. Küçük tutun — referansta " +
+             "tarlalar yola kadar dayanır.")]
+    [Range(0f, 12f)] public float agriculturalParcelRoadClearTiles = 3f;
 
-    [Tooltip("Ekin sırası (furrow) tekrar periyodu (tile). UZAKTAN görünür olması için BÜYÜK tutun.")]
-    [Range(3f, 24f)] public float agriculturalCropRowPeriodTiles = 10f;
+    [Tooltip("Grid çizgilerinin Perlin ile ne kadar eğrileceği (tile). 0 = cetvel gibi düz, " +
+             "2-3 = hafif dalgalı doğal sınırlar.")]
+    [Range(0f, 8f)] public float agriculturalParcelWarpTiles = 2f;
 
-    [Tooltip("Plot kenarının ne kadar düzensiz/organik olacağı (0 = düzgün oval, 1 = çok dalgalı). " +
-             "Kenar her zaman YUMUŞAK kalır (köşe yok).")]
-    [Range(0f, 1f)] public float agriculturalFieldIrregularity = 0.6f;
-
-    [Tooltip("Komşu tarlaların aynı yöne hizalanma eğilimi (0 = bağımsız rastgele açı, 1 = bölge açısı).")]
-    [Range(0f, 1f)] public float agriculturalFieldAlignment = 0.5f;
+    [Tooltip("Parsel içi ekin sırası (furrow) tekrar periyodu (tile). Sıralar parselin uzun " +
+             "ekseni boyunca uzanır; etki bilinçli olarak ÇOK hafiftir.")]
+    [Range(2f, 20f)] public float agriculturalParcelRowPeriodTiles = 5f;
 
     [Tooltip("Ekili tarlalar GECE ne kadar kararsın (0 = kararma yok, 0.6 = gece %60 daha koyu). " +
              "Gündüz↔gece geçişinde LightingRatio ile yumuşak harmanlanır.")]
     [Range(0f, 1f)] public float agriculturalFieldNightDarken = 0.6f;
 
-    // Cleanup of the procedurally generated texture/materials between Repaint() calls.
+    // Cleanup of the procedurally generated texture/material/mesh between Repaint() calls.
     Texture2D cropFieldTexture;
     readonly List<Material> cropFieldMaterials = new List<Material>();
     // Her tarla materyalinin GÜNDÜZ (temel) rengi — gece kararmasını buradan türetiriz.
     // cropFieldMaterials ile indeks eşleşir. Repaint başına temizlenir.
     readonly List<Color> cropFieldBaseColors = new List<Color>();
+    readonly List<Mesh> cropFieldMeshes = new List<Mesh>();
 
-    // Tarla tile'larının kümesi (key = x + y*w) — tarım binalarının tarla ÜSTÜNE yerleşmesini
-    // engellemek için (PlaceAgriculturalLayout bunu okur). Repaint başına temizlenir.
+    // EKİLİ tile'ların kümesi (key = x + y*w) — tarım binalarının ekin ÜSTÜNE yerleşmesini
+    // engellemek için (PlaceAgriculturalLayout bunu okur). Boş parseller kümeye girmez →
+    // binalar oralara yerleşebilir. Repaint başına temizlenir.
     readonly HashSet<int> cropFieldTiles = new HashSet<int>();
 
-    // Yüksek köşe sayısı + yumuşak yarıçap modülasyonu → düzgün organik blob (sivri köşe yok).
-    // Yüksek frekanslı harmonikleri (girintili kenar) pürüzsüz çözebilmek için bol köşe.
-    const int CropFieldSides = 56;
+    // Doku çözünürlüğü: tile başına piksel. 3 → parsel sınırları tile basamağı olmadan,
+    // çapraz açıda bile temiz görünür; bellek maliyeti düşük kalır.
+    const int CropFieldPxPerTile = 3;
+
+    // Parsel renk paleti (referans: çeltik tarlaları) + ağırlıkları. Ağırlık büyük = daha sık.
+    static readonly Color[] ParcelPalette =
+    {
+        new Color(0.44f, 0.64f, 0.20f), // taze yeşil (genç çeltik)
+        new Color(0.35f, 0.56f, 0.17f), // orta yeşil
+        new Color(0.26f, 0.46f, 0.14f), // koyu doygun yeşil
+        new Color(0.52f, 0.64f, 0.24f), // sarımsı yeşil
+        new Color(0.60f, 0.55f, 0.26f), // olgunlaşan altın-yeşil
+        new Color(0.46f, 0.37f, 0.22f), // sürülmüş kahverengi (nadir)
+    };
+    static readonly float[] ParcelWeights = { 3f, 3f, 2f, 2f, 1f, 0.5f };
+
+    // Parseller arası patika (açık kuru toprak) rengi.
+    static readonly Color ParcelPathColor = new Color(0.68f, 0.63f, 0.45f);
 
     // -------------------------------------------------------------------------
-    // CROP FIELD FILL
+    // PARCEL MOSAIC FILL
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Biome 4 bölgesine AZ sayıda, geniş, yumuşak-organik ekin tarlası yerleştirir. Tarla
-    /// merkezleri arasında boşluk (gap) zorunlu kılınır → seyrek görünüm. Binalardan ÖNCE çağrılır.
+    /// Biome 4 bölgesini döndürülmüş düzensiz bir grid ile parsellere böler ve tek bir quad +
+    /// üretilmiş doku olarak çizer. Her parselin kendi rengi vardır; aralarında ince patikalar
+    /// bulunur; bir kısmı boş bırakılır (binalar için). Binalardan ÖNCE çağrılır.
     /// </summary>
     void PlaceAgriculturalFields(MapGenerator map, List<Vector2Int> tiles, float halfW, float halfH)
     {
@@ -80,208 +103,260 @@ public partial class MapDecorPlacer
         if (tiles == null || tiles.Count == 0) return;
 
         CleanupCropFieldAssets();
-        cropFieldTexture = CreateWheatTexture();
 
         int w = map.width;
-        var regionSet = new HashSet<int>(tiles.Count);
+
+        // Bölge bounding box'ı.
+        int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
         for (int i = 0; i < tiles.Count; i++)
-            regionSet.Add(tiles[i].x + tiles[i].y * w);
-        var occupied = new HashSet<int>(tiles.Count);
-
-        float regionAngle = Random.Range(0f, Mathf.PI);
-
-        Vector2 lenR = agriculturalFieldLengthTiles;
-        Vector2 widR = agriculturalFieldWidthTiles;
-        float period    = Mathf.Max(3f, agriculturalCropRowPeriodTiles);
-        float gap       = Mathf.Max(0f, agriculturalFieldGapTiles);
-        int   roadClear = Mathf.RoundToInt(Mathf.Max(0f, agriculturalFieldRoadClearTiles));
-
-        int targetCovered = Mathf.RoundToInt(tiles.Count * Mathf.Clamp01(agriculturalFieldCoverage));
-        int covered = 0;
-        int placed  = 0;
-        int attempts = tiles.Count;
-
-        var uLocal = new float[CropFieldSides];
-        var vLocal = new float[CropFieldSides];
-        var coverScratch = new List<int>(4096);
-        // Yerleştirilen tarla merkezleri (tile): x, y, yarıçap → aralık (gap) kontrolü için.
-        var centers = new List<Vector3>();
-
-        for (int attempt = 0; attempt < attempts && covered < targetCovered; attempt++)
         {
-            Vector2Int seed = tiles[Random.Range(0, tiles.Count)];
-            if (occupied.Contains(seed.x + seed.y * w)) continue;
-
-            float halfLen = Random.Range(lenR.x, lenR.y) * 0.5f;
-            float halfWid = Random.Range(widR.x, widR.y) * 0.5f;
-            float radius  = Mathf.Max(halfLen, halfWid);
-
-            // Aralık (gap) kontrolü — yerleştirilmiş tarlalara çok yakınsa ele (seyreklik).
-            bool tooClose = false;
-            for (int i = 0; i < centers.Count; i++)
-            {
-                float dx = centers[i].x - seed.x, dy = centers[i].y - seed.y;
-                float minD = centers[i].z + radius + gap;
-                if (dx * dx + dy * dy < minD * minD) { tooClose = true; break; }
-            }
-            if (tooClose) continue;
-
-            float jitter = Random.Range(-0.5f, 0.5f) * (1f - agriculturalFieldAlignment) * Mathf.PI;
-            float theta  = regionAngle + jitter;
-            if (Random.value < 0.4f) theta += Mathf.PI * 0.5f;
-
-            BuildBlobOutline(halfLen, halfWid, uLocal, vLocal);
-
-            Vector2 dir  = new Vector2(Mathf.Cos(theta), Mathf.Sin(theta));
-            Vector2 perp = new Vector2(-dir.y, dir.x);
-
-            if (!TryCollectBlobTiles(seed, dir, perp, uLocal, vLocal, w, roadClear,
-                                     regionSet, occupied, coverScratch))
-                continue;
-
-            for (int i = 0; i < coverScratch.Count; i++) { occupied.Add(coverScratch[i]); cropFieldTiles.Add(coverScratch[i]); }
-            covered += coverScratch.Count;
-            centers.Add(new Vector3(seed.x, seed.y, radius));
-
-            CreateCropFieldMesh(seed, dir, perp, uLocal, vLocal, period, halfW, halfH);
-            placed++;
+            var t = tiles[i];
+            if (t.x < minX) minX = t.x;
+            if (t.x > maxX) maxX = t.x;
+            if (t.y < minY) minY = t.y;
+            if (t.y > maxY) maxY = t.y;
         }
+        int bw = maxX - minX + 1;
+        int bh = maxY - minY + 1;
 
-        Debug.Log($"MapDecorPlacer: agricultural crop fields — placed={placed}, coveredTiles={covered}/" +
-                  $"{tiles.Count} (target={targetCovered}).");
-    }
-
-    /// <summary>
-    /// Bir plot'un YUMUŞAK organik kenarını (dir/perp yerel uzayında) üretir. Yarıçap, birkaç sinüs
-    /// harmoniğinin (rastgele fazlı) toplamıyla modüle edilir → sürekli/türevlenebilir, sivri köşe
-    /// içermeyen dalgalı bir kapalı eğri. Uzun/kısa eksene göre anizotropik gerilir.
-    /// </summary>
-    void BuildBlobOutline(float halfLen, float halfWid, float[] uLocal, float[] vLocal)
-    {
-        float irr = Mathf.Clamp01(agriculturalFieldIrregularity);
-        // Düşük frekanslar genel gövde formunu, yüksek frekanslar kenardaki küçük girinti/çıkıntıları
-        // (jaggy ama YUVARLAK — sinüs olduğu için sivri değil) verir. Hepsi rastgele fazlı.
-        float p1 = Random.Range(0f, Mathf.PI * 2f);
-        float p2 = Random.Range(0f, Mathf.PI * 2f);
-        float p3 = Random.Range(0f, Mathf.PI * 2f);
-        float p5 = Random.Range(0f, Mathf.PI * 2f);
-        float p7 = Random.Range(0f, Mathf.PI * 2f);
-        float p11 = Random.Range(0f, Mathf.PI * 2f);
-
-        for (int k = 0; k < CropFieldSides; k++)
-        {
-            float a = (Mathf.PI * 2f / CropFieldSides) * k;
-            // Çok-frekanslı toplam: gövde (1-3) + ince lob/çıkıntılar (5,7,11). Yüksek harmonikler
-            // küçük genlikli → kenar dalgalı/girintili ama her geçiş yumuşak yuvarlak kalır.
-            float wave = 0.34f * Mathf.Sin(a + p1)
-                       + 0.20f * Mathf.Sin(2f * a + p2)
-                       + 0.15f * Mathf.Sin(3f * a + p3)
-                       + 0.16f * Mathf.Sin(5f * a + p5)
-                       + 0.14f * Mathf.Sin(7f * a + p7)
-                       + 0.11f * Mathf.Sin(11f * a + p11)
-                       + 0.08f * Mathf.Sin(17f * a + p3 + p7);
-            float r = 1f + irr * 0.95f * wave; // her zaman pozitif
-            uLocal[k] = Mathf.Cos(a) * halfLen * r;
-            vLocal[k] = Mathf.Sin(a) * halfWid * r;
-        }
-    }
-
-    /// <summary>
-    /// Blob polygonunun kapsadığı tüm tile'ları toplar (bounding box + point-in-polygon). Herhangi
-    /// bir tile bölge dışındaysa ya da işgalliyse false döner (plot reddedilir → taşma/çakışma yok).
-    /// </summary>
-    bool TryCollectBlobTiles(Vector2Int seed, Vector2 dir, Vector2 perp, float[] uLocal, float[] vLocal,
-                             int w, int roadClear, HashSet<int> regionSet, HashSet<int> occupied,
-                             List<int> outTiles)
-    {
-        outTiles.Clear();
-
-        float maxU = 0f, maxV = 0f;
-        for (int k = 0; k < uLocal.Length; k++)
-        {
-            maxU = Mathf.Max(maxU, Mathf.Abs(uLocal[k]));
-            maxV = Mathf.Max(maxV, Mathf.Abs(vLocal[k]));
-        }
-        int b = Mathf.CeilToInt(Mathf.Sqrt(maxU * maxU + maxV * maxV));
-
+        // Tile başına "boyanabilir mi" tablosu: bölge üyeliği + yol açıklığı.
         var rg = RoadGenerator.Instance;
-        bool checkRoad = rg != null && rg.IsGenerated && roadClear > 0;
+        float roadClear = agriculturalParcelRoadClearTiles;
+        bool checkRoad = rg != null && rg.IsGenerated && roadClear > 0f;
 
-        for (int dx = -b; dx <= b; dx++)
-        for (int dy = -b; dy <= b; dy++)
+        var paintable = new bool[bw * bh];
+        for (int i = 0; i < tiles.Count; i++)
         {
-            float lu = dx * dir.x + dy * dir.y;
-            float lv = dx * perp.x + dy * perp.y;
-            if (!PointInPolygon(lu, lv, uLocal, vLocal)) continue;
-
-            int tx = seed.x + dx, ty = seed.y + dy;
-            int key = tx + ty * w;
-            if (!regionSet.Contains(key)) return false;     // bölge dışı
-            if (occupied.Contains(key))   return false;     // başka tarla/işgal
-            // Yola/lambaya değme — yol merkez mesafesi roadClear'dan küçükse plot'u reddet.
-            if (checkRoad && rg.GetDistanceToRoad(tx, ty) <= roadClear) return false;
-            outTiles.Add(key);
+            var t = tiles[i];
+            if (checkRoad && rg.GetDistanceToRoad(t.x, t.y) <= roadClear) continue;
+            paintable[(t.x - minX) + (t.y - minY) * bw] = true;
         }
-        return outTiles.Count > 0;
+
+        // ---- Döndürülmüş düzensiz grid ----
+        float ang = Random.Range(0f, Mathf.PI);
+        float ca = Mathf.Cos(ang), sa = Mathf.Sin(ang);
+
+        // Bbox köşelerini (u,v) uzayına döndürüp grid aralığını bul.
+        float uMin = float.MaxValue, uMax = float.MinValue;
+        float vMin = float.MaxValue, vMax = float.MinValue;
+        for (int cy = 0; cy <= 1; cy++)
+        for (int cx = 0; cx <= 1; cx++)
+        {
+            float fx = cx == 0 ? minX : maxX + 1;
+            float fy = cy == 0 ? minY : maxY + 1;
+            float u = ca * fx + sa * fy;
+            float v = -sa * fx + ca * fy;
+            if (u < uMin) uMin = u; if (u > uMax) uMax = u;
+            if (v < vMin) vMin = v; if (v > vMax) vMax = v;
+        }
+        float pad = agriculturalParcelWarpTiles + 2f;
+        uMin -= pad; uMax += pad; vMin -= pad; vMax += pad;
+
+        Vector2 widR = agriculturalParcelWidthTiles;
+        Vector2 lenR = agriculturalParcelLengthTiles;
+        float minWid = Mathf.Max(3f, Mathf.Min(widR.x, widR.y));
+        float maxWid = Mathf.Max(minWid, Mathf.Max(widR.x, widR.y));
+        float minLen = Mathf.Max(3f, Mathf.Min(lenR.x, lenR.y));
+        float maxLen = Mathf.Max(minLen, Mathf.Max(lenR.x, lenR.y));
+
+        // Şerit kenarları (u ekseni) ve her şeridin parsel kenarları (v ekseni).
+        var uEdges = new List<float>();
+        for (float u = uMin; u < uMax + maxWid; u += Random.Range(minWid, maxWid))
+            uEdges.Add(u);
+
+        var vEdges = new List<float[]>(uEdges.Count - 1);
+        for (int s = 0; s < uEdges.Count - 1; s++)
+        {
+            var edges = new List<float>();
+            // Şeritler arası faz kayması — parsel köşeleri hizalanmasın.
+            for (float v = vMin - Random.Range(0f, maxLen); v < vMax + maxLen; v += Random.Range(minLen, maxLen))
+                edges.Add(v);
+            vEdges.Add(edges.ToArray());
+        }
+
+        int hashSeed = Random.Range(1, 1 << 22);
+        float noiseSeed = Random.Range(0f, 512f);
+
+        // ---- Doku boyama ----
+        const int S = CropFieldPxPerTile;
+        int texW = bw * S, texH = bh * S;
+        cropFieldTexture = new Texture2D(texW, texH, TextureFormat.RGBA32, false)
+        {
+            wrapMode   = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear,
+        };
+        var pixels = new Color32[texW * texH];
+        var clear = new Color32(0, 0, 0, 0);
+
+        float pathHalf = Mathf.Max(0f, agriculturalParcelPathTiles) * 0.5f;
+        float rowPeriod = Mathf.Max(2f, agriculturalParcelRowPeriodTiles);
+        float warpAmp = agriculturalParcelWarpTiles;
+        float emptyChance = Mathf.Clamp01(agriculturalParcelEmptyChance);
+        float invS = 1f / S;
+
+        int paintedParcels = 0;
+
+        for (int py = 0; py < texH; py++)
+        {
+            int tyLocal = py / S;
+            float fy = minY + (py + 0.5f) * invS;
+
+            for (int px = 0; px < texW; px++)
+            {
+                int idx = px + py * texW;
+                if (!paintable[(px / S) + tyLocal * bw]) { pixels[idx] = clear; continue; }
+
+                float fx = minX + (px + 0.5f) * invS;
+
+                // Grid çizgilerini hafifçe eğ (düşük frekanslı warp).
+                float wu = (Mathf.PerlinNoise(noiseSeed + fx * 0.03f, noiseSeed + fy * 0.03f) - 0.5f) * 2f * warpAmp;
+                float wv = (Mathf.PerlinNoise(noiseSeed + 77f + fx * 0.03f, noiseSeed + 77f + fy * 0.03f) - 0.5f) * 2f * warpAmp;
+                float u = ca * fx + sa * fy + wu;
+                float v = -sa * fx + ca * fy + wv;
+
+                int s = FindBand(uEdges, u);
+                float[] pe = vEdges[s];
+                int p = FindBand(pe, v);
+
+                // Boş parsel → altındaki çim görünsün.
+                if (Hash01(s, p, hashSeed) < emptyChance) { pixels[idx] = clear; continue; }
+
+                // Parsel sınırına yakınsa patika.
+                float distEdge = Mathf.Min(
+                    Mathf.Min(u - uEdges[s], uEdges[s + 1] - u),
+                    Mathf.Min(v - pe[p], pe[p + 1] - v));
+                if (distEdge < pathHalf)
+                {
+                    float pg = 0.94f + 0.10f * Mathf.PerlinNoise(noiseSeed + px * 0.31f, noiseSeed + py * 0.31f);
+                    pixels[idx] = new Color(ParcelPathColor.r * pg, ParcelPathColor.g * pg, ParcelPathColor.b * pg, 1f);
+                    continue;
+                }
+
+                // Parsel rengi: ağırlıklı palet + parsel başına parlaklık sapması.
+                Color c = PickParcelColor(s, p, hashSeed);
+                float bright = 0.88f + 0.12f * Hash01(s, p, hashSeed + 917);
+
+                // Parsel İÇİ doğal doku — üç ölçekli Perlin:
+                // (a) benek/leke (mottle): ekin örtüsündeki gür/seyrek yamalar, tonu koyulaştırır;
+                // (b) ıslak/kuru yama (patch): geniş, yavaş dalgalanan aydınlık farkı;
+                // (c) ince tane (grain): piksel ölçeğinde doku hissi.
+                float mottle = Mathf.PerlinNoise(noiseSeed + 37f + fx * 0.16f, noiseSeed + 37f + fy * 0.16f);
+                c = Color.Lerp(c, new Color(c.r * 0.62f, c.g * 0.70f, c.b * 0.62f),
+                               Mathf.SmoothStep(0.35f, 0.85f, mottle) * 0.45f);
+                float patch = Mathf.PerlinNoise(noiseSeed + 133f + fx * 0.055f, noiseSeed + 133f + fy * 0.055f);
+                float grain = 0.90f + 0.13f * Mathf.PerlinNoise(noiseSeed + fx * 1.7f, noiseSeed + fy * 1.7f);
+
+                // Çok hafif ekin sırası (parsel fazlı) + bölgesel ton kayması (parlatmadan).
+                float rowPhase = Hash01(s, p, hashSeed + 311) * Mathf.PI * 2f;
+                float row = 1f + 0.05f * Mathf.Sin(u * (Mathf.PI * 2f / rowPeriod) + rowPhase);
+                float regional = Mathf.PerlinNoise(noiseSeed + 191f + fx * 0.008f, noiseSeed + 191f + fy * 0.008f);
+                c = Color.Lerp(c, new Color(0.60f, 0.56f, 0.28f), Mathf.Clamp01((regional - 0.5f) * 0.30f));
+
+                float m = bright * row * grain * (0.93f + 0.14f * patch);
+                pixels[idx] = new Color(Mathf.Clamp01(c.r * m), Mathf.Clamp01(c.g * m), Mathf.Clamp01(c.b * m), 1f);
+            }
+        }
+
+        cropFieldTexture.SetPixels32(pixels);
+        cropFieldTexture.Apply(false);
+
+        // ---- Ekili tile kümesi (bina engelleme) — tile merkezinden parsel sorgusu ----
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            var t = tiles[i];
+            if (!paintable[(t.x - minX) + (t.y - minY) * bw]) continue;
+            float fx = t.x + 0.5f, fy = t.y + 0.5f;
+            float wu = (Mathf.PerlinNoise(noiseSeed + fx * 0.03f, noiseSeed + fy * 0.03f) - 0.5f) * 2f * warpAmp;
+            float wv = (Mathf.PerlinNoise(noiseSeed + 77f + fx * 0.03f, noiseSeed + 77f + fy * 0.03f) - 0.5f) * 2f * warpAmp;
+            float u = ca * fx + sa * fy + wu;
+            float v = -sa * fx + ca * fy + wv;
+            int s = FindBand(uEdges, u);
+            int p = FindBand(vEdges[s], v);
+            if (Hash01(s, p, hashSeed) < emptyChance) continue;
+            cropFieldTiles.Add(t.x + t.y * w);
+            paintedParcels++;
+        }
+
+        CreateCropFieldQuad(minX, minY, maxX, maxY, halfW, halfH);
+
+        Debug.Log($"MapDecorPlacer: agricultural parcel mosaic — bbox={bw}x{bh}, strips={uEdges.Count - 1}, " +
+                  $"croppedTiles={paintedParcels}/{tiles.Count}, emptyChance={emptyChance:F2}.");
     }
 
-    static bool PointInPolygon(float px, float py, float[] xs, float[] ys)
+    /// <summary>Sıralı kenar dizisinde x'in düştüğü bant indeksini (binary search) döndürür.</summary>
+    static int FindBand(List<float> edges, float x)
     {
-        bool inside = false;
-        int n = xs.Length;
-        for (int i = 0, j = n - 1; i < n; j = i++)
+        int lo = 0, hi = edges.Count - 2;
+        while (lo < hi)
         {
-            if (((ys[i] > py) != (ys[j] > py)) &&
-                (px < (xs[j] - xs[i]) * (py - ys[i]) / (ys[j] - ys[i]) + xs[i]))
-                inside = !inside;
+            int mid = (lo + hi + 1) >> 1;
+            if (edges[mid] <= x) lo = mid; else hi = mid - 1;
         }
-        return inside;
+        return lo;
     }
 
-    /// <summary>
-    /// Bir blob tarlasını fan-triangulation mesh + ortak dokulu buğday materyaliyle oluşturur.
-    /// Ekin sıraları plot'un uzun ekseni boyunca uzanır ve 'period' tile'da bir tekrarlar.
-    /// </summary>
-    void CreateCropFieldMesh(Vector2Int seed, Vector2 dir, Vector2 perp, float[] uLocal, float[] vLocal,
-                             float period, float halfW, float halfH)
+    static int FindBand(float[] edges, float x)
     {
-        int n = uLocal.Length;
-        var verts = new Vector3[n + 1];
-        var uvs   = new Vector2[n + 1];
-        var tris  = new int[n * 3];
+        int lo = 0, hi = edges.Length - 2;
+        while (lo < hi)
+        {
+            int mid = (lo + hi + 1) >> 1;
+            if (edges[mid] <= x) lo = mid; else hi = mid - 1;
+        }
+        return lo;
+    }
 
+    /// <summary>Deterministik parsel hash'i → [0,1). Aynı (şerit, parsel, seed) hep aynı değeri verir.</summary>
+    static float Hash01(int x, int y, int seed)
+    {
+        unchecked
+        {
+            uint h = (uint)(x * 374761393 + y * 668265263 + seed * 1274126177);
+            h = (h ^ (h >> 13)) * 1103515245u;
+            h ^= h >> 16;
+            return (h & 0xFFFFFF) / 16777216f;
+        }
+    }
+
+    /// <summary>Parsel için ağırlıklı paletten renk seçer (deterministik).</summary>
+    static Color PickParcelColor(int s, int p, int seed)
+    {
+        float total = 0f;
+        for (int i = 0; i < ParcelWeights.Length; i++) total += ParcelWeights[i];
+        float r = Hash01(s, p, seed + 4231) * total;
+        for (int i = 0; i < ParcelWeights.Length; i++)
+        {
+            r -= ParcelWeights[i];
+            if (r <= 0f) return ParcelPalette[i];
+        }
+        return ParcelPalette[0];
+    }
+
+    /// <summary>Mozaik dokusunu bölge bbox'ını kaplayan TEK bir quad olarak sahneye koyar.</summary>
+    void CreateCropFieldQuad(int minX, int minY, int maxX, int maxY, float halfW, float halfH)
+    {
         float invPpu = 1f / pixelsPerUnit;
-        float cLx = seed.x * invPpu - halfW;
-        float cLy = seed.y * invPpu - halfH;
-        verts[n] = new Vector3(cLx, cLy, 0f);
-        uvs[n]   = new Vector2(0f, 0f);
+        float x0 = minX * invPpu - halfW;
+        float y0 = minY * invPpu - halfH;
+        float x1 = (maxX + 1) * invPpu - halfW;
+        float y1 = (maxY + 1) * invPpu - halfH;
 
-        float maxWy = cLy;
-
-        for (int k = 0; k < n; k++)
+        var mesh = new Mesh { name = "CropFieldMosaic" };
+        mesh.vertices = new[]
         {
-            float tx = seed.x + uLocal[k] * dir.x + vLocal[k] * perp.x;
-            float ty = seed.y + uLocal[k] * dir.y + vLocal[k] * perp.y;
-            float lx = tx * invPpu - halfW;
-            float ly = ty * invPpu - halfH;
-            verts[k] = new Vector3(lx, ly, 0f);
-            if (ly > maxWy) maxWy = ly;
-
-            uvs[k] = new Vector2(uLocal[k] / period, vLocal[k] / period);
-
-            int t = k * 3;
-            tris[t]     = n;
-            tris[t + 1] = k;
-            tris[t + 2] = (k + 1) % n;
-        }
-
-        var mesh = new Mesh { name = "CropFieldMesh" };
-        mesh.vertices  = verts;
-        mesh.uv        = uvs;
-        mesh.triangles = tris;
+            new Vector3(x0, y0, 0f), new Vector3(x1, y0, 0f),
+            new Vector3(x1, y1, 0f), new Vector3(x0, y1, 0f),
+        };
+        mesh.uv = new[]
+        {
+            new Vector2(0f, 0f), new Vector2(1f, 0f),
+            new Vector2(1f, 1f), new Vector2(0f, 1f),
+        };
+        mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
         mesh.RecalculateBounds();
+        cropFieldMeshes.Add(mesh);
 
-        var go = new GameObject("CropField");
+        var go = new GameObject("CropFieldMosaic");
         go.transform.SetParent(transform, false);
         go.transform.localPosition = new Vector3(0f, 0f, -0.05f);
 
@@ -291,82 +366,18 @@ public partial class MapDecorPlacer
         var mr  = go.AddComponent<MeshRenderer>();
         var mat = new Material(Shader.Find("Sprites/Default"));
         mat.mainTexture = cropFieldTexture;
-        // Tüm tarlalar AYNI ekin görünür → tint neredeyse beyaz (renk/doku değişimi dokudan gelir).
-        // Yalnızca çok hafif parlaklık sapması (tarlalar birbirinin kopyası gibi olmasın).
-        float bright = Random.Range(0.94f, 1.04f);
-        var baseColor = new Color(bright, bright, bright, 1f);
+        var baseColor = Color.white;
         mat.color = baseColor;
         cropFieldMaterials.Add(mat);
         cropFieldBaseColors.Add(baseColor);
         mr.sharedMaterial = mat;
 
-        float worldMaxWy = maxWy + transform.position.y;
-        mr.sortingOrder = 10 + (int)(worldMaxWy * -100f) - 2;
+        // Üst kenara göre sırala: bbox'ın en üstünden aşağıdaki HER binanın sortingOrder'ı daha
+        // büyük olur (10 + wy*-100) → binalar mozaiğin üstüne çizilir.
+        float worldTopY = y1 + transform.position.y;
+        mr.sortingOrder = 10 + (int)(worldTopY * -100f) - 2;
 
         decorObjects.Add(go);
-    }
-
-    // -------------------------------------------------------------------------
-    // PROCEDURAL WHEAT TEXTURE (coloured, shared by all fields)
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Tekrarlanabilir (wrap=Repeat) RENKLİ buğday dokusu: (1) plot uzun ekseni boyunca KESKİN
-    /// altın furrow sıraları (koyu oluk ↔ açık tepe arasında net geçiş); (2) büyük ölçekli yeşilimsi/
-    /// kehribar yamalar (blotch) → her tarlanın KENDİ İÇİNDE renk değişimi; (3) ince tane gürültüsü.
-    /// Tüm tarlalar bu tek dokuyu paylaşır → aynı ekin, ama zengin iç doku.
-    /// </summary>
-    Texture2D CreateWheatTexture()
-    {
-        const int N = 128;
-        var tex = new Texture2D(N, N, TextureFormat.RGBA32, false)
-        {
-            wrapMode   = TextureWrapMode.Repeat,
-            filterMode = FilterMode.Bilinear,
-        };
-
-        // Buğday renk paleti.
-        Color furrowDark  = new Color(0.46f, 0.39f, 0.13f); // oluk (gölge) — koyu altın
-        Color furrowLight = new Color(0.95f, 0.86f, 0.43f); // tepe — açık saman
-        Color greenTone   = new Color(0.62f, 0.66f, 0.27f); // olgunlaşmamış yeşil yama
-        Color amberTone   = new Color(0.86f, 0.64f, 0.20f); // kehribar yama
-
-        float seed = Random.Range(0f, 1000f);
-        var pixels = new Color[N * N];
-
-        for (int y = 0; y < N; y++)
-        for (int x = 0; x < N; x++)
-        {
-            float fy = y / (float)N; // V (genişlik ekseni — sıralar buna göre değişir)
-            float fx = x / (float)N; // U (uzunluk ekseni — sıralar bu yönde uzanır)
-
-            // (1) KESKİN furrow: tek sıra; smoothstep ile dar parlak bant → net çizgiler.
-            float row = 0.5f + 0.5f * Mathf.Cos(fy * Mathf.PI * 2f);
-            float sharp = Mathf.SmoothStep(0.30f, 0.70f, row);
-            // Sıra boyunca hafif eğrilme.
-            float wobble = Mathf.PerlinNoise(seed + fx * 5f, seed * 0.5f) * 0.10f;
-            sharp = Mathf.Clamp01(sharp + (wobble - 0.05f));
-            Color c = Color.Lerp(furrowDark, furrowLight, sharp);
-
-            // (2) Büyük ölçekli renk yamaları — tarla içi yeşil/kehribar değişim.
-            float blotchG = Mathf.PerlinNoise(seed + fx * 2.3f, seed + fy * 2.3f);
-            c = Color.Lerp(c, greenTone, Mathf.SmoothStep(0.55f, 0.85f, blotchG) * 0.45f);
-            float blotchA = Mathf.PerlinNoise(seed + 50f + fx * 1.7f, seed + 50f + fy * 1.7f);
-            c = Color.Lerp(c, amberTone, Mathf.SmoothStep(0.55f, 0.85f, blotchA) * 0.40f);
-
-            // (3) İnce tane.
-            float grain = 0.94f + 0.06f * Mathf.PerlinNoise(seed + x * 0.9f, seed + y * 0.9f);
-            c.r = Mathf.Clamp01(c.r * grain);
-            c.g = Mathf.Clamp01(c.g * grain);
-            c.b = Mathf.Clamp01(c.b * grain);
-            c.a = 1f;
-
-            pixels[x + y * N] = c;
-        }
-
-        tex.SetPixels(pixels);
-        tex.Apply();
-        return tex;
     }
 
     void CleanupCropFieldAssets()
@@ -375,6 +386,10 @@ public partial class MapDecorPlacer
             if (cropFieldMaterials[i] != null) Destroy(cropFieldMaterials[i]);
         cropFieldMaterials.Clear();
         cropFieldBaseColors.Clear();
+
+        for (int i = 0; i < cropFieldMeshes.Count; i++)
+            if (cropFieldMeshes[i] != null) Destroy(cropFieldMeshes[i]);
+        cropFieldMeshes.Clear();
 
         if (cropFieldTexture != null) { Destroy(cropFieldTexture); cropFieldTexture = null; }
 

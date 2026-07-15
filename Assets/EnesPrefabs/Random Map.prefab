@@ -154,10 +154,10 @@ MonoBehaviour:
   cornerRadius: 0.5
   waterColor: {r: 0, g: 0, b: 1, a: 1}
   fogColor: {r: 0.7, g: 0.75, b: 0.8, a: 1}
-  biome1Color: {r: 0.2, g: 0.6, b: 0.2, a: 1}
-  biome2Color: {r: 0.85, g: 0.75, b: 0.4, a: 1}
-  biome3Color: {r: 0.4, g: 0.4, b: 0.45, a: 1}
-  biome4Color: {r: 0.3, g: 0.7, b: 0.5, a: 1}
+  urbanColor: {r: 0.2, g: 0.6, b: 0.2, a: 1}
+  cityColor: {r: 0.85, g: 0.75, b: 0.4, a: 1}
+  industrialColor: {r: 0.4, g: 0.4, b: 0.45, a: 1}
+  agriculturalColor: {r: 0.3, g: 0.7, b: 0.5, a: 1}
   biome1Ratio: 0.3
   biome2Ratio: 0.2
   biome3Ratio: 0.2

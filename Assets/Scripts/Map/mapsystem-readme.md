@@ -25,9 +25,9 @@ Harita üretimi tek bir seed ile deterministiktir (`MapSeed.cs`):
 │                     MapGenerator                             │
 │          (256x256 procedural ada haritası üretir)           │
 │                                                              │
-│  Biome'lar: Forest, Desert, Mountains, Plains               │
-│  Çıktılar: ForestRatio, DesertRatio, MountainRatio,        │
-│            PlainsRatio                                       │
+│  Bölgeler: Urban, Cities, Industrial, Agricultural          │
+│  Çıktılar: UrbanRatio, CityRatio, IndustrialRatio,          │
+│            AgriculturalRatio                                 │
 └──────────────────────┬──────────────────────────────────────┘
                        │ OnMapGenerated
                        ▼
@@ -36,11 +36,11 @@ Harita üretimi tek bir seed ile deterministiktir (`MapSeed.cs`):
 │          (harita verisini oyun diline çevirir)              │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  1. Biome oranlarını çeker ve RegionType'a dönüştürür:     │
-│     Forest    → Agricultural (Tarım)                        │
-│     Desert    → Barren (Boş Arazi)                          │
-│     Mountains → Industrial (Sanayi)                         │
-│     Plains    → Urban (Şehir)                               │
+│  1. Bölge oranlarını çeker ve RegionType'a dönüştürür:     │
+│     biome 1 → Urban (Şehir dışı yerleşim)                   │
+│     biome 2 → Cities (Şehir)                                │
+│     biome 3 → Industrial (Sanayi)                           │
+│     biome 4 → Agricultural (Tarım)                          │
 │                                                              │
 │  2. Ülke özelliklerini random üretir (0-100):              │
 │     corruptionIndex       (yozlaşma endeksi)                │

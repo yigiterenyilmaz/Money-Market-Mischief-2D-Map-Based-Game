@@ -597,9 +597,9 @@ public partial class MapDecorPlacer : MonoBehaviour
     {
         switch (biome)
         {
-            case 1: return agriculturalSpawnRate;
+            case 1: return urbanSpawnRate;
             case 3: return industrialSpawnRate;
-            case 4: return urbanSpawnRate;
+            case 4: return agriculturalSpawnRate;
             default: return 0;
         }
     }

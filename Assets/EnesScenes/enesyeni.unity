@@ -10820,9 +10820,9 @@ MonoBehaviour:
   urbanSpacing: 0.6
   urbanPlaceNature: 1
   urbanNatureScaleRange: {x: 0.3, y: 0.5}
-  urbanForestCoverage: 0.063
-  urbanForestSizeTiles: 20
-  urbanTreeDensity: 0.04
+  urbanForestCoverage: 0.65
+  urbanForestSizeTiles: 60
+  urbanTreeDensity: 0.8
   urbanTreeClearanceTiles: 5.11
 --- !u!114 &1710072564
 MonoBehaviour:

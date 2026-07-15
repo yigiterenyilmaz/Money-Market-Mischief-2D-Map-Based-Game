@@ -706,9 +706,9 @@ public partial class MapDecorPlacer
         List<Sprite> pool;
         switch (biome)
         {
-            case 1: pool = s.agriculturalDecor; break;
+            case 1: pool = s.urbanDecor;        break;
             case 3: pool = s.industrialDecor;   break;
-            case 4: pool = s.urbanDecor;        break;
+            case 4: pool = s.agriculturalDecor; break;
             default: return null;
         }
         if (pool == null || pool.Count == 0) return null;

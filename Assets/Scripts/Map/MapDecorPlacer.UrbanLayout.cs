@@ -67,14 +67,30 @@ public partial class MapDecorPlacer
              "okunsun. Orman boyutunun 6–10 katı iyi başlangıçtır.")]
     [Range(50f, 1000f)] public float urbanBareRegionSizeTiles = 350f;
 
-    [Tooltip("Orman yoğunluğunun harita DIŞ KENARINA doğru sönme bandı (tile). Kenara bu mesafeden " +
-             "yakın ormanlar kademeli seyrekleşir → ormanlar üretim sınırında tam yoğunlukla bitmek " +
-             "yerine kenara doğru cılızlaşıp dağılır. 0 = kapalı.")]
-    [Range(0f, 200f)] public float urbanForestEdgeFadeTiles = 60f;
+    [Tooltip("Orman yoğunluğunun TÜM sınırlara doğru sönme bandı (tile): harita kenarı, başka " +
+             "biyom/su sınırı, yollar ve çıplak bölgeler. Bir sınıra bu mesafeden yakın ormanlar " +
+             "kademeli seyrekleşir → orman hiçbir yerde duvar gibi bitmez, kenara doğru cılızlaşıp " +
+             "dağılır. Yollar haritayı kestiği için ÇOK büyük değerler ormanı boğar; 10–25 idealdir. " +
+             "0 = kapalı.")]
+    [Range(0f, 200f)] public float urbanForestEdgeFadeTiles = 18f;
 
     [Tooltip("Ağaçların bina/yol kenarından koruyacağı boşluk (TILE). Ağacın GERÇEK sprite tabanına göre " +
              "ölçülür (binaların şişirilmiş yerleşim yarıçapına DEĞİL) → küçük değerler yeterlidir. 2–5.")]
     [Range(0f, 12f)] public float urbanTreeClearanceTiles = 3f;
+
+    // -------------------------------------------------------------------------
+    // NOISE HELPERS
+    // -------------------------------------------------------------------------
+
+    // GLSL tarzı eşik smoothstep'i: x, [edge0..edge1] bandında 0→1 yumuşak rampalanır.
+    // DİKKAT: Unity'nin Mathf.SmoothStep(from, to, t)'si BUNUN TERSİDİR — from ile to ARASINDA
+    // interpolasyon yapar (t parametre). Eşikleme için onu kullanmak yoğunluğu [thr..thr+edge]
+    // bandına sıkıştırıp (asla 0/1 olmaz) tüm orman mantığını sessizce bozuyordu.
+    static float ThresholdStep(float edge0, float edge1, float x)
+    {
+        float t = Mathf.Clamp01((x - edge0) / Mathf.Max(1e-5f, edge1 - edge0));
+        return t * t * (3f - 2f * t);
+    }
 
     // -------------------------------------------------------------------------
     // URBAN SCATTER FILL
@@ -141,7 +157,7 @@ public partial class MapDecorPlacer
             {
                 float m = Mathf.PerlinNoise(bSeedX + tx / bRegionScale, bSeedY + ty / bRegionScale);
                 // cutoff altı = bölge boş; dar smoothstep bandı yerleşim kenarını yumuşatır.
-                float keep = Mathf.SmoothStep(bCutoff - 0.08f, bCutoff + 0.08f, m);
+                float keep = ThresholdStep(bCutoff - 0.08f, bCutoff + 0.08f, m);
                 if (keep <= 0f || (keep < 1f && Random.value > keep)) continue;
             }
 
@@ -288,9 +304,61 @@ public partial class MapDecorPlacer
         // İç yoğunluk katmanı: hafif dalgalanma (0.75..1) — orman dolgun kalır ama tekdüze de olmaz.
         float densScale = forestScale * 1.7f;
 
-        // Harita dış kenar sönmesi: kenara yaklaştıkça orman yoğunluğu 1→0 iner (SmoothStep bandı).
+        // -- SINIR SÖNME MESAFE ALANI (çok kaynaklı BFS) ----------------------------------------
+        // Orman yoğunluğu HER sınıra doğru söner: harita kenarı, başka biyom/su, yollar ve çıplak
+        // bölgeler. Tüm "orman dışı" tile'lar 0 mesafeyle BFS kaynağıdır (harita kenarındaki açık
+        // tile'lar 1 ile tohumlanır); Chebyshev (8 komşu) dalga ile tile-uzaklık alanı kurulur.
+        // ForestDensityAt yoğunluğu SmoothStep(0, fade, dist) ile çarpar → orman hiçbir sınırda
+        // duvar gibi bitmez. Mesafeler fade tavanında kesilir → BFS maliyeti sınırlı kalır.
         float edgeFade = Mathf.Max(0f, urbanForestEdgeFadeTiles);
         int mapW = map.width, mapH = map.height;
+        ushort[] borderDist = null;
+        if (edgeFade > 0f)
+        {
+            bool hasRoadsN = RoadGenerator.Instance != null && RoadGenerator.Instance.IsGenerated;
+            ushort far = (ushort)(Mathf.CeilToInt(edgeFade) + 1);
+            borderDist = new ushort[mapW * mapH];
+            var bfs = new Queue<int>();
+
+            for (int y = 0; y < mapH; y++)
+            for (int x = 0; x < mapW; x++)
+            {
+                int i = y * mapW + x;
+                // Yol için GÖRSEL kenar (boyanan piksel) baz alınır — IsRoad yalnızca 1-tile
+                // centerline işaretler, mesafe yol ortasından ölçülüp bandın yarısını yutuyordu.
+                bool blocked = !map.IsLand(x, y) || map.GetBiome(x, y) != 1
+                               || (hasRoadsN && RoadGenerator.Instance.GetDistanceToRoadEdge(x, y) == 0)
+                               || BareNoiseAt(x, y) < bareCut;
+                if (blocked)
+                {
+                    borderDist[i] = 0; bfs.Enqueue(i);
+                }
+                else if (x == 0 || y == 0 || x == mapW - 1 || y == mapH - 1)
+                {
+                    borderDist[i] = 1; bfs.Enqueue(i); // harita kenarı da sınırdır
+                }
+                else borderDist[i] = far;
+            }
+
+            while (bfs.Count > 0)
+            {
+                int i = bfs.Dequeue();
+                int cx = i % mapW, cy = i / mapW;
+                int nd = borderDist[i] + 1;
+                if (nd >= far) continue;
+                for (int oy = -1; oy <= 1; oy++)
+                for (int ox = -1; ox <= 1; ox++)
+                {
+                    if (ox == 0 && oy == 0) continue;
+                    int nx = cx + ox, ny = cy + oy;
+                    if (nx < 0 || ny < 0 || nx >= mapW || ny >= mapH) continue;
+                    int ni = ny * mapW + nx;
+                    if (borderDist[ni] <= nd) continue;
+                    borderDist[ni] = (ushort)nd;
+                    bfs.Enqueue(ni);
+                }
+            }
+        }
 
         float ForestDensityAt(int fx, int fy)
         {
@@ -306,15 +374,12 @@ public partial class MapDecorPlacer
                                            nSeedY + fy / densScale + 271f);
             dens = Mathf.Lerp(0.75f, 1f, Mathf.Clamp01(dens));
 
-            float d = Mathf.SmoothStep(thr, thr + edge, n) * dens;
+            float d = ThresholdStep(thr, thr + edge, n) * dens;
 
-            if (edgeFade > 0f)
-            {
-                // Haritanın en yakın dış kenarına uzaklık (tile) → kenar bandında yoğunluk söner.
-                float dEdge = Mathf.Min(Mathf.Min(fx, mapW - 1 - fx),
-                                        Mathf.Min(fy, mapH - 1 - fy));
-                d *= Mathf.SmoothStep(0f, edgeFade, dEdge);
-            }
+            // En yakın sınıra (biyom/su/yol/çıplak bölge/harita kenarı) uzaklıkla sön.
+            if (borderDist != null)
+                d *= ThresholdStep(0f, edgeFade, borderDist[fy * mapW + fx]);
+
             return d;
         }
 
@@ -333,8 +398,8 @@ public partial class MapDecorPlacer
             float r = ComputeBuildingRadius(settings.urbanNature[valid[i]].daySprite, sr.y, 0f);
             if (r > maxTreeR) maxTreeR = r;
         }
-        // 1.3 = jitter üst sınırı, 2.1 = seyrek bölge aralık çarpanı (aşağıdaki mySpacing ile eşleşmeli).
-        float maxTreeSpacing = Mathf.Max(0.02f, maxTreeR * packFactor * 1.3f * 2.1f);
+        // 1.3 = jitter üst sınırı, 3.5 = seyrek bölge aralık çarpanı (aşağıdaki mySpacing ile eşleşmeli).
+        float maxTreeSpacing = Mathf.Max(0.02f, maxTreeR * packFactor * 1.3f * 3.5f);
 
         // -- GERÇEK BİNA FOOTPRINT'LERİ ---------------------------------------------------------
         // KRİTİK: denseOccupied'a karşı test ETMEYİZ — orada bina yarıçapları SEYREK yerleşim için
@@ -427,8 +492,11 @@ public partial class MapDecorPlacer
             if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) continue;
 
             float forestP = ForestDensityAt(tx, ty);
-            if (forestP <= 0.001f) continue;                       // açıklık
-            if (forestP < 1f && Random.value > forestP) continue;  // yumuşak orman kenarı
+            if (forestP <= 0.001f) continue;                                 // açıklık
+            // Kabul olasılığı forestP² — lineer olasılık aralık (spacing) kısıtı tarafından
+            // yutuluyordu: ağaç tile'dan çok büyük olduğu için adayların yarısı elense de her
+            // aralık yuvası yine doluyordu. Kare düşüş fade bandını görünür kılar.
+            if (forestP < 1f && Random.value > forestP * forestP) continue;  // yumuşak orman kenarı
 
             int pick      = PickBalancedSpriteIndex(spriteCounts);
             var entry     = settings.urbanNature[valid[pick]];
@@ -447,10 +515,10 @@ public partial class MapDecorPlacer
             if (NearBuilding(wx, wy, treeRadius + clearWorld)) continue;
 
             // Diğer ağaçlara karşı sprite-boyutuna göre aralık (±%30 jitter → ızgara değil).
-            // Yoğunluk düştükçe aralık da büyür → orman kenarları/seyrek bölgeler dağınık durur,
-            // çekirdek sıkı kalır.
+            // Yoğunluk düştükçe aralık GÜÇLÜ biçimde büyür — fade'i asıl taşıyan bu çarpandır
+            // (olasılık elemesi tek başına aralık kısıtınca yutulur, bkz. forestP² yorumu).
             float mySpacing = treeRadius * packFactor
-                            * Mathf.Lerp(2.1f, 1f, forestP)
+                            * Mathf.Lerp(3.5f, 1f, forestP)
                             * Random.Range(0.7f, 1.3f);
             if (TreeOverlap(wx, wy, mySpacing)) continue;
             AddTree(wx, wy, mySpacing);

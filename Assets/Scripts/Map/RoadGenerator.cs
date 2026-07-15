@@ -155,6 +155,26 @@ public class RoadGenerator : MonoBehaviour
     [Range(2, 6)] public int stripeMinThickness = 3;
 
     // -------------------------------------------------------------------------
+    // FAZ 4 — HIGH-DEFINITION YOL OVERLAY
+    // -------------------------------------------------------------------------
+
+    [Header("Faz 4 — High-Definition Yol Overlay")]
+    [Tooltip("Yollari harita dokusu yerine, tile basina SxS piksellik anti-aliased ayri bir overlay dokusuna cizer. " +
+             "Yol mantigi (trafik, mesafe alanlari, dekor) tile bazli kalir — bu salt gorsel keskinliktir. " +
+             "Harita uretimi sirasinda etkilidir.")]
+    public bool enableHiResRoads = true;
+    [Tooltip("Supersample carpani: her harita tile'i overlay'de bu kadar piksel olur. Yuksek = daha keskin ama daha fazla bellek. " +
+             "Overlay kenari 4096 pikseli asamaz — buyuk haritada otomatik dusurulur.")]
+    [Range(2, 8)] public int roadResolutionScale = 6;
+    [Tooltip("Yol kenari yumusatma (anti-alias) bant genisligi, overlay pikseli cinsinden. Dusuk = keskin kenar.")]
+    [Range(0.5f, 3f)] public float roadEdgeSoftness = 0.75f;
+    [Tooltip("Gece yol overlay'inin kararma orani. 0.6 = tam gecede %60 karartma (parlaklik 0.4'e iner). " +
+             "DayNightCycle.LightingRatio ile dusk/dawn boyunca yumusak gecis yapar — diger sprite'larla uyumlu.")]
+    [Range(0f, 1f)] public float overlayNightDim = 0.6f;
+    [Tooltip("Overlay sprite'inin hizalanacagi harita SpriteRenderer'i. Bos birakilirsa MapPainter/MapGenerator'dan otomatik bulunur.")]
+    public SpriteRenderer overlayHostRenderer;
+
+    // -------------------------------------------------------------------------
     // GENEL
     // -------------------------------------------------------------------------
 
@@ -192,6 +212,17 @@ public class RoadGenerator : MonoBehaviour
     private int _w, _h;
     private bool _generated = false;
 
+    // Hi-res overlay durumu — yol gorselleri harita dokusundan bagimsiz supersample dokuda tutulur.
+    private Texture2D _roadOverlayTex;
+    private SpriteRenderer _roadOverlaySR;
+    private int _rw, _rh, _ovScale;
+    private Color32[] _ovPixels;      // overlay calisma tamponu (RGBA, premultiply YOK)
+    private float[] _passCov;         // pass ici max-coverage (AA disk birlesimi rim kararmasin diye)
+    private Color32[] _passCol;       // pass ici piksel rengi (kazanan stamp'in rengi)
+    private byte[] _hiBranchMask;     // T-kavsak acikligi: branch fill'in overlay kopyasi
+    private bool _overlayDirty;
+    private const int MAX_OVERLAY_DIM = 4096;
+
     private int[,] shoreDistCache;
     private static readonly int[] dx4 = { 1, -1, 0, 0 };
     private static readonly int[] dy4 = { 0, 0, 1, -1 };
@@ -207,6 +238,43 @@ public class RoadGenerator : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+    }
+
+    void OnEnable()  { UndergroundMapManager.OnViewModeChanged += OnUndergroundViewChanged; }
+    void OnDisable() { UndergroundMapManager.OnViewModeChanged -= OnUndergroundViewChanged; }
+
+    void OnUndergroundViewChanged(UndergroundMapManager.ViewMode mode)
+    {
+        // Yeralti gorunumunde yol overlay'i gizle — harita sprite'i yeralti dokusuna gecer.
+        if (_roadOverlaySR != null)
+            _roadOverlaySR.enabled = mode == UndergroundMapManager.ViewMode.Surface;
+    }
+
+    void LateUpdate()
+    {
+        // Connect* cagrilari ayni frame'de pes pese gelir (limanlar, ozel binalar, belediye).
+        // Overlay'in tamamini her cagrida yeniden cizmek pahali — dirty isaretle, frame sonunda
+        // TEK sefer ciz.
+        if (_overlayDirty && _generated)
+        {
+            _overlayDirty = false;
+            RepaintHiResOverlay();
+        }
+
+        UpdateOverlayNightDim();
+    }
+
+    // Gece kararmasi: harita sprite'i DayNightCycle tarafindan tint'lenir ama overlay ayri bir
+    // renderer oldugu icin o tint'i almaz. Diger sprite'larla uyum icin LightingRatio'ya bagli
+    // notr karartma uygulanir (tam gecede parlaklik 1-overlayNightDim'e iner).
+    void UpdateOverlayNightDim()
+    {
+        if (_roadOverlaySR == null) return;
+        var dn = DayNightCycle.Instance;
+        float ratio = dn != null ? dn.LightingRatio : 0f;
+        float b = 1f - overlayNightDim * Mathf.Clamp01(ratio);
+        Color c = new Color(b, b, b, 1f);
+        if (_roadOverlaySR.color != c) _roadOverlaySR.color = c;
     }
 
     // =========================================================================
@@ -257,12 +325,21 @@ public class RoadGenerator : MonoBehaviour
         // visualRoadDistanceField'in bridge sonrasi taze olmasi icin once build — Fill buna dayaniyor
         BuildRoadDistanceField();
 
-        PaintAllRoads();
-        PaintJunctionPlateaus();
-        PaintCenterStripes();
-        // Kavis acisi / noise mikro-gap'leri icin guvenlik agi
-        FillInteriorSandwichPixels();
-        _tex.Apply();
+        if (HiResRoadsActive)
+        {
+            // Yollar yuksek cozunurluklu overlay'e cizilir — harita dokusuna dokunulmaz.
+            // LateUpdate frame sonunda tek seferde boyar (Connect* cagrilari da ayni frame'e biner).
+            _overlayDirty = true;
+        }
+        else
+        {
+            PaintAllRoads();
+            PaintJunctionPlateaus();
+            PaintCenterStripes();
+            // Kavis acisi / noise mikro-gap'leri icin guvenlik agi
+            FillInteriorSandwichPixels();
+            _tex.Apply();
+        }
 
         _generated = true;
 
@@ -2543,12 +2620,19 @@ public class RoadGenerator : MonoBehaviour
         InjectBridgeCenterlines(map);
         BuildRoadDistanceField();
 
-        PaintRoadsByType(2);
-        PaintRoadsByType(1); //highway'i uste tekrar boya — konektor bandi asmis olsa dahi highway goruntusu korunur
-        PaintJunctionPlateaus();
-        PaintCenterStripes();
-        FillInteriorSandwichPixels();
-        _tex.Apply();
+        if (HiResRoadsActive)
+        {
+            _overlayDirty = true; //frame sonunda tek sefer overlay repaint
+        }
+        else
+        {
+            PaintRoadsByType(2);
+            PaintRoadsByType(1); //highway'i uste tekrar boya — konektor bandi asmis olsa dahi highway goruntusu korunur
+            PaintJunctionPlateaus();
+            PaintCenterStripes();
+            FillInteriorSandwichPixels();
+            _tex.Apply();
+        }
 
         Debug.Log($"RoadGenerator: Port road ({portTile.x},{portTile.y}) → ({bestRoadTile.x},{bestRoadTile.y}), {trimmed.Count}px");
     }
@@ -2642,12 +2726,19 @@ public class RoadGenerator : MonoBehaviour
         InjectBridgeCenterlines(map);
         BuildRoadDistanceField();
 
-        PaintRoadsByType(2);
-        PaintRoadsByType(1); //highway'i uste tekrar boya
-        PaintJunctionPlateaus();
-        PaintCenterStripes();
-        FillInteriorSandwichPixels();
-        _tex.Apply();
+        if (HiResRoadsActive)
+        {
+            _overlayDirty = true; //frame sonunda tek sefer overlay repaint
+        }
+        else
+        {
+            PaintRoadsByType(2);
+            PaintRoadsByType(1); //highway'i uste tekrar boya
+            PaintJunctionPlateaus();
+            PaintCenterStripes();
+            FillInteriorSandwichPixels();
+            _tex.Apply();
+        }
 
         Debug.Log($"RoadGenerator: Building road ({buildingTile.x},{buildingTile.y}), {trimmed.Count}px");
     }
@@ -2786,12 +2877,19 @@ public class RoadGenerator : MonoBehaviour
             InjectBridgeCenterlines(map);
             BuildRoadDistanceField();
 
-            PaintRoadsByType(2);
-            PaintRoadsByType(1); //highway'i uste tekrar boya — konektor bandi asmis olsa dahi highway goruntusu korunur
-            PaintJunctionPlateaus();
-            PaintCenterStripes();
+            if (HiResRoadsActive)
+            {
+                _overlayDirty = true; //frame sonunda tek sefer overlay repaint
+            }
+            else
+            {
+                PaintRoadsByType(2);
+                PaintRoadsByType(1); //highway'i uste tekrar boya — konektor bandi asmis olsa dahi highway goruntusu korunur
+                PaintJunctionPlateaus();
+                PaintCenterStripes();
                 FillInteriorSandwichPixels();
-            _tex.Apply();
+                _tex.Apply();
+            }
             Debug.Log($"RoadGenerator: CityHall connected with {connected} roads.");
         }
     }
@@ -2869,5 +2967,464 @@ public class RoadGenerator : MonoBehaviour
         shoreDistCache = null;
         _tex = null;
         _generated = false;
+        _overlayDirty = false;
+        DestroyHiResOverlay();
+    }
+
+    // =========================================================================
+    // HIGH-DEFINITION YOL OVERLAY
+    // =========================================================================
+    //
+    // Yol gorselleri, harita dokusunun (1 px = 1 tile, point-filter) uzerinde duran
+    // ayri bir supersample dokuya cizilir: tile basina _ovScale x _ovScale piksel,
+    // bilinear filtre + kenarlarda ~1 px anti-alias bandi. Zoom yapildiginda yollar
+    // bloklasmak yerine puruzsuz kavisli kenarlar gosterir.
+    //
+    // Yol MANTIGI (roadTypeMap, mesafe alanlari, trafik path'leri) tile bazli kalir;
+    // overlay salt gorseldir. Legacy boyama (enableHiResRoads kapaliyken) aynen durur.
+
+    bool HiResRoadsActive
+    {
+        get
+        {
+            if (!enableHiResRoads) return false;
+            int maxDim = Mathf.Max(_w, _h);
+            if (maxDim <= 0) return false;
+            // Overlay kenari MAX_OVERLAY_DIM'i asamaz; 2x'in altina duserse kazanc yok — legacy'e don.
+            return Mathf.Min(roadResolutionScale, MAX_OVERLAY_DIM / maxDim) >= 2;
+        }
+    }
+
+    int ComputedOverlayScale =>
+        Mathf.Clamp(Mathf.Min(roadResolutionScale, MAX_OVERLAY_DIM / Mathf.Max(1, Mathf.Max(_w, _h))), 2, 8);
+
+    SpriteRenderer ResolveOverlayHost()
+    {
+        if (overlayHostRenderer != null) return overlayHostRenderer;
+        var painter = FindFirstObjectByType<MapPainter>();
+        if (painter != null && painter.mapRenderer != null) return painter.mapRenderer;
+        if (mapGenerator != null && mapGenerator.mapRenderer != null) return mapGenerator.mapRenderer;
+        var mg = FindFirstObjectByType<MapGenerator>();
+        return mg != null ? mg.mapRenderer : null;
+    }
+
+    bool EnsureHiResOverlay()
+    {
+        int scale = ComputedOverlayScale;
+        int rw = _w * scale, rh = _h * scale;
+        if (rw <= 0 || rh <= 0) return false;
+
+        if (_roadOverlayTex == null || _rw != rw || _rh != rh)
+        {
+            DestroyHiResOverlay();
+            _ovScale = scale; _rw = rw; _rh = rh;
+            _roadOverlayTex = new Texture2D(rw, rh, TextureFormat.RGBA32, false);
+            _roadOverlayTex.filterMode = FilterMode.Bilinear; //zoom'da yumusak — point-filter haritanin tersine
+            _roadOverlayTex.wrapMode = TextureWrapMode.Clamp;
+            _ovPixels = new Color32[rw * rh];
+            _passCov = new float[rw * rh];
+            _passCol = new Color32[rw * rh];
+            _hiBranchMask = new byte[rw * rh];
+        }
+
+        if (_roadOverlaySR == null)
+        {
+            SpriteRenderer host = ResolveOverlayHost();
+            var go = new GameObject("RoadHiResOverlay");
+            if (host != null)
+                go.transform.SetParent(host.transform, false); //ayni PPU-orani → harita sprite'i ile birebir hizali
+            _roadOverlaySR = go.AddComponent<SpriteRenderer>();
+            if (host != null)
+            {
+                _roadOverlaySR.sortingLayerID = host.sortingLayerID;
+                _roadOverlaySR.sortingOrder = host.sortingOrder + 2; //haritanin ve dalga overlay'inin (order 1) ustune
+            }
+            else _roadOverlaySR.sortingOrder = 2;
+        }
+
+        if (_roadOverlaySR.sprite == null || _roadOverlaySR.sprite.texture != _roadOverlayTex)
+        {
+            if (_roadOverlaySR.sprite != null) Destroy(_roadOverlaySR.sprite);
+            // PPU = 100 * scale → dunya boyutu harita sprite'i (PPU 100) ile ayni kalir.
+            Sprite sp = Sprite.Create(_roadOverlayTex, new Rect(0, 0, _rw, _rh),
+                new Vector2(0.5f, 0.5f), 100f * _ovScale);
+            sp.name = "RoadHiResOverlay";
+            _roadOverlaySR.sprite = sp;
+        }
+
+        _roadOverlaySR.enabled = UndergroundMapManager.Instance == null ||
+                                 UndergroundMapManager.Instance.CurrentView == UndergroundMapManager.ViewMode.Surface;
+        return true;
+    }
+
+    void DestroyHiResOverlay()
+    {
+        if (_roadOverlaySR != null && _roadOverlaySR.sprite != null)
+        {
+            Destroy(_roadOverlaySR.sprite);
+            _roadOverlaySR.sprite = null;
+        }
+        if (_roadOverlayTex != null) { Destroy(_roadOverlayTex); _roadOverlayTex = null; }
+        _ovPixels = null; _passCov = null; _passCol = null; _hiBranchMask = null;
+        _rw = _rh = 0;
+    }
+
+    /// <summary>Tum yol agini overlay'e sifirdan cizer. LateUpdate uzerinden frame'de en fazla bir kez cagrilir.</summary>
+    void RepaintHiResOverlay()
+    {
+        if (!HiResRoadsActive) { DestroyHiResOverlay(); return; }
+        if (!EnsureHiResOverlay()) return;
+
+        System.Array.Clear(_ovPixels, 0, _ovPixels.Length);       //tam saydam
+        System.Array.Clear(_hiBranchMask, 0, _hiBranchMask.Length);
+        //_passCov CompositePass icinde kendini temizler — ilk alloc'ta zaten sifir.
+
+        PaintRoadsByTypeHiRes(2);
+        PaintRoadsByTypeHiRes(1);
+        PaintJunctionPlateausHiRes();
+        PaintCenterStripesHiRes();
+        FillSandwichHiRes();
+
+        _roadOverlayTex.SetPixels32(_ovPixels);
+        _roadOverlayTex.Apply(false);
+    }
+
+    /// <summary>
+    /// Legacy PaintRoadsByType'in overlay karsiligi: shoulder → outline → fill sirasi.
+    /// Farklar: kalinlik float olarak kullanilir (surekli taper), disk kenarlari AA'li,
+    /// shoulder tam disk olarak alta serilir (ustunu outline/fill kapatir — annulus gereksiz).
+    /// </summary>
+    void PaintRoadsByTypeHiRes(int targetType)
+    {
+        if (shoulderWidth > 0 && shoulderBlend > 0f)
+        {
+            foreach (var tile in allRoadTiles)
+            {
+                if (roadTypeMap[tile.x, tile.y] != targetType) continue;
+                float thickness = roadThicknessMap[tile.x, tile.y];
+                int outlineW = roadOutlineWidthMap[tile.x, tile.y];
+                float totalHalf = (thickness + outlineW * 2f) / 2f;
+                StampDiskHiRes(tile, totalHalf + shoulderWidth + 0.5f, GetShoulderColorForTile(tile), false);
+            }
+            CompositePassHiRes(shoulderBlend, false, false);
+        }
+
+        foreach (var tile in allRoadTiles) //outline
+        {
+            if (roadTypeMap[tile.x, tile.y] != targetType) continue;
+            int outlineW = roadOutlineWidthMap[tile.x, tile.y];
+            if (outlineW <= 0) continue;
+            float thickness = roadThicknessMap[tile.x, tile.y];
+            StampDiskHiRes(tile, (thickness + outlineW * 2f) / 2f + 0.5f,
+                roadOutlineColorMap[tile.x, tile.y], false);
+        }
+        //T-kavsak acikligi: highway outline'i branch fill'in oldugu overlay piksellerinde cizilmez.
+        CompositePassHiRes(1f, false, targetType == 1);
+
+        foreach (var tile in allRoadTiles) //fill
+        {
+            if (roadTypeMap[tile.x, tile.y] != targetType) continue;
+            StampDiskHiRes(tile, roadThicknessMap[tile.x, tile.y] / 2f + 0.5f,
+                roadFillColorMap[tile.x, tile.y], true);
+        }
+        CompositePassHiRes(1f, targetType == 2, false);
+    }
+
+    /// <summary>
+    /// Tile merkezine AA'li disk stamp'ler; pass tamponunda MAX coverage tutulur —
+    /// komsu disklerin rim'leri ust uste binince kararma/cift-kenar olusmaz.
+    /// radiusTiles tile birimindedir (+0.5 pad legacy piksel ayak izini esler).
+    /// </summary>
+    void StampDiskHiRes(Vector2Int tile, float radiusTiles, Color col, bool noisy)
+    {
+        float S = _ovScale;
+        float cx = (tile.x + 0.5f) * S, cy = (tile.y + 0.5f) * S;
+        float r = radiusTiles * S;
+        float aa = Mathf.Max(0.01f, roadEdgeSoftness);
+
+        int x0 = Mathf.Max(0, Mathf.FloorToInt(cx - r - aa));
+        int x1 = Mathf.Min(_rw - 1, Mathf.CeilToInt(cx + r + aa));
+        int y0 = Mathf.Max(0, Mathf.FloorToInt(cy - r - aa));
+        int y1 = Mathf.Min(_rh - 1, Mathf.CeilToInt(cy + r + aa));
+
+        for (int py = y0; py <= y1; py++)
+        {
+            int rowBase = py * _rw;
+            float dy = py + 0.5f - cy;
+            for (int px = x0; px <= x1; px++)
+            {
+                float dx = px + 0.5f - cx;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                float cov = Mathf.Clamp01((r - d) / aa + 0.5f);
+                if (cov <= 0f) continue;
+                int i = rowBase + px;
+                if (cov > _passCov[i])
+                {
+                    _passCov[i] = cov;
+                    _passCol[i] = noisy ? (Color32)ApplyRoadNoiseHiRes(col, px, py) : (Color32)col;
+                }
+            }
+        }
+    }
+
+    /// <summary>Biriken pass'i overlay'e alpha-composite eder ve pass tamponunu temizler.</summary>
+    void CompositePassHiRes(float alphaMult, bool maskWrite, bool maskSkip)
+    {
+        for (int i = 0; i < _passCov.Length; i++)
+        {
+            float cov = _passCov[i];
+            if (cov <= 0f) continue;
+            _passCov[i] = 0f;
+            if (maskSkip && _hiBranchMask[i] != 0) continue;
+
+            float a = cov * alphaMult;
+            Color32 src = _passCol[i];
+            Color32 dst = _ovPixels[i];
+            float da = dst.a / 255f;
+            float outA = a + da * (1f - a);
+            if (outA <= 0f) continue;
+            float inv = (1f - a) * da;
+            _ovPixels[i] = new Color32(
+                (byte)Mathf.RoundToInt((src.r * a + dst.r * inv) / outA),
+                (byte)Mathf.RoundToInt((src.g * a + dst.g * inv) / outA),
+                (byte)Mathf.RoundToInt((src.b * a + dst.b * inv) / outA),
+                (byte)Mathf.RoundToInt(outA * 255f));
+
+            if (maskWrite && cov >= 0.5f) _hiBranchMask[i] = 1;
+        }
+    }
+
+    /// <summary>Tek overlay pikseline dogrudan alpha-blend (plato/serit/sandwich gibi kucuk yamalar icin).</summary>
+    void BlendOverlayPixel(int px, int py, Color col, float a)
+    {
+        if (a <= 0f) return;
+        int i = py * _rw + px;
+        Color32 dst = _ovPixels[i];
+        float da = dst.a / 255f;
+        float outA = a + da * (1f - a);
+        if (outA <= 0f) return;
+        float inv = (1f - a) * da;
+        _ovPixels[i] = new Color32(
+            (byte)Mathf.RoundToInt(Mathf.Clamp((col.r * 255f * a + dst.r * inv) / outA, 0f, 255f)),
+            (byte)Mathf.RoundToInt(Mathf.Clamp((col.g * 255f * a + dst.g * inv) / outA, 0f, 255f)),
+            (byte)Mathf.RoundToInt(Mathf.Clamp((col.b * 255f * a + dst.b * inv) / outA, 0f, 255f)),
+            (byte)Mathf.RoundToInt(outA * 255f));
+    }
+
+    // Legacy ApplyRoadNoise ile ayni doku dili: Perlin tile-uzayinda ornekleniyor (yama olcegi
+    // degismez), grain overlay pikseli basina (daha ince kum dokusu).
+    Color ApplyRoadNoiseHiRes(Color baseColor, int px, int py)
+    {
+        float fx = (px + 0.5f) / _ovScale;
+        float fy = (py + 0.5f) / _ovScale;
+        float perlin = Mathf.PerlinNoise(fx * highwayNoiseScale, fy * highwayNoiseScale);
+        float perlinMod = (perlin - 0.5f) * 2f * highwayNoiseStrength;
+        float grain = (UnityEngine.Random.value - 0.5f) * 2f * highwayGrainStrength;
+        float mod = 1f + perlinMod + grain;
+        return new Color(
+            Mathf.Clamp01(baseColor.r * mod),
+            Mathf.Clamp01(baseColor.g * mod),
+            Mathf.Clamp01(baseColor.b * mod),
+            baseColor.a);
+    }
+
+    void PaintJunctionPlateausHiRes()
+    {
+        if (!enableJunctionPlateaus || branchPaths == null || visualRoadDistanceField == null) return;
+        foreach (var path in branchPaths)
+        {
+            if (path == null || path.Count == 0) continue;
+            PaintPlateauAtHiRes(path[0]);
+            if (path.Count > 1)
+            {
+                Vector2Int last = path[path.Count - 1];
+                if (last != path[0]) PaintPlateauAtHiRes(last);
+            }
+        }
+    }
+
+    void PaintPlateauAtHiRes(Vector2Int j)
+    {
+        if (j.x < 0 || j.x >= _w || j.y < 0 || j.y >= _h) return;
+        Color fillColor = roadFillColorMap[j.x, j.y];
+        float S = _ovScale;
+        float cx = (j.x + 0.5f) * S, cy = (j.y + 0.5f) * S;
+        float r = (junctionPlateauRadius + 0.5f) * S;
+        float aa = Mathf.Max(0.01f, roadEdgeSoftness);
+
+        int x0 = Mathf.Max(0, Mathf.FloorToInt(cx - r - aa));
+        int x1 = Mathf.Min(_rw - 1, Mathf.CeilToInt(cx + r + aa));
+        int y0 = Mathf.Max(0, Mathf.FloorToInt(cy - r - aa));
+        int y1 = Mathf.Min(_rh - 1, Mathf.CeilToInt(cy + r + aa));
+
+        for (int py = y0; py <= y1; py++)
+        for (int px = x0; px <= x1; px++)
+        {
+            int tx = px / _ovScale, ty = py / _ovScale;
+            if (tx < 0 || tx >= _w || ty < 0 || ty >= _h) continue;
+            //Sadece yol ustu — cim/shoulder tasmasi olmasin (legacy ile ayni kural).
+            if (visualRoadDistanceField[tx, ty] != 0) continue;
+            float dx = px + 0.5f - cx, dy = py + 0.5f - cy;
+            float cov = Mathf.Clamp01((r - Mathf.Sqrt(dx * dx + dy * dy)) / aa + 0.5f);
+            if (cov <= 0f) continue;
+            BlendOverlayPixel(px, py, ApplyRoadNoiseHiRes(fillColor, px, py), cov);
+        }
+    }
+
+    void PaintCenterStripesHiRes()
+    {
+        if (!enableCenterStripes || visualRoadDistanceField == null) return;
+        int period = stripeDashLength + stripeGapLength;
+        if (period < 1) return;
+        int plateauSkip = enableJunctionPlateaus ? junctionPlateauRadius + 1 : 0;
+
+        if (highwaySegments != null)
+            foreach (var seg in highwaySegments) PaintStripeOnPathHiRes(seg, period, plateauSkip);
+        if (enableBranchStripes && branchPaths != null)
+            foreach (var path in branchPaths) PaintStripeOnPathHiRes(path, period, plateauSkip);
+    }
+
+    void PaintStripeOnPathHiRes(List<Vector2Int> path, int period, int plateauSkip)
+    {
+        if (path == null || path.Count == 0) return;
+        int start = Mathf.Min(plateauSkip, path.Count);
+        int end = Mathf.Max(start, path.Count - plateauSkip);
+        float S = _ovScale;
+        float dotR = Mathf.Max(1f, 0.35f * S); //~0.7 tile genislik — legacy 1 tile'dan ince/keskin
+
+        for (int i = start; i < end; i += period)
+        {
+            Vector2Int anchor = path[i];
+            int lo = Mathf.Max(0, i - 3);
+            int hi = Mathf.Min(path.Count - 1, i + 3);
+            float dx = path[hi].x - path[lo].x;
+            float dy = path[hi].y - path[lo].y;
+            float len = Mathf.Sqrt(dx * dx + dy * dy);
+            float tx = len < 0.0001f ? 0f : dx / len;
+            float ty = len < 0.0001f ? 0f : dy / len;
+
+            //Dash: anchor'dan tangent yonunde stripeDashLength tile — overlay'de piksel piksel.
+            int dashPx = Mathf.Max(1, stripeDashLength * _ovScale);
+            for (int k = 0; k < dashPx; k++)
+            {
+                float fx = (anchor.x + 0.5f) * S + tx * k;
+                float fy = (anchor.y + 0.5f) * S + ty * k;
+                //Nokta merkezinin tile'inda taper/ince-yol ve yol-ici kontrolu (legacy kurallari).
+                int ctx = Mathf.Clamp((int)(fx / S), 0, _w - 1);
+                int cty = Mathf.Clamp((int)(fy / S), 0, _h - 1);
+                if (roadThicknessMap[ctx, cty] < stripeMinThickness) continue;
+                if (visualRoadDistanceField[ctx, cty] != 0) continue;
+                StampStripeDotHiRes(fx, fy, dotR);
+            }
+        }
+    }
+
+    void StampStripeDotHiRes(float cx, float cy, float r)
+    {
+        float aa = Mathf.Max(0.01f, roadEdgeSoftness);
+        int x0 = Mathf.Max(0, Mathf.FloorToInt(cx - r - aa));
+        int x1 = Mathf.Min(_rw - 1, Mathf.CeilToInt(cx + r + aa));
+        int y0 = Mathf.Max(0, Mathf.FloorToInt(cy - r - aa));
+        int y1 = Mathf.Min(_rh - 1, Mathf.CeilToInt(cy + r + aa));
+
+        for (int py = y0; py <= y1; py++)
+        for (int px = x0; px <= x1; px++)
+        {
+            int tx = px / _ovScale, ty = py / _ovScale;
+            if (tx < 0 || tx >= _w || ty < 0 || ty >= _h) continue;
+            if (visualRoadDistanceField[tx, ty] != 0) continue; //cim/shoulder tasmasi yok
+            float dx = px + 0.5f - cx, dy = py + 0.5f - cy;
+            float cov = Mathf.Clamp01((r - Mathf.Sqrt(dx * dx + dy * dy)) / aa + 0.5f);
+            if (cov <= 0f) continue;
+            BlendOverlayPixel(px, py, ApplyRoadNoiseHiRes(centerStripeColor, px, py), cov);
+        }
+    }
+
+    /// <summary>
+    /// Legacy FillInteriorSandwichPixels'in overlay karsiligi: iki yol bandi arasinda sikismis
+    /// tekil arka plan tile'lari tespit edilir (ayni eksen-sandwich kurali) ve uzerine en yakin
+    /// yolun fill renginde opak yuvarlak yama basilir.
+    /// </summary>
+    void FillSandwichHiRes()
+    {
+        if (visualRoadDistanceField == null) return;
+        const int R = 3;
+        int[] axDX = { 1, 0, 1, 1 };
+        int[] axDY = { 0, 1, 1, -1 };
+
+        for (int y = 0; y < _h; y++)
+        for (int x = 0; x < _w; x++)
+        {
+            int d = visualRoadDistanceField[x, y];
+            if (d == 0) continue;
+            if (d > R + 1) continue;
+
+            bool sandwich = false;
+            for (int a = 0; a < 4; a++)
+            {
+                int ax = axDX[a], ay = axDY[a];
+                bool posFound = false, negFound = false;
+                for (int s = 1; s <= R; s++)
+                {
+                    int nx = x + ax * s, ny = y + ay * s;
+                    if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) break;
+                    if (visualRoadDistanceField[nx, ny] == 0) { posFound = true; break; }
+                }
+                if (!posFound) continue;
+                for (int s = 1; s <= R; s++)
+                {
+                    int nx = x - ax * s, ny = y - ay * s;
+                    if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) break;
+                    if (visualRoadDistanceField[nx, ny] == 0) { negFound = true; break; }
+                }
+                if (negFound) { sandwich = true; break; }
+            }
+            if (!sandwich) continue;
+
+            if (!TryNearestRoadFillColor(x, y, out Color col)) continue;
+            //Tile'i tam kapatan hafif tasan yama — komsu yol bandlariyla ortusur.
+            StampSandwichPatchHiRes(x, y, col);
+        }
+    }
+
+    bool TryNearestRoadFillColor(int x, int y, out Color col)
+    {
+        for (int r = 1; r <= 5; r++)
+        {
+            for (int ddx = -r; ddx <= r; ddx++)
+            for (int ddy = -r; ddy <= r; ddy++)
+            {
+                if (Mathf.Max(Mathf.Abs(ddx), Mathf.Abs(ddy)) != r) continue;
+                int nx = x + ddx, ny = y + ddy;
+                if (nx < 0 || nx >= _w || ny < 0 || ny >= _h) continue;
+                if (roadTypeMap[nx, ny] == 0) continue;
+                col = roadFillColorMap[nx, ny];
+                return true;
+            }
+        }
+        col = default;
+        return false;
+    }
+
+    void StampSandwichPatchHiRes(int tileX, int tileY, Color col)
+    {
+        float S = _ovScale;
+        float cx = (tileX + 0.5f) * S, cy = (tileY + 0.5f) * S;
+        float r = 0.9f * S;
+        float aa = Mathf.Max(0.01f, roadEdgeSoftness);
+
+        int x0 = Mathf.Max(0, Mathf.FloorToInt(cx - r - aa));
+        int x1 = Mathf.Min(_rw - 1, Mathf.CeilToInt(cx + r + aa));
+        int y0 = Mathf.Max(0, Mathf.FloorToInt(cy - r - aa));
+        int y1 = Mathf.Min(_rh - 1, Mathf.CeilToInt(cy + r + aa));
+
+        for (int py = y0; py <= y1; py++)
+        for (int px = x0; px <= x1; px++)
+        {
+            float dx = px + 0.5f - cx, dy = py + 0.5f - cy;
+            float cov = Mathf.Clamp01((r - Mathf.Sqrt(dx * dx + dy * dy)) / aa + 0.5f);
+            if (cov <= 0f) continue;
+            BlendOverlayPixel(px, py, ApplyRoadNoiseHiRes(col, px, py), cov);
+        }
     }
 }

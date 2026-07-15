@@ -82,10 +82,10 @@ public class CountryData : MonoBehaviour
 
     private void PullRegionRatios()
     {
-        regionRatios[RegionType.Agricultural] = mapGenerator.ForestRatio;
-        regionRatios[RegionType.Cities]       = mapGenerator.DesertRatio;
-        regionRatios[RegionType.Industrial]   = mapGenerator.MountainRatio;
-        regionRatios[RegionType.Urban]        = mapGenerator.PlainsRatio;
+        regionRatios[RegionType.Urban]        = mapGenerator.UrbanRatio;        // biome 1
+        regionRatios[RegionType.Cities]       = mapGenerator.CityRatio;         // biome 2
+        regionRatios[RegionType.Industrial]   = mapGenerator.IndustrialRatio;   // biome 3
+        regionRatios[RegionType.Agricultural] = mapGenerator.AgriculturalRatio; // biome 4
     }
 
     #region Region Getters

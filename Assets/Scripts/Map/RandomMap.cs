@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 using System.Collections.Generic;
 
 public class MapGenerator : MonoBehaviour
@@ -77,26 +78,29 @@ public class MapGenerator : MonoBehaviour
     public Color waterColor = new Color(0.1f, 0.3f, 0.8f);
     public Color fogColor = new Color(0.7f, 0.75f, 0.8f);
 
-    [Header("Biomes")]
-    public Color biome1Color = new Color(0.2f, 0.6f, 0.2f);
-    public Color biome2Color = new Color(0.85f, 0.75f, 0.4f);
-    public Color biome3Color = new Color(0.4f, 0.4f, 0.45f);
-    public Color biome4Color = new Color(0.3f, 0.7f, 0.5f);
-    [Tooltip("Fallback color for sea rocks (biome 5). MapPainter overrides with its own paint method.")]
-    public Color biome5Color = new Color(0.5f, 0.5f, 0.52f);
+    // Region fallback colors, indexed by biome id: 1=Urban, 2=Cities, 3=Industrial,
+    // 4=Agricultural, 5=SeaRock. MapPainter overrides these with its own paint methods.
+    [Header("Region Colors")]
+    [FormerlySerializedAs("biome1Color")] public Color urbanColor        = new Color(0.2f, 0.6f, 0.2f);
+    [FormerlySerializedAs("biome2Color")] public Color cityColor         = new Color(0.85f, 0.75f, 0.4f);
+    [FormerlySerializedAs("biome3Color")] public Color industrialColor   = new Color(0.4f, 0.4f, 0.45f);
+    [FormerlySerializedAs("biome4Color")] public Color agriculturalColor = new Color(0.3f, 0.7f, 0.5f);
+    [Tooltip("Fallback color for sea rocks. MapPainter overrides with its own paint method.")]
+    [FormerlySerializedAs("biome5Color")] public Color seaRockColor      = new Color(0.5f, 0.5f, 0.52f);
 
-    [Header("Biome Spawn Settings")]
-    [Range(0f, 1f)] public float biome2MaxRatio = 0.2f;
-    [Range(0f, 1f)] public float biome3MaxRatio = 0.2f;
-    [Range(0f, 1f)] public float biome4MaxRatio = 0.3f;
+    [Header("Region Spawn Settings")]
+    [Range(0f, 1f)] [FormerlySerializedAs("biome2MaxRatio")] public float cityMaxRatio         = 0.2f;
+    [Range(0f, 1f)] [FormerlySerializedAs("biome3MaxRatio")] public float industrialMaxRatio   = 0.2f;
+    [Range(0f, 1f)] [FormerlySerializedAs("biome4MaxRatio")] public float agriculturalMaxRatio = 0.3f;
 
     [Header("Spawn Threshold")]
     [Range(0f, 0.2f)] public float minSpawnThreshold = 0.03f;
 
-    public float ForestRatio   { get; private set; }
-    public float DesertRatio   { get; private set; }
-    public float MountainRatio { get; private set; }
-    public float PlainsRatio   { get; private set; }
+    // Fraction of land occupied by each region (by biome id 1-4).
+    public float UrbanRatio        { get; private set; }
+    public float CityRatio         { get; private set; }
+    public float IndustrialRatio   { get; private set; }
+    public float AgriculturalRatio { get; private set; }
 
     [Header("Cleanup")]
     public bool fillSmallLakes = true;
@@ -642,7 +646,7 @@ public class MapGenerator : MonoBehaviour
 
         if (totalLandTiles == 0) return;
 
-        float[] maxRatios   = { biome2MaxRatio, biome3MaxRatio, biome4MaxRatio };
+        float[] maxRatios   = { cityMaxRatio, industrialMaxRatio, agriculturalMaxRatio };
         float[] rolledRatios = new float[3];
         bool[]  biomeActive  = new bool[3];
 
@@ -724,20 +728,20 @@ public class MapGenerator : MonoBehaviour
             }
         }
 
-        Debug.Log($"Biomes - Forest(BG): {(finalRatios[0]*100):F1}%, " +
-                  $"Desert: {biomeActive[0]} ({(finalRatios[1]*100):F1}%), " +
-                  $"Mountains: {biomeActive[1]} ({(finalRatios[2]*100):F1}%), " +
-                  $"Plains: {biomeActive[2]} ({(finalRatios[3]*100):F1}%), " +
+        Debug.Log($"Regions - Urban(BG): {(finalRatios[0]*100):F1}%, " +
+                  $"Cities: {biomeActive[0]} ({(finalRatios[1]*100):F1}%), " +
+                  $"Industrial: {biomeActive[1]} ({(finalRatios[2]*100):F1}%), " +
+                  $"Agricultural: {biomeActive[2]} ({(finalRatios[3]*100):F1}%), " +
                   $"SeaRocks: {biomeTileCounts[4]}tiles");
     }
 
     void CalculateBiomeRatios()
     {
-        if (totalLandTiles == 0) { ForestRatio = DesertRatio = MountainRatio = PlainsRatio = 0f; return; }
-        ForestRatio   = (float)biomeTileCounts[0] / totalLandTiles;
-        DesertRatio   = (float)biomeTileCounts[1] / totalLandTiles;
-        MountainRatio = (float)biomeTileCounts[2] / totalLandTiles;
-        PlainsRatio   = (float)biomeTileCounts[3] / totalLandTiles;
+        if (totalLandTiles == 0) { UrbanRatio = CityRatio = IndustrialRatio = AgriculturalRatio = 0f; return; }
+        UrbanRatio        = (float)biomeTileCounts[0] / totalLandTiles;
+        CityRatio         = (float)biomeTileCounts[1] / totalLandTiles;
+        IndustrialRatio   = (float)biomeTileCounts[2] / totalLandTiles;
+        AgriculturalRatio = (float)biomeTileCounts[3] / totalLandTiles;
     }
 
     // -------------------------------------------------------------------------
@@ -784,7 +788,7 @@ public class MapGenerator : MonoBehaviour
         // Point-filtered pixel map never samples mips → skip the mip chain (saves ~33% memory + Apply cost).
         Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
         texture.filterMode = FilterMode.Point;
-        Color[] biomeColors = { biome1Color, biome2Color, biome3Color, biome4Color, biome5Color };
+        Color[] biomeColors = { urbanColor, cityColor, industrialColor, agriculturalColor, seaRockColor };
 
         for (int x = 0; x < width; x++)
             for (int y = 0; y < height; y++)
@@ -823,7 +827,7 @@ public class MapGenerator : MonoBehaviour
         landMap[x, y]  = isLand;
         biomeMap[x, y] = isLand ? Mathf.Clamp(biome, 1, 5) : 0;
 
-        Color[] biomeColors = { biome1Color, biome2Color, biome3Color, biome4Color, biome5Color };
+        Color[] biomeColors = { urbanColor, cityColor, industrialColor, agriculturalColor, seaRockColor };
         Color baseColor = isLand ? biomeColors[biomeMap[x, y] - 1] : waterColor;
         if (useFog && fogMap[x, y] > 0)
             baseColor = Color.Lerp(baseColor, fogColor, fogMap[x, y]);
