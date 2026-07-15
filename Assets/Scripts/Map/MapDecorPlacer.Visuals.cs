@@ -36,6 +36,7 @@ public partial class MapDecorPlacer
         {
             BuildingData bd = cityBuildings[i];
             if (bd.dayRenderer == null) continue;
+            if (bd.lodHidden) continue; // zoom LOD gizledi → renk yazmak boşa iş
 
             float baseA    = bd.baseAlpha;
             bool  hasNight = bd.nightRenderer != null;
@@ -43,12 +44,16 @@ public partial class MapDecorPlacer
             crossfadeTemp   = bd.dayRenderer.color;
             crossfadeTemp.a = hasNight ? baseA * dayFadeFactor : baseA;
             bd.dayRenderer.color = crossfadeTemp;
+            // Alpha ~0 iken renderer'ı tamamen kapat: görünmez sprite yine draw call üretir —
+            // gündüz boyunca her gece overlay'i (ve tam gecede gündüz sprite'ı) bedavaya kapanır.
+            SetRendererVisible(bd.dayRenderer, crossfadeTemp.a);
 
             if (hasNight)
             {
                 crossfadeTemp   = bd.nightRenderer.color;
                 crossfadeTemp.a = baseA * nightFactor;
                 bd.nightRenderer.color = crossfadeTemp;
+                SetRendererVisible(bd.nightRenderer, crossfadeTemp.a);
             }
         }
 
@@ -64,12 +69,14 @@ public partial class MapDecorPlacer
             crossfadeTemp   = pd.dayRenderer.color;
             crossfadeTemp.a = hasNight ? baseA * dayFadeFactor : baseA;
             pd.dayRenderer.color = crossfadeTemp;
+            SetRendererVisible(pd.dayRenderer, crossfadeTemp.a);
 
             if (hasNight)
             {
                 crossfadeTemp   = pd.nightRenderer.color;
                 crossfadeTemp.a = baseA * nightFactor;
                 pd.nightRenderer.color = crossfadeTemp;
+                SetRendererVisible(pd.nightRenderer, crossfadeTemp.a);
             }
         }
 
@@ -85,18 +92,31 @@ public partial class MapDecorPlacer
             crossfadeTemp   = ship.dayRenderer.color;
             crossfadeTemp.a = hasNight ? baseA * dayFadeFactor : baseA;
             ship.dayRenderer.color = crossfadeTemp;
+            SetRendererVisible(ship.dayRenderer, crossfadeTemp.a);
 
             if (hasNight)
             {
                 crossfadeTemp   = ship.nightRenderer.color;
                 crossfadeTemp.a = baseA * nightFactor;
                 ship.nightRenderer.color = crossfadeTemp;
+                SetRendererVisible(ship.nightRenderer, crossfadeTemp.a);
             }
         }
+
+        // Orman imposter'ı (uzak zoom) — bake edilmiş gündüz/gece dokuları aynı eğriyle geçişir.
+        UpdateForestImposterCrossfade(dayFadeFactor, nightFactor);
 
         // Ekili tarlalar (crop fields) — gece kararması. Debug overlay modunda dokunma.
         if (!debugOverlayDayNight)
             ApplyCropFieldNightDarken(Mathf.Clamp01(ratio));
+    }
+
+    // Alpha ~0 olan renderer'ı devre dışı bırak (görünmez sprite yine draw call + sorting maliyeti
+    // öder). Eşik, crossfade'in kendi "hissedilir değişim" eşiğinin altında → görsel fark yok.
+    static void SetRendererVisible(SpriteRenderer sr, float alpha)
+    {
+        bool visible = alpha > 0.004f;
+        if (sr.enabled != visible) sr.enabled = visible;
     }
 
     // -------------------------------------------------------------------------
@@ -279,10 +299,12 @@ public partial class MapDecorPlacer
                 float du = (vx / (sh.halfWidth  * 2f)) * sh.uvW;
                 float dv = (vy / (sh.halfHeight * 2f)) * sh.uvH;
 
-                if (sh.material != null)
+                if (sh.mpb != null && sh.renderer != null)
                 {
-                    sh.material.SetVector("_SmearDir", new Vector4(du, dv, 0f, 0f));
-                    sh.material.color = col;
+                    // Materyal paylaşıldığı için per-gölge parametreler MPB üzerinden gider.
+                    sh.mpb.SetVector("_SmearDir", new Vector4(du, dv, 0f, 0f));
+                    sh.mpb.SetColor("_Color", col);
+                    sh.renderer.SetPropertyBlock(sh.mpb);
                 }
                 continue;
             }
@@ -309,9 +331,13 @@ public partial class MapDecorPlacer
                 continue;
             }
 
-            // Iso alpha fade — şafakta yavaş yavaş oluşur, akşamda yavaş yavaş kaybolur
-            if (sh.material != null)
-                sh.material.color = col;
+            // Iso alpha fade — şafakta yavaş yavaş oluşur, akşamda yavaş yavaş kaybolur.
+            // Materyal paylaşıldığı için renk per-renderer MPB ile yazılır.
+            if (sh.mpb != null && sh.renderer != null)
+            {
+                sh.mpb.SetColor("_Color", col);
+                sh.renderer.SetPropertyBlock(sh.mpb);
+            }
         }
     }
 
@@ -417,10 +443,12 @@ public partial class MapDecorPlacer
             float du = (vx / (sh.halfWidth  * 2f)) * sh.uvW;
             float dv = (vy / (sh.halfHeight * 2f)) * sh.uvH;
 
-            if (sh.material != null)
+            if (sh.mpb != null && sh.renderer != null)
             {
-                sh.material.SetVector("_SmearDir", new Vector4(du, dv, 0f, 0f));
-                sh.material.color = col;
+                // Paylaşılan materyal — per-gölge parametreler MPB üzerinden.
+                sh.mpb.SetVector("_SmearDir", new Vector4(du, dv, 0f, 0f));
+                sh.mpb.SetColor("_Color", col);
+                sh.renderer.SetPropertyBlock(sh.mpb);
             }
         }
         else
@@ -439,6 +467,56 @@ public partial class MapDecorPlacer
     public void DestroyShadow(ShadowHandle sh)
     {
         if (sh != null && sh.transform != null) Destroy(sh.transform.gameObject);
+    }
+
+    // -------------------------------------------------------------------------
+    // SHARED SHADOW MATERIALS — texture başına TEK materyal + per-renderer MPB
+    // -------------------------------------------------------------------------
+    // Eskiden her gölge kendi Material instance'ını alıyordu → her gölge ayrı draw call + materyal
+    // sızıntısı. Şimdi materyal texture başına cache'lenir; gölgeye özgü parametreler (_UvRect,
+    // _SmearDir, _Color) MaterialPropertyBlock ile renderer üzerinde taşınır → batching bozulmaz.
+
+    private readonly Dictionary<Texture, Material> sharedTraceMats = new Dictionary<Texture, Material>();
+    private readonly Dictionary<Texture, Material> sharedIsoMats   = new Dictionary<Texture, Material>();
+
+    Material GetSharedTraceMaterial(Texture tex)
+    {
+        if (sharedTraceMats.TryGetValue(tex, out var m) && m != null) return m;
+
+        Shader traceShader = Shader.Find("Custom/MapShadowSmear");
+        m = new Material(traceShader != null ? traceShader : Shader.Find("Sprites/Default"));
+        m.mainTexture = tex;
+        m.color       = shadowColor;
+        if (traceShader != null)
+        {
+            // Global kalite parametreleri — tüm gölgeler için ortak, materyalde kalır.
+            m.SetFloat("_Steps", shadowTraceSteps);
+            m.SetFloat("_BlurRadius", shadowTraceBlur);
+            m.SetFloat("_EdgeLow", shadowTraceStrayCut);
+            m.SetFloat("_EdgeHigh", Mathf.Clamp01(shadowTraceStrayCut + 0.45f));
+        }
+        sharedTraceMats[tex] = m;
+        return m;
+    }
+
+    Material GetSharedIsoMaterial(Texture tex)
+    {
+        if (sharedIsoMats.TryGetValue(tex, out var m) && m != null) return m;
+
+        m = new Material(Shader.Find("Sprites/Default"));
+        m.mainTexture = tex;
+        m.color       = shadowColor;
+        sharedIsoMats[tex] = m;
+        return m;
+    }
+
+    void OnDestroy()
+    {
+        foreach (var kvp in sharedTraceMats) if (kvp.Value != null) Destroy(kvp.Value);
+        foreach (var kvp in sharedIsoMats)   if (kvp.Value != null) Destroy(kvp.Value);
+        sharedTraceMats.Clear();
+        sharedIsoMats.Clear();
+        DestroyForestImposter();
     }
 
     // -------------------------------------------------------------------------
@@ -566,7 +644,9 @@ public partial class MapDecorPlacer
             // Margin = mümkün olan en uzun smear (alçak güneş). lengthFactor tavanı shadowMaxLength.
             float margin = halfHeight * 2f * shadowMaxLength * shadowProjectLength * 1.1f;
 
-            Rect tr   = sprite.rect;
+            // textureRect: sprite bir SpriteAtlas'a paketlendiğinde texture atlas dokusuna döner ve
+            // sub-rect atlas koordinatlarında gelir; paketlenmemiş sprite'ta rect ile birebir aynıdır.
+            Rect tr   = sprite.textureRect;
             float ttw = sprite.texture.width;
             float tth = sprite.texture.height;
             Vector2 tUvMin = new Vector2(tr.x / ttw, tr.y / tth);
@@ -603,22 +683,14 @@ public partial class MapDecorPlacer
             tmf.sharedMesh = tmesh;
 
             MeshRenderer tmr = containerGo.AddComponent<MeshRenderer>();
-            // Per-pixel smear shader: her fragment _SmearDir boyunca geri yürür, caster izlerini birleştirir.
-            // Shader yoksa (ör. Always Included'da değil) Sprites/Default'a düş.
-            Shader traceShader = Shader.Find("Custom/MapShadowSmear");
-            Material tmat = new Material(traceShader != null ? traceShader : Shader.Find("Sprites/Default"));
-            tmat.mainTexture = sprite.texture;
-            tmat.color       = shadowColor;
-            if (traceShader != null)
-            {
-                tmat.SetVector("_UvRect", new Vector4(tUvMin.x, tUvMin.y, uvW, uvH));
-                tmat.SetFloat("_Steps", shadowTraceSteps);
-                tmat.SetFloat("_BlurRadius", shadowTraceBlur);
-                // Stray-cut = coverage low; high (solid) bir miktar üstünde → ramp = yumuşak kenar.
-                tmat.SetFloat("_EdgeLow", shadowTraceStrayCut);
-                tmat.SetFloat("_EdgeHigh", Mathf.Clamp01(shadowTraceStrayCut + 0.45f));
-            }
+            // Per-pixel smear shader — materyal texture başına PAYLAŞILIR; gölgeye özgü _UvRect /
+            // _SmearDir / _Color per-renderer MaterialPropertyBlock ile verilir (batching bozulmaz).
+            Material tmat = GetSharedTraceMaterial(sprite.texture);
+            var tmpb = new MaterialPropertyBlock();
+            tmpb.SetVector("_UvRect", new Vector4(tUvMin.x, tUvMin.y, uvW, uvH));
+            tmpb.SetColor("_Color", shadowColor);
             tmr.sharedMaterial = tmat;
+            tmr.SetPropertyBlock(tmpb);
             tmr.sortingOrder   = sortOrder - 1;
             if (sortingLayerName != null) tmr.sortingLayerName = sortingLayerName;
 
@@ -628,6 +700,7 @@ public partial class MapDecorPlacer
                 renderer    = tmr,
                 mesh        = tmesh,
                 material    = tmat,
+                mpb         = tmpb,
                 verts       = tverts,
                 halfWidth   = halfWidth,
                 halfHeight  = halfHeight,
@@ -711,7 +784,7 @@ public partial class MapDecorPlacer
         // Flat modda tüm sprite UV'si gölgeye basılır.
         // Iso modda sadece sprite'ın alt bandı (taban kısmı) sample edilir → gölgeye binanın
         // üst yüzeyi/çatı sızmaz, sadece taban silueti düşer.
-        Rect r   = sprite.rect;
+        Rect r   = sprite.textureRect; // atlas-güvenli: paketlenmemiş sprite'ta rect ile aynı
         float tw = sprite.texture.width;
         float th = sprite.texture.height;
         Vector2 uvMin = new Vector2(r.x / tw, r.y / th);
@@ -752,10 +825,12 @@ public partial class MapDecorPlacer
         mf.sharedMesh = mesh;
 
         MeshRenderer mr = containerGo.AddComponent<MeshRenderer>();
-        Material mat = new Material(Shader.Find("Sprites/Default"));
-        mat.mainTexture = sprite.texture;
-        mat.color       = shadowColor;
+        // Materyal texture başına paylaşılır; gölge rengi per-renderer MPB ile verilir.
+        Material mat = GetSharedIsoMaterial(sprite.texture);
+        var mpb = new MaterialPropertyBlock();
+        mpb.SetColor("_Color", shadowColor);
         mr.sharedMaterial = mat;
+        mr.SetPropertyBlock(mpb);
         mr.sortingOrder   = sortOrder - 1;
 
         return new ShadowHandle
@@ -764,6 +839,7 @@ public partial class MapDecorPlacer
             renderer    = mr,
             mesh        = mesh,
             material    = mat,
+            mpb         = mpb,
             verts       = verts,
             halfWidth   = halfWidth,
             halfHeight  = halfHeight,

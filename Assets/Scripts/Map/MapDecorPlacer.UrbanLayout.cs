@@ -372,6 +372,7 @@ public partial class MapDecorPlacer
                 spriteIndex   = valid[pick],
                 brokenIndex   = -1,
                 baseAlpha     = baseA,
+                baseScale     = scale, // zoom LOD ölçek telafisi bu orijinal ölçeğe göre uygulanır
             });
             spriteCounts[pick]++;
             placed++;

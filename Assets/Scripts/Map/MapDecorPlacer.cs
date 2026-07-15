@@ -49,14 +49,30 @@ public partial class MapDecorPlacer : MonoBehaviour
              "için tüm harita görünürken her ağacın dinamik gölgesini her frame yeniden kurmak en " +
              "pahalı iştir; bu ölçekte gölgeler zaten piksel-altıdır. Kapalıysa her zaman tam kalite.")]
     public bool shadowLodEnabled = true;
-    [Tooltip("Ölçek-bağımsız eşik: ekranda BİR DÜNYA BİRİMİNİN kapladığı piksel sayısı bu değerin " +
-             "altına düşünce (yeterince uzaklaşınca) AĞAÇ gölgeleri gizlenir ve güncelleme döngüsünden " +
-             "çıkarılır. Büyük = ağaç gölgeleri daha erken (daha az uzaklaşınca) kapanır.")]
-    [Range(2f, 64f)] public float treeShadowMinPixels = 16f;
-    [Tooltip("Bir dünya biriminin ekran pikseli bu değerin de altına inince (iyice uzaklaşınca) TÜM " +
-             "gölgeler (binalar dâhil) gizlenir → gölge güncelleme döngüsü tamamen atlanır. " +
-             "treeShadowMinPixels'ten küçük olmalı.")]
-    [Range(1f, 32f)] public float allShadowMinPixels = 5f;
+    [Tooltip("LOD tier 1 eşiği — TAM UZAKLAŞMANIN oranı (0..1). Kamera, haritanın tamamını gösteren " +
+             "zoom'un bu oranına ulaşınca ağaç gölgeleri kapanır + orman seyreltilir. 0.5 = zoom " +
+             "aralığının yarısından itibaren. Küçük = LOD daha erken devreye girer (daha hızlı).")]
+    [Range(0.1f, 0.95f)] public float treeLodZoomFraction = 0.45f;
+    [Tooltip("LOD tier 2 eşiği — TAM UZAKLAŞMANIN oranı (0..1). Bu orana ulaşınca TÜM gölgeler " +
+             "kapanır ve orman tek dokuya (imposter) döner. treeLodZoomFraction'dan büyük olmalı. " +
+             "1.0 = yalnızca tam uzaklaşınca.")]
+    [Range(0.2f, 1f)] public float allLodZoomFraction = 0.6f;
+    [Tooltip("Zoom LOD tier 1'de (ağaç gölgeleri kapandığında) AĞAÇLARIN bu oranı TAMAMEN gizlenir. " +
+             "Seçim tile koordinatından deterministik türetilir → zoom'da hep aynı ağaçlar gizlenir, " +
+             "titreme/popping olmaz. Kanopiler üst üste bindiği için orman silueti korunur. 0 = kapalı.")]
+    [Range(0f, 0.9f)] public float treeThinFraction = 0.4f;
+    [Tooltip("Tier 1'de gizlenMEyen ağaçlara uygulanan ölçek çarpanı — seyreltilen ormanın görsel " +
+             "kütlesini telafi eder. 1 = büyütme yok.")]
+    [Range(1f, 1.6f)] public float treeThinScaleBoost = 1.2f;
+
+    [Header("Forest Imposter — Uzak Zoomda Tek Doku Orman")]
+    [Tooltip("En uzak zoom seviyesinde (tier 2, tüm gölgeler kapalı) BÜTÜN ağaç GameObject'leri " +
+             "gizlenir ve yerlerine bir kez bake edilmiş tek bir orman dokusu (2 quad: gündüz+gece) " +
+             "gösterilir → binlerce draw call 2'ye iner. Bake, tier 2'ye ilk girişte yapılır.")]
+    public bool forestImposterEnabled = true;
+    [Tooltip("Imposter dokusunun uzun kenar çözünürlüğü (piksel). Büyük = daha net ama daha çok VRAM. " +
+             "Tier 2 zaten çok uzak zoom olduğu için 2048 genelde yeterli.")]
+    [Range(512, 4096)] public int forestImposterMaxRes = 2048;
 
     [Header("City Building Shadow — Dinamik Güneş Gölgesi")]
     [Tooltip("Flat gölge üretim modu. Projection = eski tek-pivot afin izdüşüm (karşılaştırma için). " +
@@ -235,6 +251,9 @@ public partial class MapDecorPlacer : MonoBehaviour
         public bool         isTrace;
         public float        uvW, uvH;     // sprite atlas sub-rect normalize genişlik/yükseklik
         public float        traceMargin;  // quad'ın sprite çevresine eklenen pay (local birim) = max smear
+        // Paylaşılan materyal + per-renderer parametreler (draw call batching bozulmasın diye
+        // materyal instance'ı yerine MaterialPropertyBlock kullanılır).
+        public MaterialPropertyBlock mpb;
     }
 
     private struct BuildingData
@@ -250,6 +269,8 @@ public partial class MapDecorPlacer : MonoBehaviour
         public int             spriteIndex;
         public int             brokenIndex;
         public float           baseAlpha;
+        public float           baseScale;   // ağaç LOD ölçek telafisi için orijinal ölçek (0 = kullanılmaz)
+        public bool            lodHidden;   // zoom LOD tarafından gizlendi → crossfade/gölge döngüleri atlar
     }
 
     private struct PortData
@@ -632,9 +653,11 @@ public partial class MapDecorPlacer : MonoBehaviour
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Kamera zoom'una göre gölge LOD seviyesini seçer (histerezisli, titremesin diye) ve değişince
-    /// uygular. Ölçek-bağımsız metrik: bir dünya biriminin ekranda kapladığı piksel = Screen.height /
-    /// (2 * orthographicSize). Uzaklaştıkça bu değer küçülür.
+    /// Kamera zoom'una göre gölge/dekor LOD seviyesini seçer (histerezisli, titremesin diye) ve
+    /// değişince uygular. Metrik: zoom01 = orthographicSize / (haritanın tamamını gösteren
+    /// orthographicSize). 1 = tam uzaklaşmış, küçüldükçe yakınlaşır. Harita ve ekran boyutundan
+    /// bağımsız çalışır — mutlak px/unit eşiği KULLANILMAZ (küçük dünya-ölçekli haritalarda o
+    /// eşiklere hiç inilmiyordu ve LOD hiç devreye girmiyordu).
     /// </summary>
     void UpdateShadowLod()
     {
@@ -647,14 +670,21 @@ public partial class MapDecorPlacer : MonoBehaviour
         }
         if (!lodCamera.orthographic) return;
 
-        float px = Screen.height / (2f * Mathf.Max(0.0001f, lodCamera.orthographicSize));
+        // Haritanın tamamını gösteren ortho size (MapController.CalculateMaxZoom ile aynı mantık).
+        float fullOrtho = ComputeFullMapOrthoSize();
+        if (fullOrtho <= 0f) return; // harita henüz yok → LOD atlanır
 
-        const float band = 0.12f; // histerezis payı — sınırda ileri-geri titremeyi önler
+        float zoom01 = lodCamera.orthographicSize / fullOrtho;
+
+        float t1 = Mathf.Clamp01(treeLodZoomFraction);
+        float t2 = Mathf.Max(Mathf.Clamp01(allLodZoomFraction), t1 + 0.05f);
+        const float band = 0.04f; // histerezis payı (zoom01 cinsinden) — sınırda titremeyi önler
+
         int desired;
         if (shadowLod < 0)
         {
             // İlk uygulama (Repaint sonrası) — düz eşik, histerezis yok.
-            desired = px < allShadowMinPixels ? 2 : (px < treeShadowMinPixels ? 1 : 0);
+            desired = zoom01 >= t2 ? 2 : (zoom01 >= t1 ? 1 : 0);
         }
         else
         {
@@ -662,26 +692,44 @@ public partial class MapDecorPlacer : MonoBehaviour
             switch (shadowLod)
             {
                 case 0:
-                    if      (px < allShadowMinPixels)  desired = 2;
-                    else if (px < treeShadowMinPixels) desired = 1;
+                    if      (zoom01 >= t2) desired = 2;
+                    else if (zoom01 >= t1) desired = 1;
                     break;
                 case 1:
-                    if      (px < allShadowMinPixels)               desired = 2;
-                    else if (px > treeShadowMinPixels * (1f + band)) desired = 0;
+                    if      (zoom01 >= t2)        desired = 2;
+                    else if (zoom01 < t1 - band)  desired = 0;
                     break;
                 case 2:
-                    if (px > allShadowMinPixels * (1f + band))
-                        desired = px > treeShadowMinPixels * (1f + band) ? 0 : 1;
+                    if (zoom01 < t2 - band)
+                        desired = zoom01 < t1 - band ? 0 : 1;
                     break;
             }
         }
 
-        if (desired != shadowLod) SetShadowLod(desired);
+        if (desired != shadowLod)
+        {
+            Debug.Log($"MapDecorPlacer: shadow/decor LOD {shadowLod} → {desired} " +
+                      $"(zoom={zoom01:F2}, eşikler: ağaç={t1:F2}, tümü={t2:F2})");
+            SetShadowLod(desired);
+        }
     }
 
     /// <summary>
-    /// LOD seviyesini uygular: bu seviyede kısılan gölgeleri gizler ve UpdateShadows'u zorlar
-    /// (görünür kalanları/yeniden açılanları bir sonraki tick'te doğru güncellesin diye).
+    /// Haritanın tamamını ekranda gösteren orthographicSize — MapController.CalculateMaxZoom ile
+    /// aynı formül, ama harita boyutundan bağımsızca burada hesaplanır (bağımlılık olmasın diye).
+    /// </summary>
+    float ComputeFullMapOrthoSize()
+    {
+        if (cachedMap == null || lodCamera == null) return -1f;
+        float halfH = cachedMap.height * 0.5f / pixelsPerUnit;
+        float halfW = cachedMap.width  * 0.5f / pixelsPerUnit;
+        return Mathf.Min(halfH, halfW / Mathf.Max(0.01f, lodCamera.aspect));
+    }
+
+    /// <summary>
+    /// LOD seviyesini uygular: bu seviyede kısılan gölgeleri gizler, ağaç LOD'unu (seyreltme /
+    /// imposter) uygular ve UpdateShadows'u zorlar (görünür kalanları/yeniden açılanları bir
+    /// sonraki tick'te doğru güncellesin diye).
     /// </summary>
     void SetShadowLod(int newLod)
     {
@@ -693,7 +741,69 @@ public partial class MapDecorPlacer : MonoBehaviour
             bool hide = newLod >= 2 || (newLod >= 1 && cityBuildings[i].isTree);
             if (hide) sh.transform.gameObject.SetActive(false);
         }
+        ApplyTreeLod(newLod);
         prevSunProgress = float.NaN; // UpdateShadows'u zorla → görünür gölgeler yeniden hesaplanır/açılır
+    }
+
+    /// <summary>
+    /// Ağaç LOD'u: tier 1'de ağaçların deterministik bir kısmı gizlenir (kalanlar hafif büyütülür),
+    /// tier 2'de (imposter bake edilebildiyse) TÜM ağaçlar gizlenip yerine tek orman dokusu gösterilir.
+    /// Tier 0'a dönüşte her şey aslına döner. Animatörler yalnızca tier 0'da çalışır.
+    /// </summary>
+    void ApplyTreeLod(int lod)
+    {
+        // Imposter yalnızca tier 2'de ve bake başarılıysa devreye girer; bake edilemiyorsa
+        // (kamera/harita yok) tier 1 seyreltmesi fallback olarak kalır.
+        bool imposterOn = lod >= 2 && forestImposterEnabled && EnsureForestImposterBaked();
+        SetForestImposterVisible(imposterOn);
+
+        for (int i = 0; i < cityBuildings.Count; i++)
+        {
+            BuildingData bd = cityBuildings[i];
+            if (!bd.isTree || bd.go == null) continue;
+
+            bool hide = imposterOn || (lod >= 1 && IsTreeThinned(bd));
+
+            if (bd.go.activeSelf == hide) bd.go.SetActive(!hide);
+
+            // Ölçek telafisi: seyreltilmiş ormanda kalan ağaçlar hafif büyür, tier 0'da asıl ölçek.
+            if (bd.baseScale > 0f)
+            {
+                float s = (!hide && lod >= 1 && !imposterOn) ? bd.baseScale * treeThinScaleBoost
+                                                             : bd.baseScale;
+                if (!Mathf.Approximately(bd.go.transform.localScale.x, s))
+                    bd.go.transform.localScale = new Vector3(s, s, 1f);
+            }
+
+            // Sprite animatörleri uzakta görünmez detaydır → yalnızca tier 0'da çalışsın.
+            SetAnimatorsEnabled(bd.go, lod == 0);
+
+            bd.lodHidden = hide;
+            cityBuildings[i] = bd;
+        }
+
+        // Crossfade, lodHidden bayrağına göre atlama yapar → mevcut ratio'yu yeniden uygula
+        // (yeniden görünür olan ağaçların alpha'sı güncel kalsın).
+        prevRatio = -1f;
+    }
+
+    /// <summary>
+    /// Tier 1 ağaç seyreltmesi: tile koordinatından deterministik hash → zoom değişince hep aynı
+    /// ağaçlar gizlenir (popping/titreme yok, frame maliyeti yok).
+    /// </summary>
+    bool IsTreeThinned(in BuildingData bd)
+    {
+        if (treeThinFraction <= 0f) return false;
+        uint h = (uint)(bd.tileX * 73856093) ^ (uint)(bd.tileY * 19349663);
+        h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
+        return (h & 0xFFFF) / 65535f < treeThinFraction;
+    }
+
+    static void SetAnimatorsEnabled(GameObject go, bool enabled)
+    {
+        var anims = go.GetComponentsInChildren<SpriteSheetAnimator>(true);
+        for (int i = 0; i < anims.Length; i++)
+            if (anims[i].enabled != enabled) anims[i].enabled = enabled;
     }
 
     // -------------------------------------------------------------------------
@@ -791,6 +901,7 @@ public partial class MapDecorPlacer : MonoBehaviour
         prevRatio = -1f;
         prevSunProgress = float.NaN;
         shadowLod = -1; // yeni binalara mevcut zoom seviyesini yeniden uygula
+        DestroyForestImposter(); // eski haritanın bake'i geçersiz — tier 2'ye ilk girişte yeniden bake edilir
         ClearDenseGrid();
         dayNightLookedUp = false;
         cachedMap = null;

@@ -60,7 +60,7 @@ public class MapController : MonoBehaviour
         float mapHeight = mapRenderer.bounds.size.y / 2f;
         float mapWidthSize = (mapRenderer.bounds.size.x / 2f) / cam.aspect;
         maxSize = Mathf.Min(mapHeight, mapWidthSize);
-        
+
         cam.orthographicSize = maxSize;
     }
 
