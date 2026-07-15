@@ -51,6 +51,8 @@ public class MapPainter : MonoBehaviour
     {
         if (settings == null) { Debug.LogError("MapPainter: BiomePaintSettings not assigned."); return; }
 
+        MapSeed.Apply("paint");
+
         int w = mapGenerator.width;
         int h = mapGenerator.height;
 

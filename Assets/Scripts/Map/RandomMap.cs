@@ -3,6 +3,17 @@ using System.Collections.Generic;
 
 public class MapGenerator : MonoBehaviour
 {
+    [Header("Seed")]
+    [Tooltip("Harita seed'i. useRandomSeed açıkken her üretimde rastgele seçilir ve buraya " +
+             "geri yazılır — üretilmiş haritanın seed'ini buradan kopyalayabilirsin. Aynı seed " +
+             "+ aynı ayarlar = aynı harita (yollar, binalar, petrol, hazine, fay dahil).")]
+    public int seed = 0;
+    [Tooltip("Açık: her üretimde yeni rastgele seed. Kapalı: yukarıdaki seed aynen kullanılır.")]
+    public bool useRandomSeed = true;
+
+    /// <summary>Üretilmiş haritanın seed'i (üretim sırasında yazılır).</summary>
+    public int CurrentSeed => seed;
+
     [Header("Map Size")]
     public int width = 256;
     public int height = 256;
@@ -122,8 +133,30 @@ public class MapGenerator : MonoBehaviour
         GenerateMap();
     }
 
+    [ContextMenu("Regenerate (Same Seed)")]
+    public void RegenerateSameSeed()
+    {
+        GenerateMap(seed);
+    }
+
+    /// <summary>Belirli bir seed ile harita üretir (useRandomSeed yok sayılır).</summary>
+    public void GenerateMap(int withSeed)
+    {
+        seed = withSeed;
+        bool prev = useRandomSeed;
+        useRandomSeed = false;
+        GenerateMap();
+        useRandomSeed = prev;
+    }
+
     public void GenerateMap()
     {
+        if (useRandomSeed)
+            seed = unchecked((int)System.DateTime.Now.Ticks);
+        MapSeed.SetSeed(seed);
+        MapSeed.Apply("island");
+        Debug.Log($"MapGenerator: seed = {seed}");
+
         landMap    = new bool[width, height];
         biomeMap   = new int[width, height];
         fogMap     = new float[width, height];
@@ -163,7 +196,10 @@ public class MapGenerator : MonoBehaviour
         CalculateBiomeRatios();
 
         mapTexture = CreateTexture();
-        ApplyTexture();
+        ApplyTexture(); // OnMapGenerated buradan tetiklenir → tüm downstream üretim senkron biter
+
+        // Üretim zinciri bitti — runtime rastgelelik (gemi/trafik/olaylar) seed'e bağlı kalmasın
+        MapSeed.RandomizeRuntime();
     }
 
     // -------------------------------------------------------------------------

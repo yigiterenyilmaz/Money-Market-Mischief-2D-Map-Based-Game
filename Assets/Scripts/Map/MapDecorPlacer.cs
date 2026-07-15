@@ -346,6 +346,8 @@ public partial class MapDecorPlacer : MonoBehaviour
         Clear();
         if (settings == null) { Debug.LogError("MapDecorPlacer: settings is null!"); return; }
 
+        MapSeed.Apply("decor");
+
         dayNight         = DayNightCycle.Instance;
         dayNightLookedUp = (dayNight != null);
         cachedMap        = map;

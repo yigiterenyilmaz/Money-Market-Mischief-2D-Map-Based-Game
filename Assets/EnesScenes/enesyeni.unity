@@ -10730,6 +10730,7 @@ MonoBehaviour:
   agriculturalCropRowPeriodTiles: 4
   agriculturalFieldIrregularity: 0.5
   agriculturalFieldAlignment: 0.7
+  agriculturalFieldNightDarken: 0.6
   agriculturalPlaceBuildings: 1
   agriculturalScaleRange: {x: 0.35, y: 0.55}
   agriculturalFillDensity: 0.5
@@ -10746,12 +10747,14 @@ MonoBehaviour:
   cityRegionBorderBuffer: 11
   minRegionTiles: 900
   cityMinRoadDistance: 3
+  shadowLodEnabled: 1
+  treeShadowMinPixels: 16
+  allShadowMinPixels: 5
   shadowMode: 1
   shadowTraceSteps: 29
   shadowTraceBlur: 0.69
   shadowTraceStrayCut: 0.164
   shadowColor: {r: 0, g: 0, b: 0, a: 0.52156866}
-  shadowNearScale: 0.489
   shadowTipRatio: 0.225
   shadowHeightRatio: 0.82
   shadowMaxLength: 0.34
@@ -10801,7 +10804,6 @@ MonoBehaviour:
   shipMinCorridorWidth: 5
   shipShoreAvoidanceWeight: 2.5
   shipTurnSpeed: 102
-  shipPathSmoothingPasses: 3
   industrialPlaceBuildings: 1
   industrialLineBothSides: 1
   industrialScaleRange: {x: 0.5, y: 0.8}
@@ -10818,9 +10820,10 @@ MonoBehaviour:
   urbanSpacing: 0.6
   urbanPlaceNature: 1
   urbanNatureScaleRange: {x: 0.3, y: 0.5}
-  urbanNatureFillDensity: 0.9
-  urbanNatureScatterRate: 3
-  urbanNatureSpacing: 0.03
+  urbanForestCoverage: 0.063
+  urbanForestSizeTiles: 20
+  urbanTreeDensity: 0.04
+  urbanTreeClearanceTiles: 5.11
 --- !u!114 &1710072564
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11017,9 +11020,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoadGenerator
   mapGenerator: {fileID: 1710072556}
-  highwayControlPoints: 3
   highwayCurviness: 0.428
-  highwaySplineResolution: 14
   highwayThickness: 5
   highwayOutlineWidth: 2
   highwayShoreBuffer: 11
@@ -11053,6 +11054,7 @@ MonoBehaviour:
   industrialBlockHeight: 51
   industrialGridThickness: 2
   industrialGridOutlineWidth: 1
+  industrialGridAlignToRegion: 1
   industrialGridAngle: 3.7
   industrialGridMinRegionTiles: 400
   industrialGridConnectToNetwork: 1
@@ -11113,7 +11115,6 @@ MonoBehaviour:
   speedVariation: 0.219
   directionLookahead: 10
   directionSmoothSpeed: 17.3
-  flipRotationSpeed: 94
 --- !u!114 &1710072576
 MonoBehaviour:
   m_ObjectHideFlags: 0

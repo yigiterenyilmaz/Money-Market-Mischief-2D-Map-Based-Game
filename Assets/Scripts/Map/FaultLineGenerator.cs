@@ -73,6 +73,8 @@ public class FaultLineGenerator : MonoBehaviour
     {
         if (mapGenerator == null) { Debug.LogError("FaultLineGenerator: mapGenerator is null!"); return; }
 
+        MapSeed.Apply("faults");
+
         int w = mapGenerator.width;
         int h = mapGenerator.height;
         faultMap       = new bool[w, h];

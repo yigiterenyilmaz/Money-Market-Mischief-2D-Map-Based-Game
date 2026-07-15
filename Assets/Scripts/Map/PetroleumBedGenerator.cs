@@ -60,6 +60,8 @@ public class PetroleumBedGenerator : MonoBehaviour
     {
         if (mapGenerator == null) { Debug.LogError("PetroleumBedGenerator: MapGenerator missing."); return; }
 
+        MapSeed.Apply("petroleum");
+
         int w = mapGenerator.width, h = mapGenerator.height;
         purityMap = new float[w, h];
         bedIndexMap = new int[w, h];

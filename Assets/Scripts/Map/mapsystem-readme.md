@@ -6,6 +6,18 @@ Her oyunda rastgele bir ada haritası üretilir. Harita üretildikten sonra böl
 
 ---
 
+## Seed Sistemi
+
+Harita üretimi tek bir seed ile deterministiktir (`MapSeed.cs`):
+
+- `MapGenerator.seed` + `useRandomSeed` inspector'dan ayarlanır. `useRandomSeed` açıkken her üretimde yeni seed seçilir ve `seed` alanına **geri yazılır** — üretilmiş haritanın seed'i buradan okunur/kopyalanır.
+- Kod tarafı: `mapGenerator.GenerateMap(12345)` belirli seed ile üretir; `MapSeed.CurrentSeed` aktif seed'i verir. Context menu: **Regenerate (Same Seed)**.
+- Her üretim aşaması (`island`, `paint`, `roads`, `decor`, `country`, `faults`, `petroleum`, `treasure`) kendi alt-seed'ini `MapSeed.Apply("faz")` ile tek seed'den türetir → event abone sırası değişse bile determinizm bozulmaz.
+- Aynı seed **+ aynı inspector ayarları** = aynı harita (yollar, binalar, petrol yatakları, hazineler, fay hatları, ülke özellikleri dahil).
+- Runtime rastgelelik (gemiler, trafik, tornado/deprem zamanlaması) seed'e bağlı DEĞİLDİR — üretim bitince `MapSeed.RandomizeRuntime()` global Random'ı serbest bırakır.
+
+---
+
 ## Akış Şeması
 
 ```

@@ -66,6 +66,8 @@ public class TreasureGenerator : MonoBehaviour
     {
         if (mapGenerator == null) { Debug.LogError("TreasureGenerator: MapGenerator missing."); return; }
 
+        MapSeed.Apply("treasure");
+
         treasures.Clear();
         tileToTreasure.Clear();
 

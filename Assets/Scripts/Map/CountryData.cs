@@ -52,6 +52,7 @@ public class CountryData : MonoBehaviour
 
     private void HandleMapGenerated()
     {
+        MapSeed.Apply("country");
         PullRegionRatios();
         GenerateCountryProperties();
         LogCountryData();

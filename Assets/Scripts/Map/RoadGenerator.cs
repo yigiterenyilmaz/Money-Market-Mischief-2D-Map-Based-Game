@@ -221,6 +221,8 @@ public class RoadGenerator : MonoBehaviour
             return;
         }
 
+        MapSeed.Apply("roads");
+
         _tex = mapTexture;
         _w = map.width;
         _h = map.height;
