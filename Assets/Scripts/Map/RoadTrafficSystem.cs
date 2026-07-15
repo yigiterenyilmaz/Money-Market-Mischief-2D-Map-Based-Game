@@ -171,24 +171,15 @@ public class RoadTrafficSystem : MonoBehaviour
         allPaths.Clear();
         activeCars.Clear();
 
-        var highways = roadGenerator.GetHighwaySegments();
-        if (highways != null)
-            foreach (var seg in highways)
-                if (seg != null && seg.Count >= 10) allPaths.Add(seg);
+        AddPathsSplitAtGaps(roadGenerator.GetHighwaySegments());
 
         highwayPathCount = allPaths.Count;
 
-        var branches = roadGenerator.GetBranchPaths();
-        if (branches != null)
-            foreach (var seg in branches)
-                if (seg != null && seg.Count >= 10) allPaths.Add(seg);
+        AddPathsSplitAtGaps(roadGenerator.GetBranchPaths());
 
         // Sanayi izgara sokaklari — branch'ler gibi (highwayPathCount sonrasi) eklenir, boylece
         // kavsaklarda her zaman donerler ve highway/branch agina BuildJunctions ile baglanir.
-        var gridPaths = roadGenerator.GetIndustrialGridPaths();
-        if (gridPaths != null)
-            foreach (var seg in gridPaths)
-                if (seg != null && seg.Count >= 10) allPaths.Add(seg);
+        AddPathsSplitAtGaps(roadGenerator.GetIndustrialGridPaths());
 
         BuildJunctions();
         SpawnCars();
@@ -363,28 +354,51 @@ public class RoadTrafficSystem : MonoBehaviour
 
                     if (car.pendingRespawn)
                     {
-                        //rastgele başka bir branch yolun ucundan fade-in ile spawn
                         car.pendingRespawn = false;
+
+                        float spd = baseSpeed / worldUnitsPerPixel * Random.Range(0.8f, 1.2f);
 
                         //rastgele bir branch yolun çıkmaz ucundan fade-in ile spawn
                         var deadEnd = FindRandomDeadEnd(car.pathIndex);
                         if (deadEnd.pathIndex >= 0)
                         {
                             car.pathIndex = deadEnd.pathIndex;
-                            car.position = deadEnd.pixelIndex;
-                            float spd = baseSpeed / worldUnitsPerPixel * Random.Range(0.8f, 1.2f);
+                            car.position  = deadEnd.pixelIndex;
                             //çıkmaz uçtan içeri doğru git
                             car.speedInPixels = deadEnd.pixelIndex == 0 ? spd : -spd;
-
-                            car.color = PickCarColor();
-                            car.daySR.color = car.color;
-                            car.previousPathIndex = -1;
-                            car.switchCooldown = 0f;
-
-                            car.smoothedWorldPos = InterpolatedWorldPos(car.pathIndex, car.position);
-                            car.go.transform.position = car.smoothedWorldPos;
-                            car.isFadingIn = true;
                         }
+                        else
+                        {
+                            //çıkmaz uç yoksa: rastgele bir yolun ortasından spawn —
+                            //araba görünmez + hızsız takılı kalmasın
+                            int p = Random.Range(0, allPaths.Count);
+                            car.pathIndex     = p;
+                            car.position      = Random.Range(0f, allPaths[p].Count - 1f);
+                            car.speedInPixels = Random.value > 0.5f ? spd : -spd;
+                        }
+
+                        //yeni gövde rengi — day + night katmanlarının RGB'si güncellenir,
+                        //alpha'yı ApplyCarAlpha belirler (fadeAlpha=0 → tek frame'lik
+                        //tam görünür "flash" olmaz)
+                        car.color = PickCarColor();
+                        car.daySR.color = new Color(car.color.r, car.color.g, car.color.b, 0f);
+                        if (car.nightSR != null)
+                            car.nightSR.color = new Color(car.color.r, car.color.g, car.color.b, 0f);
+                        ApplyCarAlpha(car);
+
+                        car.previousPathIndex = -1;
+                        car.switchCooldown    = 0f;
+
+                        car.smoothedWorldPos = InterpolatedWorldPos(car.pathIndex, car.position);
+                        car.go.transform.position = car.smoothedWorldPos;
+
+                        //spawn anında yönü de yola göre ayarla — eski rotasyonla belirip dönmesin
+                        int spawnIdx = Mathf.Clamp(Mathf.RoundToInt(car.position), 0, allPaths[car.pathIndex].Count - 1);
+                        car.smoothedDir     = GetDirectionAtIndex(car.pathIndex, spawnIdx, car.speedInPixels);
+                        car.currentRotation = DirToRotation(car.smoothedDir);
+                        car.go.transform.rotation = car.currentRotation;
+
+                        car.isFadingIn = true;
                     }
                 }
 
@@ -404,6 +418,10 @@ public class RoadTrafficSystem : MonoBehaviour
             //Kavsak gecis animasyonu — cubic bezier ile pozisyon+yon. Transition bitince yeni yola yerlesir.
             if (car.transitioning)
             {
+                //cooldown geçiş sırasında da işlesin (piksel cinsinden kat edilen yol)
+                if (car.switchCooldown > 0f)
+                    car.switchCooldown -= Mathf.Abs(car.pendingSpeed) * dt;
+
                 car.transT += dt / Mathf.Max(0.001f, car.transDuration);
                 float t = Mathf.Clamp01(car.transT);
                 float u = 1f - t;
@@ -429,6 +447,10 @@ public class RoadTrafficSystem : MonoBehaviour
                     car.position      = car.pendingPosition;
                     car.speedInPixels = car.pendingSpeed;
                     car.smoothedDir   = car.pendingEndDir;
+
+                    //geçiş sırasında yol kırılmış olabilir — inişte kontrol et
+                    if (CrackAhead(car.pathIndex, car.position, car.speedInPixels))
+                        car.speedInPixels = 0f;
                 }
 
                 activeCars[i] = car;
@@ -472,24 +494,21 @@ public class RoadTrafficSystem : MonoBehaviour
             if (car.switchCooldown > 0f)
                 car.switchCooldown -= Mathf.Abs(car.speedInPixels) * dt;
 
+            //0.12f/sn ≈ eski 0.002f/frame @60fps — dt ile çarpınca frame hızından bağımsız
             int currentIdx = Mathf.Clamp(Mathf.RoundToInt(car.position), 0, path.Count - 1);
-            if (car.switchCooldown <= 0f && car.pathIndex < highwayPathCount && Random.value < 0.002f)
+            if (car.switchCooldown <= 0f && car.pathIndex < highwayPathCount && Random.value < 0.12f * dt)
             {
                 var midConns = FindConnections(car.pathIndex, currentIdx, 5);
                 //önceki yolu filtrele
                 midConns.RemoveAll(e => e.pathIndex == car.previousPathIndex);
                 if (midConns.Count > 0)
                 {
-                    var target    = midConns[Random.Range(0, midConns.Count)];
-                    var currentPx = path[currentIdx];
-                    float absSpd  = Mathf.Abs(car.speedInPixels);
-                    float newPos  = FindNearestPixelOnPath(allPaths[target.pathIndex], currentPx);
-                    float newSpd  = AlignSpeedAwayFromJunction(target.pathIndex, Mathf.RoundToInt(newPos), currentPx, absSpd);
-                    car.previousPathIndex = car.pathIndex;
-                    car.switchCooldown = 150f;
-                    BeginCarTransition(car, target.pathIndex, newPos, newSpd);
-                    activeCars[i] = car;
-                    continue;
+                    var target = midConns[Random.Range(0, midConns.Count)];
+                    if (TryBeginSwitch(car, target, path[currentIdx]))
+                    {
+                        activeCars[i] = car;
+                        continue;
+                    }
                 }
             }
 
@@ -517,18 +536,16 @@ public class RoadTrafficSystem : MonoBehaviour
 
                 if (shouldSwitch && car.switchCooldown <= 0f)
                 {
-                    var target    = connections[Random.Range(0, connections.Count)];
-                    var currentPx = path[endIdx];
-                    float absSpd  = Mathf.Abs(car.speedInPixels);
-                    float newPos  = FindNearestPixelOnPath(allPaths[target.pathIndex], currentPx);
-                    float newSpd  = AlignSpeedAwayFromJunction(target.pathIndex, Mathf.RoundToInt(newPos), currentPx, absSpd);
-                    car.previousPathIndex = car.pathIndex;
-                    car.switchCooldown = 150f;
-                    BeginCarTransition(car, target.pathIndex, newPos, newSpd);
-                    activeCars[i] = car;
-                    continue;
+                    var target = connections[Random.Range(0, connections.Count)];
+                    if (TryBeginSwitch(car, target, path[endIdx]))
+                    {
+                        activeCars[i] = car;
+                        continue;
+                    }
                 }
-                else if (unfilteredCount > 0 || car.pathIndex < highwayPathCount)
+
+                //geçiş yapılmadıysa (şans tutmadı / cooldown / hedef çok uzak) normal akış
+                if (unfilteredCount > 0 || car.pathIndex < highwayPathCount)
                 {
                     //kavşak var ama dönmedi veya ana otoban — geri dön
                     if (reachedEnd)   { car.position = pathLen - 1; car.speedInPixels = -Mathf.Abs(car.speedInPixels); }
@@ -719,25 +736,40 @@ public class RoadTrafficSystem : MonoBehaviour
 
         for (int i = 0; i < activeCars.Count; i++)
         {
-            Car car  = activeCars[i];
-            var path = allPaths[car.pathIndex];
+            Car car = activeCars[i];
 
-            int curIdx   = Mathf.Clamp(Mathf.RoundToInt(car.position), 0, path.Count - 1);
-            int lookDir  = car.speedInPixels >= 0 ? 1 : -1;
-            int lookEnd  = curIdx + lookDir * (directionLookahead + 8);
-            int lo       = Mathf.Clamp(Mathf.Min(curIdx, lookEnd), 0, path.Count - 1);
-            int hi       = Mathf.Clamp(Mathf.Max(curIdx, lookEnd), 0, path.Count - 1);
+            //geçiş halindeki arabanın pathIndex/position'ı hâlâ eski yolu gösterir —
+            //iniş yapacağı pending yolu kontrol et, kırıksa iniş hızını sıfırla
+            int   pathIdx = car.transitioning ? car.pendingPathIndex : car.pathIndex;
+            float pos     = car.transitioning ? car.pendingPosition  : car.position;
+            float spd     = car.transitioning ? car.pendingSpeed     : car.speedInPixels;
 
-            for (int pi = lo; pi <= hi; pi++)
+            if (CrackAhead(pathIdx, pos, spd))
             {
-                if (!brokenRoadTiles.Contains(path[pi])) continue;
-                car.speedInPixels = 0f;
-                activeCars[i]     = car;
-                break;
+                if (car.transitioning) car.pendingSpeed  = 0f;
+                else                   car.speedInPixels = 0f;
+                activeCars[i] = car;
             }
         }
 
         Debug.Log($"RoadTrafficSystem: roads broken, cars facing cracks stopped.");
+    }
+
+    //Bulunulan tile dahil, gidiş yönünde lookahead penceresinde kırık tile var mı?
+    bool CrackAhead(int pathIndex, float position, float speed)
+    {
+        if (brokenRoadTiles.Count == 0) return false;
+
+        var path    = allPaths[pathIndex];
+        int curIdx  = Mathf.Clamp(Mathf.RoundToInt(position), 0, path.Count - 1);
+        int lookDir = speed >= 0 ? 1 : -1;
+        int lookEnd = curIdx + lookDir * (directionLookahead + 8);
+        int lo      = Mathf.Clamp(Mathf.Min(curIdx, lookEnd), 0, path.Count - 1);
+        int hi      = Mathf.Clamp(Mathf.Max(curIdx, lookEnd), 0, path.Count - 1);
+
+        for (int pi = lo; pi <= hi; pi++)
+            if (brokenRoadTiles.Contains(path[pi])) return true;
+        return false;
     }
 
     public bool IsRoadBroken(int x, int y) => brokenRoadTiles.Contains(new Vector2Int(x, y));
@@ -852,23 +884,37 @@ public class RoadTrafficSystem : MonoBehaviour
         car.pendingSpeed     = newSpeed;
     }
 
-    int FindNearestPixelOnPath(List<Vector2Int> path, Vector2Int fromPixel)
+    //Tam tarama — kaba örnekleme (step) yanlış lokal minimuma takılıp arabayı yolun
+    //bambaşka bir bölümüne "ışınlayabiliyordu". Sadece yol değiştirme anında çağrıldığı
+    //için tam taramanın maliyeti önemsiz.
+    int FindNearestPixelOnPath(List<Vector2Int> path, Vector2Int fromPixel, out float bestDist)
     {
-        int   bestIdx  = 0;
-        float bestDist = float.MaxValue;
-        int   step     = Mathf.Max(1, path.Count / 100);
-        for (int i = 0; i < path.Count; i += step)
-        {
-            float d = Vector2Int.Distance(fromPixel, path[i]);
-            if (d < bestDist) { bestDist = d; bestIdx = i; }
-        }
-        int from = Mathf.Max(0, bestIdx - step), to = Mathf.Min(path.Count - 1, bestIdx + step);
-        for (int i = from; i <= to; i++)
+        int bestIdx = 0;
+        bestDist    = float.MaxValue;
+        for (int i = 0; i < path.Count; i++)
         {
             float d = Vector2Int.Distance(fromPixel, path[i]);
             if (d < bestDist) { bestDist = d; bestIdx = i; }
         }
         return bestIdx;
+    }
+
+    //Yeni yoldaki en yakın nokta makul uzaklıktaysa (maxSwitchJumpPixels) geçişi başlatır.
+    //Uzaksa false döner — araba yol değiştirmez, blokların üzerinden uçmaz.
+    const float maxSwitchJumpPixels = 12f;
+
+    bool TryBeginSwitch(Car car, JunctionEntry target, Vector2Int currentPx)
+    {
+        float nearestDist;
+        int newIdx = FindNearestPixelOnPath(allPaths[target.pathIndex], currentPx, out nearestDist);
+        if (nearestDist > maxSwitchJumpPixels) return false;
+
+        float absSpd = Mathf.Abs(car.speedInPixels);
+        float newSpd = AlignSpeedAwayFromJunction(target.pathIndex, newIdx, currentPx, absSpd);
+        car.previousPathIndex = car.pathIndex;
+        car.switchCooldown    = 150f;
+        BeginCarTransition(car, target.pathIndex, newIdx, newSpd);
+        return true;
     }
 
     Vector2 GetDirectionAtIndex(int pathIndex, int idx, float speed)
@@ -929,29 +975,37 @@ public class RoadTrafficSystem : MonoBehaviour
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Yol path'lerinde su boşluklarını tespit eder.
-    /// Ardışık pikseller arası mesafe 3'ten fazlaysa, boşluğun iki tarafını
-    /// brokenRoadTiles'a ekler — arabalar bu noktada durur.
+    /// Path'leri süreksizlik noktalarından bölerek allPaths'e ekler.
+    /// Ardışık pikseller arası mesafe 3'ten fazlaysa (su boşluğu vb.) path o noktadan
+    /// ikiye ayrılır — araba tek index adımında boşluğun üzerinden "ışınlanamaz".
+    /// 10 pikselden kısa parçalar elenir (mevcut minimum path uzunluğu kuralı).
     /// </summary>
-    void DetectPathGaps()
+    void AddPathsSplitAtGaps(IReadOnlyList<List<Vector2Int>> segments)
     {
-        for (int p = 0; p < allPaths.Count; p++)
+        if (segments == null) return;
+        foreach (var seg in segments)
         {
-            var path = allPaths[p];
-            for (int i = 0; i < path.Count - 1; i++)
+            if (seg == null || seg.Count < 10) continue;
+            int pieceStart = 0;
+            for (int i = 0; i < seg.Count - 1; i++)
             {
-                float dist = Vector2Int.Distance(path[i], path[i + 1]);
-                if (dist > 3f)
+                if (Vector2Int.Distance(seg[i], seg[i + 1]) > 3f)
                 {
-                    //büyük atlama = su boşluğu — her iki tarafı da kırık olarak işaretle
-                    brokenRoadTiles.Add(path[i]);
-                    brokenRoadTiles.Add(path[i + 1]);
-                    //etrafındaki birkaç pikseli de ekle ki lookahead yakalasın
-                    for (int j = Mathf.Max(0, i - 3); j <= Mathf.Min(path.Count - 1, i + 4); j++)
-                        brokenRoadTiles.Add(path[j]);
+                    AddPathPiece(seg, pieceStart, i);
+                    pieceStart = i + 1;
                 }
             }
+            AddPathPiece(seg, pieceStart, seg.Count - 1);
         }
+    }
+
+    void AddPathPiece(List<Vector2Int> seg, int from, int to)
+    {
+        int len = to - from + 1;
+        if (len < 10) return;
+        //boşluk yoksa segmenti kopyalamadan olduğu gibi ekle
+        if (from == 0 && to == seg.Count - 1) { allPaths.Add(seg); return; }
+        allPaths.Add(seg.GetRange(from, len));
     }
 
     void BuildJunctions()
@@ -1028,6 +1082,14 @@ public class RoadTrafficSystem : MonoBehaviour
                         }
                         if (blocked) continue;
                     }
+
+                    //BuildJunctions çiftleri simetrik ürettiğinden aynı hedef iki kez
+                    //gelebilir — tekrarları ele, rastgele seçim tarafsız kalsın
+                    bool duplicate = false;
+                    foreach (var r in results)
+                        if (r.pathIndex == e.pathIndex && Mathf.Abs(r.pixelIndex - e.pixelIndex) <= 6)
+                        { duplicate = true; break; }
+                    if (duplicate) continue;
 
                     results.Add(e);
                 }
