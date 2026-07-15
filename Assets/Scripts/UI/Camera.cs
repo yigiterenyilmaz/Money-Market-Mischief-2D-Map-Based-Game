@@ -9,8 +9,11 @@ public class MapController : MonoBehaviour
 
     [Header("Zoom Settings")]
     public float zoomSpeed = 1.2f;
+    [Tooltip("Zoom yumuşatma hızı: büyük değer = hedefe daha çabuk oturur, küçük değer = daha yumuşak/uzun süzülme.")]
+    public float zoomSmoothing = 10f;
     public float minSize = 2f;
     private float maxSize;
+    private float targetSize;
 
     private Camera cam;
     private Vector3 dragOrigin;
@@ -62,6 +65,7 @@ public class MapController : MonoBehaviour
         maxSize = Mathf.Min(mapHeight, mapWidthSize);
 
         cam.orthographicSize = maxSize;
+        targetSize = maxSize;
     }
 
     void CenterCamera()
@@ -79,6 +83,8 @@ public class MapController : MonoBehaviour
             HandleZoom();
             HandlePan();
         }
+
+        ApplySmoothZoom();
 
         transform.position = ClampCamera(transform.position);
     }
@@ -102,16 +108,32 @@ public class MapController : MonoBehaviour
         float scroll = Mouse.current.scroll.ReadValue().y;
         if (scroll == 0) return;
 
+        // Çarpımsal (üstel) zoom: her scroll adımı hedef boyutu sabit bir ORANLA değiştirir,
+        // böylece zoom hissi her ölçekte aynıdır. Girdi yalnızca HEDEFİ günceller; kamera
+        // hedefe ApplySmoothZoom içinde kademesiz süzülür — böylece sprite LOD/detay
+        // geçişleri tek karede "pat" diye olmaz.
+        float zoomFactor = Mathf.Exp(-scroll * zoomSpeed * 0.001f);
+        targetSize = Mathf.Clamp(targetSize * zoomFactor, minSize, maxSize);
+    }
+
+    void ApplySmoothZoom()
+    {
+        if (Mathf.Approximately(cam.orthographicSize, targetSize)) return;
+
         Vector3 mouseBefore = GetMouseWorldPosition();
 
-        // Çarpımsal (üstel) zoom: her scroll adımı orthographicSize'ı sabit bir ORANLA değiştirir,
-        // böylece zoom hissi her ölçekte aynıdır. Eski lineer adım (size - sabit) tam yakınken
-        // (minSize'a yakın) sabit adımı boyutun büyük bir yüzdesi yapıyordu → son iki kademe
-        // arasında ~2x sıçrama. Üstel adım, yakınlaştıkça mutlak adımı otomatik küçültür.
-        float zoomFactor = Mathf.Exp(-scroll * zoomSpeed * 0.001f);
-        float newSize    = cam.orthographicSize * zoomFactor;
-        cam.orthographicSize = Mathf.Clamp(newSize, minSize, maxSize);
+        // Kare hızından bağımsız üstel yumuşatma: her karede kalan mesafenin sabit bir
+        // oranını kapatır, hedefe yaklaştıkça doğal olarak yavaşlar.
+        float t = 1f - Mathf.Exp(-zoomSmoothing * Time.deltaTime);
+        float newSize = Mathf.Lerp(cam.orthographicSize, targetSize, t);
 
+        // Hedefe çok yaklaşınca sonsuz küçük adımlarla sürünmesin diye kilitle.
+        if (Mathf.Abs(newSize - targetSize) < 0.001f)
+            newSize = targetSize;
+
+        cam.orthographicSize = newSize;
+
+        // Zoom animasyonu boyunca imlecin altındaki dünya noktasını sabit tut.
         Vector3 mouseAfter = GetMouseWorldPosition();
         transform.position += (mouseBefore - mouseAfter);
     }
