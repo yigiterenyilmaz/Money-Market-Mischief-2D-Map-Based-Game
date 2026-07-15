@@ -103,8 +103,9 @@ public partial class MapDecorPlacer
             }
         }
 
-        // Orman imposter'ı (uzak zoom) — bake edilmiş gündüz/gece dokuları aynı eğriyle geçişir.
+        // Orman + bina imposter'ları (uzak zoom) — bake edilmiş gündüz/gece dokuları aynı eğriyle geçişir.
         UpdateForestImposterCrossfade(dayFadeFactor, nightFactor);
+        UpdateBuildingImposterCrossfade(dayFadeFactor, nightFactor);
 
         // Ekili tarlalar (crop fields) — gece kararması. Debug overlay modunda dokunma.
         if (!debugOverlayDayNight)
@@ -476,12 +477,16 @@ public partial class MapDecorPlacer
     // sızıntısı. Şimdi materyal texture başına cache'lenir; gölgeye özgü parametreler (_UvRect,
     // _SmearDir, _Color) MaterialPropertyBlock ile renderer üzerinde taşınır → batching bozulmaz.
 
-    private readonly Dictionary<Texture, Material> sharedTraceMats = new Dictionary<Texture, Material>();
-    private readonly Dictionary<Texture, Material> sharedIsoMats   = new Dictionary<Texture, Material>();
+    private readonly Dictionary<Texture, Material> sharedTraceMats    = new Dictionary<Texture, Material>();
+    private readonly Dictionary<Texture, Material> sharedTraceLowMats = new Dictionary<Texture, Material>();
+    private readonly Dictionary<Texture, Material> sharedIsoMats      = new Dictionary<Texture, Material>();
 
-    Material GetSharedTraceMaterial(Texture tex)
+    // lowDetail=true → AĞAÇ gölgeleri: az adım, blur yok, düşük _EdgeHigh (ilk opak örnekte erken
+    // çıkış). Ağaç sayısı binalardan kat kat fazla olduğu için asıl fragment maliyeti buradan gelir.
+    Material GetSharedTraceMaterial(Texture tex, bool lowDetail = false)
     {
-        if (sharedTraceMats.TryGetValue(tex, out var m) && m != null) return m;
+        var cache = lowDetail ? sharedTraceLowMats : sharedTraceMats;
+        if (cache.TryGetValue(tex, out var m) && m != null) return m;
 
         Shader traceShader = Shader.Find("Custom/MapShadowSmear");
         m = new Material(traceShader != null ? traceShader : Shader.Find("Sprites/Default"));
@@ -489,13 +494,25 @@ public partial class MapDecorPlacer
         m.color       = shadowColor;
         if (traceShader != null)
         {
-            // Global kalite parametreleri — tüm gölgeler için ortak, materyalde kalır.
-            m.SetFloat("_Steps", shadowTraceSteps);
-            m.SetFloat("_BlurRadius", shadowTraceBlur);
-            m.SetFloat("_EdgeLow", shadowTraceStrayCut);
-            m.SetFloat("_EdgeHigh", Mathf.Clamp01(shadowTraceStrayCut + 0.45f));
+            if (lowDetail)
+            {
+                // BlurRadius 0 → Coverage tüm örnekleri aynı texel'den okur (0 ya da 1 döner),
+                // düşük _EdgeHigh ile ilk opak vuruşta march döngüsü kırılır → en pahalı yol kısalır.
+                m.SetFloat("_Steps", Mathf.Max(4, treeShadowTraceSteps));
+                m.SetFloat("_BlurRadius", 0f);
+                m.SetFloat("_EdgeLow", 0.05f);
+                m.SetFloat("_EdgeHigh", 0.3f);
+            }
+            else
+            {
+                // Global kalite parametreleri — tüm gölgeler için ortak, materyalde kalır.
+                m.SetFloat("_Steps", shadowTraceSteps);
+                m.SetFloat("_BlurRadius", shadowTraceBlur);
+                m.SetFloat("_EdgeLow", shadowTraceStrayCut);
+                m.SetFloat("_EdgeHigh", Mathf.Clamp01(shadowTraceStrayCut + 0.45f));
+            }
         }
-        sharedTraceMats[tex] = m;
+        cache[tex] = m;
         return m;
     }
 
@@ -512,11 +529,14 @@ public partial class MapDecorPlacer
 
     void OnDestroy()
     {
-        foreach (var kvp in sharedTraceMats) if (kvp.Value != null) Destroy(kvp.Value);
-        foreach (var kvp in sharedIsoMats)   if (kvp.Value != null) Destroy(kvp.Value);
+        foreach (var kvp in sharedTraceMats)    if (kvp.Value != null) Destroy(kvp.Value);
+        foreach (var kvp in sharedTraceLowMats) if (kvp.Value != null) Destroy(kvp.Value);
+        foreach (var kvp in sharedIsoMats)      if (kvp.Value != null) Destroy(kvp.Value);
         sharedTraceMats.Clear();
+        sharedTraceLowMats.Clear();
         sharedIsoMats.Clear();
         DestroyForestImposter();
+        DestroyBuildingImposter();
     }
 
     // -------------------------------------------------------------------------
@@ -539,7 +559,7 @@ public partial class MapDecorPlacer
 
     (GameObject go, SpriteRenderer daySR, SpriteRenderer nightSR, ShadowHandle shadow) CreateCityBuildingObject(
         Sprite daySprite, Sprite nightSprite, float wx, float wy,
-        float scale, float baseA, int sortOrder, bool isIsometric)
+        float scale, float baseA, int sortOrder, bool isIsometric, bool lowDetailShadow = false)
     {
         GameObject go = new GameObject("CityBuilding");
         go.transform.SetParent(transform);
@@ -548,7 +568,8 @@ public partial class MapDecorPlacer
 
         // Gölge — trapez mesh. UpdateShadows her frame vertex + pozisyon günceller.
         // isIsometric=true ise pivot/UV/yön izometrik moda göre ayarlanır.
-        ShadowHandle shadow = AddShadow(go, daySprite, sortOrder, isIsometric);
+        // lowDetailShadow=true (ağaçlar) → ucuz trace materyali (az adım, blur yok).
+        ShadowHandle shadow = AddShadow(go, daySprite, sortOrder, isIsometric, lowDetailShadow);
 
         SpriteRenderer daySR = go.AddComponent<SpriteRenderer>();
         daySR.sprite       = daySprite;
@@ -616,7 +637,7 @@ public partial class MapDecorPlacer
     // sprite-lokal birimdedir; lamba/araba çok küçük ölçekli (0.01/0.05) olduğundan o nudge dünyada
     // ezilir. Lamba/araba bu parametreyle dünya-uzayı bir kaldırma geçirip gölgeyi objeye hizalar.
     public ShadowHandle CreateFlatShadow(GameObject parent, Sprite sprite, int sortOrder, string sortingLayerName,
-                                         float localBaseRaise = 0f)
+                                         float localBaseRaise = 0f, bool lowDetail = false)
     {
         // Container — origin sabit; UpdateFlatShadow localRotation/scale (projeksiyon) veya
         // _SmearDir (trace) günceller.
@@ -685,7 +706,7 @@ public partial class MapDecorPlacer
             MeshRenderer tmr = containerGo.AddComponent<MeshRenderer>();
             // Per-pixel smear shader — materyal texture başına PAYLAŞILIR; gölgeye özgü _UvRect /
             // _SmearDir / _Color per-renderer MaterialPropertyBlock ile verilir (batching bozulmaz).
-            Material tmat = GetSharedTraceMaterial(sprite.texture);
+            Material tmat = GetSharedTraceMaterial(sprite.texture, lowDetail);
             var tmpb = new MaterialPropertyBlock();
             tmpb.SetVector("_UvRect", new Vector4(tUvMin.x, tUvMin.y, uvW, uvH));
             tmpb.SetColor("_Color", shadowColor);
@@ -743,12 +764,13 @@ public partial class MapDecorPlacer
         };
     }
 
-    ShadowHandle AddShadow(GameObject parent, Sprite sprite, int sortOrder, bool isIsometric)
+    ShadowHandle AddShadow(GameObject parent, Sprite sprite, int sortOrder, bool isIsometric,
+                           bool lowDetail = false)
     {
         // Flat (Projection/Trace) gölge ortak public CreateFlatShadow'da — lamba/araba birebir
         // aynı mantığı kullanır. Iso gölge bu sınıfa özel kalır (aşağıda).
         if (!isIsometric)
-            return CreateFlatShadow(parent, sprite, sortOrder, null);
+            return CreateFlatShadow(parent, sprite, sortOrder, null, 0f, lowDetail);
 
         // Container — bina merkezinde sabit; UpdateShadows localPosition + scale.x (flip) günceller.
         GameObject containerGo = new GameObject("Shadow");

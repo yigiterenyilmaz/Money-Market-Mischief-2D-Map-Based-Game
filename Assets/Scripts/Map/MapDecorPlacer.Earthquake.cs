@@ -59,7 +59,10 @@ public partial class MapDecorPlacer
         }
 
         if (count > 0)
+        {
             Debug.Log($"MapDecorPlacer: {count} building(s) marked broken.");
+            InvalidateBuildingImposter(); // bake artık eski sprite/tint'leri gösteriyor → yenile
+        }
 
         return count;
     }
@@ -97,6 +100,7 @@ public partial class MapDecorPlacer
             destroyed++;
         }
         Debug.Log($"MapDecorPlacer: {destroyed} building(s) destroyed by fault lines.");
+        if (destroyed > 0) InvalidateBuildingImposter();
     }
 
     public void DestroyBuildingsInRadius(FaultLineGenerator faultGen, Vector2Int epicenter, int radius)
@@ -115,5 +119,6 @@ public partial class MapDecorPlacer
             destroyed++;
         }
         Debug.Log($"MapDecorPlacer: {destroyed} building(s) destroyed by earthquake.");
+        if (destroyed > 0) InvalidateBuildingImposter();
     }
 }

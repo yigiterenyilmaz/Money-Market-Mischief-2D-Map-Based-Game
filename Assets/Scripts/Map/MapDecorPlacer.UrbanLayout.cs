@@ -34,6 +34,11 @@ public partial class MapDecorPlacer
              "Seyrek görünüm için sprite yarıçapından büyük tutun.")]
     [Range(0.1f, 4f)] public float urbanSpacing = 0.8f;
 
+    [Tooltip("Bölgesel bina kontrastı (0..1). 0 = binalar tüm urban araziye eşit serpilir (eski davranış); " +
+             "1 = binalar yerleşim öbeklerinde toplanır ve geniş bölgeler TAMAMEN boş (binasız) kalır. " +
+             "Orman bölge gürültüsünden bağımsız → boş çayırlar, ormanlık ve yerleşim bölgeleri karışır.")]
+    [Range(0f, 1f)] public float urbanBuildingRegionVariation = 0.6f;
+
     [Header("Urban Layout — Ağaç/Doğa Dağılımı")]
     [Tooltip("Urban ağaçlarını/doğa öğelerini yerleştir (biome 1). Kapalıysa hiç ağaç konmaz.")]
     public bool urbanPlaceNature = true;
@@ -52,6 +57,20 @@ public partial class MapDecorPlacer
     [Tooltip("Orman İÇİ ağaç sıklığı (0..1). 1 = kanopiler iç içe (sık orman), 0 = ağaçlar aralıklı. " +
              "Aralık ağaç SPRITE boyutuna göre otomatik ölçeklenir — sabit dünya-birimi ayarı YOK.")]
     [Range(0f, 1f)] public float urbanTreeDensity = 0.85f;
+
+    [Tooltip("Urban arazinin ne kadarı ÇIPLAK (tamamen ağaçsız) kalsın (0..1). Çıplak bölgeler orman " +
+             "yoğunluğunu düşürmez — o bölgede orman HİÇ oluşmaz. 0 = çıplak bölge yok.")]
+    [Range(0f, 1f)] public float urbanBareFraction = 0.35f;
+
+    [Tooltip("Çıplak bölgelerin BÜYÜKLÜĞÜ (tile, dalga boyu). Orman öbek boyutundan çok daha büyük " +
+             "tutun ki çıplak alanlar sıradan orman açıklığı gibi değil, dev yalın kesitler gibi " +
+             "okunsun. Orman boyutunun 6–10 katı iyi başlangıçtır.")]
+    [Range(50f, 1000f)] public float urbanBareRegionSizeTiles = 350f;
+
+    [Tooltip("Orman yoğunluğunun harita DIŞ KENARINA doğru sönme bandı (tile). Kenara bu mesafeden " +
+             "yakın ormanlar kademeli seyrekleşir → ormanlar üretim sınırında tam yoğunlukla bitmek " +
+             "yerine kenara doğru cılızlaşıp dağılır. 0 = kapalı.")]
+    [Range(0f, 200f)] public float urbanForestEdgeFadeTiles = 60f;
 
     [Tooltip("Ağaçların bina/yol kenarından koruyacağı boşluk (TILE). Ağacın GERÇEK sprite tabanına göre " +
              "ölçülür (binaların şişirilmiş yerleşim yarıçapına DEĞİL) → küçük değerler yeterlidir. 2–5.")]
@@ -96,6 +115,16 @@ public partial class MapDecorPlacer
         float overlapR = Mathf.Max(0.1f, urbanSpacing);
         int attempts  = Mathf.Max(1, Mathf.RoundToInt(tiles.Count * density * rate));
 
+        // Bölgesel yerleşim gürültüsü: makro Perlin bir "yerleşim uygunluğu" haritası verir; düşük
+        // bölgelerde bina hiç konmaz → urban arazinin bir kısmı gerçekten BOŞ kalır, binalar köy/kasaba
+        // öbekleri halinde toplanır. Orman bölge gürültüsünden bağımsız seed → boş çayır, ormanlık ve
+        // yerleşim bölgeleri doğal biçimde karışır. cutoff bVar ile büyür: 0 = eski eşit serpme.
+        float bVar        = Mathf.Clamp01(urbanBuildingRegionVariation);
+        float bRegionScale = Mathf.Max(6f, urbanForestSizeTiles) * 3f;
+        float bSeedX = Random.Range(0f, 500f);
+        float bSeedY = Random.Range(0f, 500f);
+        float bCutoff = 0.45f * bVar;
+
         int placed = 0;
         int[] spriteCounts = new int[valid.Count];
 
@@ -107,6 +136,14 @@ public partial class MapDecorPlacer
             if (!map.IsLand(tx, ty)) continue;
             if (map.GetBiome(tx, ty) != 1) continue;
             if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) continue;
+
+            if (bVar > 0f)
+            {
+                float m = Mathf.PerlinNoise(bSeedX + tx / bRegionScale, bSeedY + ty / bRegionScale);
+                // cutoff altı = bölge boş; dar smoothstep bandı yerleşim kenarını yumuşatır.
+                float keep = Mathf.SmoothStep(bCutoff - 0.08f, bCutoff + 0.08f, m);
+                if (keep <= 0f || (keep < 1f && Random.value > keep)) continue;
+            }
 
             int pick      = PickBalancedSpriteIndex(spriteCounts);
             var entry     = settings.urbanBuildings[valid[pick]];
@@ -200,22 +237,85 @@ public partial class MapDecorPlacer
 
         // -- ORMAN ALANI (fBm gürültü) ---------------------------------------------------------
         // coverage → eşik: Perlin ~0.5 civarında yoğunlaştığı için eşiği [0.72 .. 0.14] arasına eşleriz
-        // (coverage 0 = az orman, 1 = neredeyse her yer). Çekirdek TAM dolar; yalnızca ince kenar seyrelir
-        // → ormanlar dolgun ve büyük görünür (eski lineer rampa çekirdeği de seyreltiyordu = cılız orman).
+        // (coverage 0 = az orman, 1 = neredeyse her yer). Eşik üstü DEĞER olarak döner (0..1): geniş
+        // kenar bandı sayesinde orman çekirdeği dolgun, kenarlar/ara bölgeler kademeli seyrelir —
+        // yoğunluk artık ikili (var/yok) değil, sürekli.
         float forestScale = Mathf.Max(6f, urbanForestSizeTiles);
         float coverage    = Mathf.Clamp01(urbanForestCoverage);
         float thr         = Mathf.Lerp(0.72f, 0.14f, coverage);
-        const float edge  = 0.06f;
+        const float edge  = 0.12f;
         float nSeedX = Random.Range(0f, 500f);
         float nSeedY = Random.Range(0f, 500f);
 
+        // ÇIPLAK BÖLGELER: orman öbek boyutundan ÇOK daha büyük dalga boylu (urbanBareRegionSizeTiles)
+        // ayrı bir makro gürültü haritayı az sayıda dev bölgeye ayırır. Cutoff altı = ÇIPLAK: o bölgede
+        // orman hiç oluşmaz (yoğunluk düşürme DEĞİL — binary kapı). Cutoff üstü = normal orman bölgesi;
+        // oradaki ormanlar tam dolgunlukta kalır.
+        float bareFrac = Mathf.Clamp01(urbanBareFraction);
+
+        // Dalga boyunu urban bölgenin GERÇEK boyutuna kıstır: kullanıcı ayarı bölgeden büyükse Perlin
+        // bölge boyunca neredeyse sabit kalır → tüm bölge cutoff'un tek tarafına düşer ve hiç çıplak
+        // alan çıkmaz (ya da her yer çıplak olur). Extent*0.5 ile bölgede en az ~2 dalga garanti.
+        int bMinX = int.MaxValue, bMaxX = int.MinValue, bMinY = int.MaxValue, bMaxY = int.MinValue;
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            if (tiles[i].x < bMinX) bMinX = tiles[i].x;
+            if (tiles[i].x > bMaxX) bMaxX = tiles[i].x;
+            if (tiles[i].y < bMinY) bMinY = tiles[i].y;
+            if (tiles[i].y > bMaxY) bMaxY = tiles[i].y;
+        }
+        float extent    = Mathf.Max(bMaxX - bMinX, bMaxY - bMinY);
+        float bareScale = Mathf.Min(Mathf.Max(50f, urbanBareRegionSizeTiles),
+                                    Mathf.Max(50f, extent * 0.5f));
+
+        float BareNoiseAt(int fx, int fy)
+            => Mathf.PerlinNoise(nSeedX + fx / bareScale + 113f, nSeedY + fy / bareScale + 113f);
+
+        // Cutoff = gürültünün URBAN TILE'LAR üZERİNDEKİ gerçek quantile'ı → bareFrac kadar arazi
+        // KESİN olarak çıplak kalır. Sabit eşik (dağılım tahmini) dalga boyu/bölge şekline göre
+        // ıskalıyordu; quantile bunu garantiler.
+        float bareCut = float.NegativeInfinity;
+        if (bareFrac > 0f)
+        {
+            var bareVals = new List<float>(tiles.Count);
+            for (int i = 0; i < tiles.Count; i++)
+                bareVals.Add(BareNoiseAt(tiles[i].x, tiles[i].y));
+            bareVals.Sort();
+            int q = Mathf.Clamp(Mathf.RoundToInt((bareVals.Count - 1) * bareFrac), 0, bareVals.Count - 1);
+            bareCut = bareVals[q];
+        }
+
+        // İç yoğunluk katmanı: hafif dalgalanma (0.75..1) — orman dolgun kalır ama tekdüze de olmaz.
+        float densScale = forestScale * 1.7f;
+
+        // Harita dış kenar sönmesi: kenara yaklaştıkça orman yoğunluğu 1→0 iner (SmoothStep bandı).
+        float edgeFade = Mathf.Max(0f, urbanForestEdgeFadeTiles);
+        int mapW = map.width, mapH = map.height;
+
         float ForestDensityAt(int fx, int fy)
         {
+            // Çıplak bölge kapısı önce — kesilen bölgede orman gürültüsü örneklemeye gerek yok.
+            if (BareNoiseAt(fx, fy) < bareCut) return 0f;
+
             float lo = Mathf.PerlinNoise(nSeedX + fx / forestScale,          nSeedY + fy / forestScale);
             float hi = Mathf.PerlinNoise(nSeedX + fx / (forestScale * 0.45f) + 37f,
                                          nSeedY + fy / (forestScale * 0.45f) + 37f);
             float n = lo * 0.7f + hi * 0.3f;
-            return Mathf.SmoothStep(thr, thr + edge, n); // çekirdek=1, açıklık=0
+
+            float dens = Mathf.PerlinNoise(nSeedX + fx / densScale + 271f,
+                                           nSeedY + fy / densScale + 271f);
+            dens = Mathf.Lerp(0.75f, 1f, Mathf.Clamp01(dens));
+
+            float d = Mathf.SmoothStep(thr, thr + edge, n) * dens;
+
+            if (edgeFade > 0f)
+            {
+                // Haritanın en yakın dış kenarına uzaklık (tile) → kenar bandında yoğunluk söner.
+                float dEdge = Mathf.Min(Mathf.Min(fx, mapW - 1 - fx),
+                                        Mathf.Min(fy, mapH - 1 - fy));
+                d *= Mathf.SmoothStep(0f, edgeFade, dEdge);
+            }
+            return d;
         }
 
         // -- AĞAÇ ARALIĞI (sprite-boyutuna göre) ------------------------------------------------
@@ -233,7 +333,8 @@ public partial class MapDecorPlacer
             float r = ComputeBuildingRadius(settings.urbanNature[valid[i]].daySprite, sr.y, 0f);
             if (r > maxTreeR) maxTreeR = r;
         }
-        float maxTreeSpacing = Mathf.Max(0.02f, maxTreeR * packFactor * 1.3f);
+        // 1.3 = jitter üst sınırı, 2.1 = seyrek bölge aralık çarpanı (aşağıdaki mySpacing ile eşleşmeli).
+        float maxTreeSpacing = Mathf.Max(0.02f, maxTreeR * packFactor * 1.3f * 2.1f);
 
         // -- GERÇEK BİNA FOOTPRINT'LERİ ---------------------------------------------------------
         // KRİTİK: denseOccupied'a karşı test ETMEYİZ — orada bina yarıçapları SEYREK yerleşim için
@@ -322,6 +423,8 @@ public partial class MapDecorPlacer
 
             if (!map.IsLand(tx, ty)) continue;
             if (map.GetBiome(tx, ty) != 1) continue;
+            // Kıyı tamponu — binalarla aynı kural: ağaçlar kıyıya/sahile taşmasın.
+            if (cityShoreBuffer > 0 && !HasShoreBuffer(map, tx, ty)) continue;
 
             float forestP = ForestDensityAt(tx, ty);
             if (forestP <= 0.001f) continue;                       // açıklık
@@ -344,15 +447,22 @@ public partial class MapDecorPlacer
             if (NearBuilding(wx, wy, treeRadius + clearWorld)) continue;
 
             // Diğer ağaçlara karşı sprite-boyutuna göre aralık (±%30 jitter → ızgara değil).
-            float mySpacing = treeRadius * packFactor * Random.Range(0.7f, 1.3f);
+            // Yoğunluk düştükçe aralık da büyür → orman kenarları/seyrek bölgeler dağınık durur,
+            // çekirdek sıkı kalır.
+            float mySpacing = treeRadius * packFactor
+                            * Mathf.Lerp(2.1f, 1f, forestP)
+                            * Random.Range(0.7f, 1.3f);
             if (TreeOverlap(wx, wy, mySpacing)) continue;
             AddTree(wx, wy, mySpacing);
 
             float baseA   = 1f;
             int sortOrder = 10 + (int)(wy * -100f);
 
+            // Ağaç gölgeleri düşük detaylı trace materyali kullanır (treeShadowTraceSteps) —
+            // binlerce ağaçta asıl gölge fragment maliyeti buradan geliyordu.
             var (go, daySR, nightSR, shadow) = CreateCityBuildingObject(
-                daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder, entry.isIsometric);
+                daySprite, entry.nightSprite, wx, wy, scale, baseA, sortOrder, entry.isIsometric,
+                lowDetailShadow: true);
             go.name = "UrbanTree";
 
             AttachBuildingAnimators(daySR, nightSR, entry);
@@ -380,6 +490,7 @@ public partial class MapDecorPlacer
 
         Debug.Log($"MapDecorPlacer: urban nature (ağaç) — tiles={order.Count}, placed={placed}, " +
                   $"coverage={coverage:F2}→thr={thr:F2}, forestSize={forestScale:F0}, " +
+                  $"bare={bareFrac:F2} (scale={bareScale:F0}, extent={extent:F0}), " +
                   $"treeDensity={urbanTreeDensity:F2} (pack={packFactor:F2}), buildings={bFoot.Count}");
     }
 }

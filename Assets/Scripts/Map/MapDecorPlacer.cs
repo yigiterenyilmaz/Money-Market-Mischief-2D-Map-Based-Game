@@ -71,8 +71,15 @@ public partial class MapDecorPlacer : MonoBehaviour
              "gösterilir → binlerce draw call 2'ye iner. Bake, tier 2'ye ilk girişte yapılır.")]
     public bool forestImposterEnabled = true;
     [Tooltip("Imposter dokusunun uzun kenar çözünürlüğü (piksel). Büyük = daha net ama daha çok VRAM. " +
-             "Tier 2 zaten çok uzak zoom olduğu için 2048 genelde yeterli.")]
+             "Tier 2 zaten çok uzak zoom olduğu için 2048 genelde yeterli. (Bina imposter'ı da aynı " +
+             "çözünürlüğü kullanır.)")]
     [Range(512, 4096)] public int forestImposterMaxRes = 2048;
+
+    [Header("Building Imposter — Uzak Zoomda Tek Doku Binalar")]
+    [Tooltip("Tier 2'de (tüm gölgeler kapalı) ağaç OLMAYAN tüm binalar da gizlenip yerlerine bir kez " +
+             "bake edilmiş tek doku (2 quad: gündüz+gece) gösterilir. Deprem binaları değiştirirse " +
+             "bake otomatik yenilenir.")]
+    public bool buildingImposterEnabled = true;
 
     [Header("City Building Shadow — Dinamik Güneş Gölgesi")]
     [Tooltip("Flat gölge üretim modu. Projection = eski tek-pivot afin izdüşüm (karşılaştırma için). " +
@@ -88,6 +95,10 @@ public partial class MapDecorPlacer : MonoBehaviour
              "VERMEZ → bedenden kopmuş ince/küçük parçalar (duman vb.) gölge bırakmaz. Büyük = daha " +
              "agresif temizleme (ama beden kenarları da incelir).")]
     [Range(0f, 0.7f)] public float shadowTraceStrayCut = 0.35f;
+    [Tooltip("AĞAÇ gölgeleri için düşük detaylı trace adım sayısı (performans). Ağaç sayısı binalardan " +
+             "kat kat fazla olduğu için ağaç gölgeleri daha az örnekle + blur'suz + erken çıkışlı çizilir. " +
+             "8–16 genelde yeterli; kenarlar sertleşir ama ağaç silueti zaten yumuşak olduğundan fark edilmez.")]
+    [Range(4, 64)] public int treeShadowTraceSteps = 12;
     [Tooltip("Gölge rengi ve saydamlığı.")]
     public Color shadowColor = new Color(0f, 0f, 0f, 0.35f);
     [Tooltip("Far edge (uzak uç) trapez incelme oranı. 0 = sivri uç, 1 = dikdörtgen.")]
@@ -742,7 +753,21 @@ public partial class MapDecorPlacer : MonoBehaviour
             if (hide) sh.transform.gameObject.SetActive(false);
         }
         ApplyTreeLod(newLod);
+        ApplyBuildingLod(newLod);
+        // KRİTİK: crossfade'i AYNI frame içinde yeniden uygula. Tier geçişinde imposter quad'ları
+        // görünür olur ama alpha'ları bir sonraki Update'e kadar bayat kalırsa (gündüz+gece ikisi
+        // birden tam opak) bir frame'lik "çift pozlama/bulanık" parlama olur. Aynı çağrı yeniden
+        // görünen renderer'ları da (SetRendererVisible) hemen açar.
+        ReapplyCrossfadeNow();
         prevSunProgress = float.NaN; // UpdateShadows'u zorla → görünür gölgeler yeniden hesaplanır/açılır
+    }
+
+    /// <summary>Crossfade'i mevcut gün/gece oranıyla hemen uygular (frame bekletmeden).</summary>
+    void ReapplyCrossfadeNow()
+    {
+        float r = (dayNight != null) ? dayNight.LightingRatio : 0f;
+        prevRatio = r;
+        ApplyCrossfade(r);
     }
 
     /// <summary>
@@ -764,7 +789,15 @@ public partial class MapDecorPlacer : MonoBehaviour
 
             bool hide = imposterOn || (lod >= 1 && IsTreeThinned(bd));
 
-            if (bd.go.activeSelf == hide) bd.go.SetActive(!hide);
+            // GO'yu deaktive etmek yerine yalnızca renderer'ları kapat: binlerce SetActive,
+            // OnEnable/OnDisable zinciriyle tier geçişinde hissedilir bir takılma (hitch) yapar.
+            // Yeniden görünecekler SetShadowLod'un hemen ardından çağırdığı ReapplyCrossfadeNow'da
+            // (SetRendererVisible) açılır; gölge child'ları SetShadowLod/UpdateShadows yönetir.
+            if (hide)
+            {
+                if (bd.dayRenderer   != null) bd.dayRenderer.enabled   = false;
+                if (bd.nightRenderer != null) bd.nightRenderer.enabled = false;
+            }
 
             // Ölçek telafisi: seyreltilmiş ormanda kalan ağaçlar hafif büyür, tier 0'da asıl ölçek.
             if (bd.baseScale > 0f)
@@ -781,10 +814,7 @@ public partial class MapDecorPlacer : MonoBehaviour
             bd.lodHidden = hide;
             cityBuildings[i] = bd;
         }
-
-        // Crossfade, lodHidden bayrağına göre atlama yapar → mevcut ratio'yu yeniden uygula
-        // (yeniden görünür olan ağaçların alpha'sı güncel kalsın).
-        prevRatio = -1f;
+        // Crossfade'in yeniden uygulanması SetShadowLod'da (ReapplyCrossfadeNow) — frame bekletmez.
     }
 
     /// <summary>
@@ -799,11 +829,16 @@ public partial class MapDecorPlacer : MonoBehaviour
         return (h & 0xFFFF) / 65535f < treeThinFraction;
     }
 
+    // Alloc'suz animator toplama: GetComponentsInChildren'ın dizi dönen overload'u her çağrıda
+    // (animatörsüz objelerde bile boş dizi) allocate eder → binlerce ağaç/bina × tier geçişi = GC
+    // spike = zoom sırasında takılma. List overload'u tamponu yeniden kullanır.
+    static readonly List<SpriteSheetAnimator> s_animBuf = new List<SpriteSheetAnimator>(8);
+
     static void SetAnimatorsEnabled(GameObject go, bool enabled)
     {
-        var anims = go.GetComponentsInChildren<SpriteSheetAnimator>(true);
-        for (int i = 0; i < anims.Length; i++)
-            if (anims[i].enabled != enabled) anims[i].enabled = enabled;
+        go.GetComponentsInChildren(true, s_animBuf);
+        for (int i = 0; i < s_animBuf.Count; i++)
+            if (s_animBuf[i].enabled != enabled) s_animBuf[i].enabled = enabled;
     }
 
     // -------------------------------------------------------------------------
@@ -901,7 +936,8 @@ public partial class MapDecorPlacer : MonoBehaviour
         prevRatio = -1f;
         prevSunProgress = float.NaN;
         shadowLod = -1; // yeni binalara mevcut zoom seviyesini yeniden uygula
-        DestroyForestImposter(); // eski haritanın bake'i geçersiz — tier 2'ye ilk girişte yeniden bake edilir
+        DestroyForestImposter();   // eski haritanın bake'i geçersiz — tier 2'ye ilk girişte yeniden bake edilir
+        DestroyBuildingImposter();
         ClearDenseGrid();
         dayNightLookedUp = false;
         cachedMap = null;
