@@ -3019,7 +3019,11 @@ public class RoadGenerator : MonoBehaviour
             DestroyHiResOverlay();
             _ovScale = scale; _rw = rw; _rh = rh;
             _roadOverlayTex = new Texture2D(rw, rh, TextureFormat.RGBA32, false);
-            _roadOverlayTex.filterMode = FilterMode.Bilinear; //zoom'da yumusak — point-filter haritanin tersine
+            //Point — harita dokusu (1 px = 1 tile, point-filter) ile ayni pixel-art dili.
+            //Overlay zaten _ovScale kat supersample ve kenar AA'si texel'lere PISMIS durumda
+            //(StampDiskHiRes coverage + roadEdgeSoftness). Bilinear bunun USTUNE ikinci bir
+            //bulaniklik ekliyordu → yakin zoom'da yol kenarlari lapa gibi goruntuleniyordu.
+            _roadOverlayTex.filterMode = FilterMode.Point;
             _roadOverlayTex.wrapMode = TextureWrapMode.Clamp;
             _ovPixels = new Color32[rw * rh];
             _passCov = new float[rw * rh];

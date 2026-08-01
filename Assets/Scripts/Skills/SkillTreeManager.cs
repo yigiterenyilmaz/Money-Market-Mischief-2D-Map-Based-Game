@@ -368,6 +368,12 @@ public class SkillTreeManager : MonoBehaviour
         if (IsBlocked(skill.id))
             return false;
 
+        if (GameStatManager.Instance == null)
+        {
+            Debug.LogError("[SkillTreeManager] GameStatManager sahnede yok — maliyet kontrol edilemiyor.", this);
+            return false;
+        }
+
         if (!GameStatManager.Instance.HasEnoughWealth(skill.cost))
             return false;
 
@@ -375,7 +381,7 @@ public class SkillTreeManager : MonoBehaviour
         {
             foreach (Skill prerequisite in skill.prerequisites)
             {
-                if (!IsUnlocked(prerequisite.id))
+                if (prerequisite != null && !IsUnlocked(prerequisite.id))
                     return false;
             }
         }
@@ -392,7 +398,7 @@ public class SkillTreeManager : MonoBehaviour
 
     public bool TryUnlock(string skillId)
     {
-        Skill skill = database.GetById(skillId);
+        Skill skill = database != null ? database.GetById(skillId) : null;
 
         if (skill == null)
             return false;
@@ -400,14 +406,54 @@ public class SkillTreeManager : MonoBehaviour
             return false;
 
         GameStatManager.Instance.TrySpendWealth(skill.cost);
+        ApplyUnlock(skill);
 
-        unlockedSkillIds.Add(skillId);
+        return true;
+    }
+
+    /// <summary>
+    /// TEST amaçlı: ön koşul, para ve diğer gereksinimleri atlayarak skill'i açar.
+    /// Ağaç görselini denerken kullanılır — normal oynanışta TryUnlock çağrılmalı.
+    /// </summary>
+    public bool ForceUnlock(string skillId)
+    {
+        if (database == null)
+        {
+            Debug.LogError("[SkillTreeManager] database atanmamış — hiçbir skill açılamaz.", this);
+            return false;
+        }
+
+        Skill skill = database.GetById(skillId);
+
+        if (skill == null)
+            return false;
+        if (IsUnlocked(skillId))
+            return false;
+
+        ApplyUnlock(skill);
+
+        return true;
+    }
+
+    /// <summary>Skill'i açılmış sayar: efektlerini uygular, kilitlediklerini işaretler, event yayar.</summary>
+    private void ApplyUnlock(Skill skill)
+    {
+        unlockedSkillIds.Add(skill.id);
 
         if (skill.effects != null)
         {
             foreach (SkillEffect effect in skill.effects)
             {
-                effect.Apply();
+                //bir efekt patlarsa skill yine de açılmış sayılsın ve UI güncellensin —
+                //aksi halde tıklama hiçbir şey yapmamış gibi görünüyor
+                try
+                {
+                    effect.Apply();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError($"[SkillTreeManager] '{skill.id}' efekti uygulanamadı: {exception}");
+                }
             }
         }
 
@@ -424,6 +470,72 @@ public class SkillTreeManager : MonoBehaviour
         }
 
         SkillEvents.OnSkillUnlocked?.Invoke(skill);
+    }
+
+    // ==================== AKTİF YETENEKLER ====================
+
+    //skillId -> yeteneğin tekrar hazır olacağı zaman (Time.time)
+    private Dictionary<string, float> activeAbilityReadyAt = new Dictionary<string, float>();
+
+    public static event Action<Skill> OnSkillActivated; //aktif yetenek kullanıldı
+
+    public static bool HasActiveAbility(Skill skill)
+    {
+        return skill != null && skill.activeAbility != null && skill.activeAbility.enabled;
+    }
+
+    /// <summary>Yeteneğin hazır olmasına kalan süre (saniye). 0 = hazır.</summary>
+    public float GetCooldownRemaining(string skillId)
+    {
+        if (string.IsNullOrEmpty(skillId)) return 0f;
+        if (!activeAbilityReadyAt.TryGetValue(skillId, out float readyAt)) return 0f;
+
+        return Mathf.Max(0f, readyAt - Time.time);
+    }
+
+    /// <summary>Bekleme ilerlemesi: 0 = yeni kullanıldı, 1 = tekrar hazır.</summary>
+    public float GetCooldownProgress(Skill skill)
+    {
+        if (!HasActiveAbility(skill)) return 1f;
+
+        float cooldown = skill.activeAbility.cooldownSeconds;
+        if (cooldown <= 0f) return 1f;
+
+        return Mathf.Clamp01(1f - GetCooldownRemaining(skill.id) / cooldown);
+    }
+
+    public bool CanActivate(Skill skill)
+    {
+        if (!HasActiveAbility(skill)) return false;
+        if (!IsUnlocked(skill.id)) return false;
+
+        return GetCooldownRemaining(skill.id) <= 0f;
+    }
+
+    /// <summary>
+    /// Aktif yeteneği kullanır: efektlerini uygular ve bekleme süresini başlatır.
+    /// </summary>
+    public bool TryActivate(string skillId)
+    {
+        Skill skill = database != null ? database.GetById(skillId) : null;
+        if (!CanActivate(skill)) return false;
+
+        foreach (SkillEffect effect in skill.activeAbility.onActivate)
+        {
+            if (effect == null) continue;
+
+            try
+            {
+                effect.Apply();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[SkillTreeManager] '{skill.id}' aktif efekti uygulanamadı: {exception}");
+            }
+        }
+
+        activeAbilityReadyAt[skillId] = Time.time + skill.activeAbility.cooldownSeconds;
+        OnSkillActivated?.Invoke(skill);
 
         return true;
     }

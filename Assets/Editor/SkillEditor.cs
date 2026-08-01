@@ -32,6 +32,26 @@ public class SkillEditor : Editor
         serializedObject.Update();
 
         EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Aktif Yetenek", EditorStyles.boldLabel);
+        SerializedProperty ability = serializedObject.FindProperty("activeAbility");
+        SerializedProperty abilityEnabled = ability.FindPropertyRelative("enabled");
+        EditorGUILayout.PropertyField(abilityEnabled, new GUIContent("Aktif Yeteneği Var"));
+
+        if (abilityEnabled.boolValue)
+        {
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(ability.FindPropertyRelative("abilityName"));
+            EditorGUILayout.PropertyField(ability.FindPropertyRelative("description"));
+            EditorGUILayout.PropertyField(ability.FindPropertyRelative("cooldownSeconds"));
+            serializedObject.ApplyModifiedProperties();
+
+            EditorGUILayout.LabelField("Kullanınca Çalışan Efektler", EditorStyles.miniBoldLabel);
+            SkillEffectDrawer.DrawEffectList(ability.FindPropertyRelative("onActivate"));
+            serializedObject.Update();
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space();
         EditorGUILayout.LabelField("Diğer Ön Koşullar", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(
             serializedObject.FindProperty("otherPrerequisites")

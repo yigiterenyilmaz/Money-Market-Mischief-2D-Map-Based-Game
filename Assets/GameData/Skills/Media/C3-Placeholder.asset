@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f0aaa824f7832b94e9010f7cdb57d8aa, type: 3}
-  m_Name: A8-Seek&Destroy
+  m_Name: C3-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
-  id: a8
-  displayName: Seek&Destroy
-  description: "petrol\xFC olan \xFClkeye sava\u015F a\xE7ma"
+  id: c3
+  displayName: Medya C3
+  description: 'PLACEHOLDER — Medya agaci, C3. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
   icon: {fileID: 0}
-  cost: 0
+  cost: 15000
   prerequisites:
-  - {fileID: 11400000, guid: e36f3da2f5c5d4631d1484ab14fedec8, type: 2}
+  - {fileID: 11400000, guid: e3b67cadbf62e33350bf00dadd7053bf, type: 2}
   effects: []
   otherPrerequisites: 0
   blocksSkills: []

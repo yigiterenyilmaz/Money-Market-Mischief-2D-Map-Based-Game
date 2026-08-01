@@ -1,0 +1,401 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c1e4a90d3b24f1e8a5c6d0f11223301, type: 3}
+  m_Name: SkillTreeLayout
+  m_EditorClassIdentifier: Assembly-CSharp::SkillTreeLayout
+  nodes:
+  - skillId: c1
+    branches: 4
+    column: 0
+    row: 6.1000
+    colorTag: gray
+  - skillId: c2
+    branches: 4
+    column: 1
+    row: 3.1000
+    colorTag: gray
+  - skillId: c3
+    branches: 4
+    column: 1
+    row: 6.6000
+    colorTag: gray
+  - skillId: c4
+    branches: 4
+    column: 1
+    row: 8.6000
+    colorTag: gray
+  - skillId: c5
+    branches: 4
+    column: 2
+    row: 4.1000
+    colorTag: gray
+  - skillId: c6
+    branches: 4
+    column: 2
+    row: 2.1000
+    colorTag: gray
+  - skillId: c7
+    branches: 4
+    column: 3
+    row: 3.6000
+    colorTag: gray
+  - skillId: c8
+    branches: 4
+    column: 3
+    row: 4.6000
+    colorTag: gray
+  - skillId: c10
+    branches: 4
+    column: 3
+    row: 2.1000
+    colorTag: gray
+  - skillId: c11
+    branches: 4
+    column: 4
+    row: 1.6000
+    colorTag: gray
+  - skillId: c12
+    branches: 4
+    column: 4
+    row: 2.6000
+    colorTag: gray
+  - skillId: c13
+    branches: 4
+    column: 2
+    row: 6.6000
+    colorTag: gray
+  - skillId: c14
+    branches: 4
+    column: 3
+    row: 5.6000
+    colorTag: gray
+  - skillId: c15
+    branches: 4
+    column: 3
+    row: 6.6000
+    colorTag: gray
+  - skillId: c16
+    branches: 4
+    column: 3
+    row: 7.6000
+    colorTag: gray
+  - skillId: c17
+    branches: 4
+    column: 2
+    row: 8.6000
+    colorTag: gray
+  - skillId: c18
+    branches: 4
+    column: 3
+    row: 8.6000
+    colorTag: gray
+  - skillId: c20
+    branches: 4
+    column: 5
+    row: 2.6000
+    colorTag: gray
+  - skillId: c21
+    branches: 4
+    column: 4
+    row: 6.6000
+    colorTag: gray
+  - skillId: a1
+    branches: 1
+    column: 0
+    row: 20.6833
+    colorTag: gray
+  - skillId: a2
+    branches: 1
+    column: 1
+    row: 14.3000
+    colorTag: gray
+  - skillId: a3
+    branches: 1
+    column: 2
+    row: 14.3000
+    colorTag: gray
+  - skillId: a4
+    branches: 1
+    column: 4
+    row: 13.3000
+    colorTag: gray
+  - skillId: a5
+    branches: 1
+    column: 5
+    row: 13.3000
+    colorTag: gray
+  - skillId: a6
+    branches: 1
+    column: 4
+    row: 14.3000
+    colorTag: gray
+  - skillId: a7
+    branches: 1
+    column: 5
+    row: 14.3000
+    colorTag: gray
+  - skillId: a8
+    branches: 1
+    column: 6
+    row: 14.3000
+    colorTag: gray
+  - skillId: a9
+    branches: 1
+    column: 3
+    row: 15.3000
+    colorTag: gray
+  - skillId: a10
+    branches: 1
+    column: 4
+    row: 15.3000
+    colorTag: gray
+  - skillId: a11
+    branches: 1
+    column: 1
+    row: 17.4667
+    colorTag: gray
+  - skillId: a12
+    branches: 1
+    column: 3
+    row: 13.3000
+    colorTag: gray
+  - skillId: a13
+    branches: 1
+    column: 3
+    row: 14.3000
+    colorTag: gray
+  - skillId: a14
+    branches: 1
+    column: 2
+    row: 16.3000
+    colorTag: gray
+  - skillId: a15
+    branches: 1
+    column: 2
+    row: 17.3000
+    colorTag: gray
+  - skillId: a16
+    branches: 1
+    column: 2
+    row: 18.8000
+    colorTag: gray
+  - skillId: a17
+    branches: 1
+    column: 3
+    row: 19.3000
+    colorTag: gray
+  - skillId: a18
+    branches: 1
+    column: 3
+    row: 18.3000
+    colorTag: gray
+  - skillId: a19
+    branches: 1
+    column: 4
+    row: 18.3000
+    colorTag: gray
+  - skillId: a20
+    branches: 1
+    column: 1
+    row: 21.3000
+    colorTag: gray
+  - skillId: a21
+    branches: 1
+    column: 2
+    row: 20.3000
+    colorTag: gray
+  - skillId: a22
+    branches: 1
+    column: 2
+    row: 21.3000
+    colorTag: gray
+  - skillId: a23
+    branches: 1
+    column: 3
+    row: 21.3000
+    colorTag: gray
+  - skillId: a24
+    branches: 1
+    column: 2
+    row: 22.3000
+    colorTag: gray
+  - skillId: a25
+    branches: 1
+    column: 3
+    row: 22.3000
+    colorTag: gray
+  - skillId: a26
+    branches: 1
+    column: 1
+    row: 23.8000
+    colorTag: gray
+  - skillId: a27
+    branches: 1
+    column: 2
+    row: 23.3000
+    colorTag: gray
+  - skillId: a28
+    branches: 1
+    column: 2
+    row: 24.3000
+    colorTag: gray
+  - skillId: a29
+    branches: 1
+    column: 3
+    row: 23.3000
+    colorTag: gray
+  - skillId: a30
+    branches: 1
+    column: 4
+    row: 23.3000
+    colorTag: gray
+  - skillId: a31
+    branches: 1
+    column: 3
+    row: 24.3000
+    colorTag: gray
+  - skillId: a32
+    branches: 1
+    column: 4
+    row: 24.3000
+    colorTag: gray
+  - skillId: a33
+    branches: 1
+    column: 1
+    row: 26.5500
+    colorTag: gray
+  - skillId: a34
+    branches: 1
+    column: 2
+    row: 25.8000
+    colorTag: gray
+  - skillId: a35
+    branches: 1
+    column: 3
+    row: 25.3000
+    colorTag: gray
+  - skillId: a36
+    branches: 1
+    column: 3
+    row: 26.3000
+    colorTag: gray
+  - skillId: a37
+    branches: 1
+    column: 2
+    row: 27.3000
+    colorTag: gray
+  - skillId: a38
+    branches: 1
+    column: 3
+    row: 27.3000
+    colorTag: gray
+  - skillId: a39
+    branches: 1
+    column: 4
+    row: 26.3000
+    colorTag: gray
+  - skillId: a40
+    branches: 1
+    column: 4
+    row: 27.3000
+    colorTag: gray
+  - skillId: b1
+    branches: 2
+    column: 0
+    row: 35.5000
+    colorTag: gray
+  - skillId: b2
+    branches: 2
+    column: 1
+    row: 33.5000
+    colorTag: gray
+  - skillId: b3
+    branches: 2
+    column: 1
+    row: 37.0000
+    colorTag: gray
+  - skillId: b4
+    branches: 2
+    column: 2
+    row: 35.0000
+    colorTag: gray
+  - skillId: b5
+    branches: 2
+    column: 2
+    row: 34.0000
+    colorTag: gray
+  - skillId: b6
+    branches: 2
+    column: 2
+    row: 32.0000
+    colorTag: gray
+  - skillId: b7
+    branches: 2
+    column: 2
+    row: 33.0000
+    colorTag: gray
+  - skillId: b8
+    branches: 2
+    column: 2
+    row: 37.0000
+    colorTag: gray
+  - skillId: b9
+    branches: 2
+    column: 3
+    row: 37.0000
+    colorTag: gray
+  - skillId: b10
+    branches: 2
+    column: 4
+    row: 37.0000
+    colorTag: gray
+  - skillId: b11
+    branches: 2
+    column: 1
+    row: 36.0000
+    colorTag: gray
+  - skillId: b12
+    branches: 2
+    column: 2
+    row: 36.0000
+    colorTag: gray
+  - skillId: b13
+    branches: 2
+    column: 3
+    row: 36.0000
+    colorTag: gray
+  - skillId: b14
+    branches: 2
+    column: 4
+    row: 36.0000
+    colorTag: gray
+  - skillId: b15
+    branches: 2
+    column: 3
+    row: 34.0000
+    colorTag: gray
+  headers:
+  - branch: 4
+    title: Medya
+    row: 0.0000
+    rowStart: 0.4000
+    rowEnd: 9.2000
+  - branch: 1
+    title: Finans
+    row: 11.7000
+    rowStart: 12.1000
+    rowEnd: 27.9000
+  - branch: 2
+    title: Siyaset
+    row: 30.4000
+    rowStart: 30.8000
+    rowEnd: 37.6000

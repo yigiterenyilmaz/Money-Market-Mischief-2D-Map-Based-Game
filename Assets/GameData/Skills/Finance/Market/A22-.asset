@@ -17,7 +17,8 @@ MonoBehaviour:
   description: "bilgi manipulasyonu yalan bilan\xE7o"
   icon: {fileID: 0}
   cost: 0
-  prerequisites: []
+  prerequisites:
+  - {fileID: 11400000, guid: 32aac072ef876044aac5851823280006, type: 2}
   effects: []
   otherPrerequisites: 0
   blocksSkills: []

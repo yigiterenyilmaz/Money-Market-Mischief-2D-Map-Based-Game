@@ -40,9 +40,11 @@ public partial class MapDecorPlacer
              "ince açık çizgiler. 0 = patika yok.")]
     [Range(0f, 3f)] public float agriculturalParcelPathTiles = 0.8f;
 
-    [Tooltip("Tarlaların yol merkezinden uzak duracağı tile mesafesi. Küçük tutun — referansta " +
-             "tarlalar yola kadar dayanır.")]
-    [Range(0f, 12f)] public float agriculturalParcelRoadClearTiles = 3f;
+    [Tooltip("Tarlaların yolun GÖRSEL KENARINDAN (boyanmış dolgu + outline) uzak duracağı tile " +
+             "mesafesi. Yol merkezinden DEĞİL — merkez baz alınırsa kalın highway'lerde mozaik " +
+             "yolun dış bandının üstüne taşar. 0 = kenara dayanır (omuz bandını da örter), " +
+             "2 = omuzun da dışında kalır. Küçük tutun — referansta tarlalar yola kadar dayanır.")]
+    [Range(0f, 12f)] public float agriculturalParcelRoadClearTiles = 2f;
 
     [Tooltip("Grid çizgilerinin Perlin ile ne kadar eğrileceği (tile). 0 = cetvel gibi düz, " +
              "2-3 = hafif dalgalı doğal sınırlar.")]
@@ -69,9 +71,14 @@ public partial class MapDecorPlacer
     // binalar oralara yerleşebilir. Repaint başına temizlenir.
     readonly HashSet<int> cropFieldTiles = new HashSet<int>();
 
-    // Doku çözünürlüğü: tile başına piksel. 3 → parsel sınırları tile basamağı olmadan,
-    // çapraz açıda bile temiz görünür; bellek maliyeti düşük kalır.
-    const int CropFieldPxPerTile = 3;
+    // Doku çözünürlüğü: tile başına piksel. 6 → çapraz kenarlardaki merdiven basamakları
+    // yarı boyuta iner (aynı mesafede iki katı basamak). Bellek 3'e göre 4 katına çıkar,
+    // bu yüzden aşağıdaki tavan boyutuyla sınırlanır.
+    const int CropFieldPxPerTile = 6;
+
+    // Doku hiçbir boyutta bunu aşmasın; aşacaksa çözünürlük kademeli düşürülür.
+    // Çok geniş tarım bölgelerinde bellek patlamasını ve GPU limitini önler.
+    const int CropFieldMaxTextureSize = 8192;
 
     // Parsel renk paleti (referans: çeltik tarlaları) + ağırlıkları. Ağırlık büyük = daha sık.
     static readonly Color[] ParcelPalette =
@@ -120,15 +127,22 @@ public partial class MapDecorPlacer
         int bh = maxY - minY + 1;
 
         // Tile başına "boyanabilir mi" tablosu: bölge üyeliği + yol açıklığı.
+        //
+        // Açıklık YOLUN GÖRSEL KENARINDAN ölçülür (GetDistanceToRoadEdge: 0 = boyanmış yol
+        // pikseli, 1 = kenara komşu tile...). Merkez hattından ölçmek (GetDistanceToRoad)
+        // yanlıştır: highway'in boyalı bandı thickness + outline*2 tile genişliğindedir, yani
+        // yarı genişliği birkaç tile eder — merkeze 3 tile açıklık bırakmak mozaiği hâlâ yolun
+        // outline'ının ÜSTÜNE bırakır (mozaik quad'ı harita dokusunun üstünde çizilir).
         var rg = RoadGenerator.Instance;
-        float roadClear = agriculturalParcelRoadClearTiles;
-        bool checkRoad = rg != null && rg.IsGenerated && roadClear > 0f;
+        int roadClear = Mathf.RoundToInt(agriculturalParcelRoadClearTiles);
+        bool checkRoad = rg != null && rg.IsGenerated;
 
         var paintable = new bool[bw * bh];
         for (int i = 0; i < tiles.Count; i++)
         {
             var t = tiles[i];
-            if (checkRoad && rg.GetDistanceToRoad(t.x, t.y) <= roadClear) continue;
+            // roadClear = 0 olsa bile yol pikselinin kendisi (mesafe 0) asla boyanmaz.
+            if (checkRoad && rg.GetDistanceToRoadEdge(t.x, t.y) <= roadClear) continue;
             paintable[(t.x - minX) + (t.y - minY) * bw] = true;
         }
 
@@ -178,12 +192,18 @@ public partial class MapDecorPlacer
         float noiseSeed = Random.Range(0f, 512f);
 
         // ---- Doku boyama ----
-        const int S = CropFieldPxPerTile;
+        int S = CropFieldPxPerTile;
+        while (S > 1 && (bw * S > CropFieldMaxTextureSize || bh * S > CropFieldMaxTextureSize))
+            S--;
+
         int texW = bw * S, texH = bh * S;
         cropFieldTexture = new Texture2D(texW, texH, TextureFormat.RGBA32, false)
         {
             wrapMode   = TextureWrapMode.Clamp,
-            filterMode = FilterMode.Bilinear,
+            // Point — harita dokusu ve yol overlay'i ile ayni pixel-art dili. Mozaik zaten
+            // tile basina CropFieldPxPerTile piksel cozunurlukte; bilinear bunun ustune
+            // bulaniklik ekliyordu (parsel sinirlari ve patikalar yakin zoom'da lapa oluyordu).
+            filterMode = FilterMode.Point,
         };
         var pixels = new Color32[texW * texH];
         var clear = new Color32(0, 0, 0, 0);
@@ -198,15 +218,23 @@ public partial class MapDecorPlacer
 
         for (int py = 0; py < texH; py++)
         {
-            int tyLocal = py / S;
             float fy = minY + (py + 0.5f) * invS;
 
             for (int px = 0; px < texW; px++)
             {
                 int idx = px + py * texW;
-                if (!paintable[(px / S) + tyLocal * bw]) { pixels[idx] = clear; continue; }
 
                 float fx = minX + (px + 0.5f) * invS;
+
+                // Bölge kenarı: maske tile çözünürlüklü olduğu için doğrudan okunursa
+                // çapraz sınırlar tam tile'lık merdiven yapıyor. Komşu dört tile arasında
+                // bilineer örnekleyip 0.5'te eşikleyince kenar tile'ın içinden geçebiliyor —
+                // çapraz sınırlar tam basamak yerine pah kırılmış görünüyor.
+                if (SampleCoverage(paintable, bw, bh, fx - minX - 0.5f, fy - minY - 0.5f) < 0.5f)
+                {
+                    pixels[idx] = clear;
+                    continue;
+                }
 
                 // Grid çizgilerini hafifçe eğ (düşük frekanslı warp).
                 float wu = (Mathf.PerlinNoise(noiseSeed + fx * 0.03f, noiseSeed + fy * 0.03f) - 0.5f) * 2f * warpAmp;
@@ -281,6 +309,33 @@ public partial class MapDecorPlacer
 
         Debug.Log($"MapDecorPlacer: agricultural parcel mosaic — bbox={bw}x{bh}, strips={uEdges.Count - 1}, " +
                   $"croppedTiles={paintedParcels}/{tiles.Count}, emptyChance={emptyChance:F2}.");
+    }
+
+    /// <summary>
+    /// Tile çözünürlüklü boyanabilirlik maskesini komşu dört tile arasında bilineer örnekler.
+    /// gx/gy, tile MERKEZLERİ tam sayıya denk gelecek şekilde verilir.
+    /// Dönen değer 0..1 kapsama oranıdır; 0.5 eşiği kenarı tile'ın ortasından geçirir.
+    /// </summary>
+    static float SampleCoverage(bool[] mask, int bw, int bh, float gx, float gy)
+    {
+        int x0 = Mathf.FloorToInt(gx);
+        int y0 = Mathf.FloorToInt(gy);
+        float tx = gx - x0;
+        float ty = gy - y0;
+
+        float m00 = MaskAt(mask, bw, bh, x0, y0);
+        float m10 = MaskAt(mask, bw, bh, x0 + 1, y0);
+        float m01 = MaskAt(mask, bw, bh, x0, y0 + 1);
+        float m11 = MaskAt(mask, bw, bh, x0 + 1, y0 + 1);
+
+        return Mathf.Lerp(Mathf.Lerp(m00, m10, tx), Mathf.Lerp(m01, m11, tx), ty);
+    }
+
+    /// <summary>Maske değeri; bölge dışı 0 sayılır (kenarda kapsama doğal olarak düşer).</summary>
+    static float MaskAt(bool[] mask, int bw, int bh, int x, int y)
+    {
+        if (x < 0 || y < 0 || x >= bw || y >= bh) return 0f;
+        return mask[x + y * bw] ? 1f : 0f;
     }
 
     /// <summary>Sıralı kenar dizisinde x'in düştüğü bant indeksini (binary search) döndürür.</summary>

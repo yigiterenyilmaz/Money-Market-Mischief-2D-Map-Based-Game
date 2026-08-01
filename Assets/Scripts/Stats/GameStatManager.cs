@@ -7,6 +7,11 @@ public class GameStatManager : MonoBehaviour
     public static GameStatManager Instance { get; private set; }
 
     [Header("Starting Values")]
+    [Header("DEBUG")]
+    [Tooltip("Açıkken para tükenmez: her harcama karşılanır ve bakiye düşmez. Sadece test için — yayına çıkmadan KAPAT.")]
+    public bool infiniteWealth = false;
+    private const float INFINITE_WEALTH_AMOUNT = 1_000_000_000f; //UI'da makul görünsün diye sonsuz yerine çok büyük bir sayı
+
     public float startingWealth = 1000f;
     public float startingSuspicion = 0f;
     public float startingReputation = 50f;
@@ -67,7 +72,9 @@ public class GameStatManager : MonoBehaviour
         }
         Instance = this;
 
-        wealth = startingWealth;
+        //Wealth'i doğrudan okuyup karşılaştıran yerler de (petrol, hazine) çalışsın diye
+        //bakiye gerçekten büyük bir değere ayarlanır, sadece kontroller atlanmakla kalınmaz
+        wealth = infiniteWealth ? INFINITE_WEALTH_AMOUNT : startingWealth;
         suspicion = startingSuspicion;
         reputation = startingReputation;
         politicalInfluence = startingPoliticalInfluence;
@@ -413,11 +420,18 @@ public class GameStatManager : MonoBehaviour
 
     public bool HasEnoughWealth(float amount)
     {
+        if (infiniteWealth)
+            return true;
+
         return wealth >= amount;
     }
 
     public bool TrySpendWealth(float amount)
     {
+        //harcama başarılı sayılır ama bakiye düşmez — böylece bakiye hep dolu kalır
+        if (infiniteWealth)
+            return true;
+
         if (!HasEnoughWealth(amount))
             return false;
 
