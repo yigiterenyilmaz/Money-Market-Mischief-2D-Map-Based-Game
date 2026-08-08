@@ -37,6 +37,11 @@ public class MapPainter : MonoBehaviour
     private float[,]       beachDistMap;
     private int[,]         shoreDistField;
 
+    //Paint() içinde seçilen gürültü seed'i. Bölge dönüşümü sonrası bir yamayı yeniden boyarken
+    //AYNI seed kullanılmalı; yoksa yamanın deseni komşusuyla tutmaz ve dikiş yeri görünür.
+    private float paintSeed;
+    private bool  hasPainted;
+
     void Awake() { decorPlacer = GetComponent<MapDecorPlacer>(); }
     void OnEnable()  { if (mapGenerator != null) mapGenerator.OnMapGenerated += Paint; }
     void OnDisable() { if (mapGenerator != null) mapGenerator.OnMapGenerated -= Paint; }
@@ -65,6 +70,9 @@ public class MapPainter : MonoBehaviour
         mapTexture.filterMode = FilterMode.Point;
 
         float   seed   = Random.Range(0f, 9999f);
+        paintSeed  = seed;
+        hasPainted = true;
+
         Color[] pixels = new Color[w * h];
 
         for (int x = 0; x < w; x++)
@@ -559,6 +567,63 @@ public class MapPainter : MonoBehaviour
 
     static float Perlin(int x, int y, float seed, float scale)
         => Mathf.PerlinNoise(x * scale + seed, y * scale + seed);
+
+    /// <summary>
+    /// Biyomu değişmiş bir bölgeyi yeniden boyar (RegionConversionSystem sonrası).
+    ///
+    /// Üç incelik:
+    ///   * Paint()'in seed'i saklanır ve tekrar kullanılır — yoksa yama komşusundan farklı
+    ///     desende çıkar ve sınır belli olur.
+    ///   * Alan transitionWidth kadar GENİŞLETİLİR: biyom geçişleri komşu pikselleri de
+    ///     etkiler, sadece değişen tile'ları boyamak kenarda sert bir çizgi bırakır.
+    ///   * YOL pikselleri atlanır. Yollar Paint() sonrası doğrudan bu dokuya çizilir; yeniden
+    ///     boyamak onları siler ve yolu yeniden üretmek (GenerateRoads) tüm haritayı değiştirir.
+    ///
+    /// Su/kıyı/sınır uzaklık alanları yeniden kurulmaz — bunlar KARA/SU dağılımına bağlıdır,
+    /// dönüşüm ise yalnızca biyomu değiştirir.
+    /// </summary>
+    public void RepaintBiomeRegion(RectInt area)
+    {
+        if (mapTexture == null || mapGenerator == null) return;
+        if (!hasPainted)
+        {
+            Debug.LogWarning("MapPainter: Paint() çalışmadan RepaintBiomeRegion çağrıldı — atlandı.");
+            return;
+        }
+
+        int w = mapGenerator.width;
+        int h = mapGenerator.height;
+
+        int pad  = Mathf.Max(1, transitionWidth);
+        int minX = Mathf.Max(0, area.xMin - pad);
+        int minY = Mathf.Max(0, area.yMin - pad);
+        int maxX = Mathf.Min(w - 1, area.xMax + pad);
+        int maxY = Mathf.Min(h - 1, area.yMax + pad);
+        if (minX > maxX || minY > maxY) return;
+
+        bool hasRoads = roadGenerator != null && roadGenerator.IsGenerated;
+
+        for (int x = minX; x <= maxX; x++)
+        for (int y = minY; y <= maxY; y++)
+        {
+            if (hasRoads && roadGenerator.IsRoad(x, y)) continue; //yolu ezme
+
+            Color c = mapGenerator.IsLand(x, y)
+                ? PaintLandWithTransition(x, y, paintSeed)
+                : PaintWater(x, y, paintSeed, w, h);
+
+            float fog = mapGenerator.GetFog(x, y);
+            if (fog > 0f) c = Color.Lerp(c, settings.fogColor, fog);
+
+            mapTexture.SetPixel(x, y, c);
+        }
+
+        mapTexture.Apply();
+
+        //sprite aynı dokuyu gösteriyor; yeniden Sprite.Create gerekmez, Apply yeter.
+        //Yine de renderer kapalıysa aç.
+        if (mapRenderer != null && !mapRenderer.enabled) mapRenderer.enabled = true;
+    }
 
     void ApplyToRenderer(Texture2D tex)
     {

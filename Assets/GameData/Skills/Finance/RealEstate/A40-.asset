@@ -19,9 +19,25 @@ MonoBehaviour:
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 60831cff9ade3da45807f86cee70b100, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000026
+  activeAbility:
+    enabled: 1
+    abilityName: Sanayi Kur
+    description: Haritada boş araziye sınır çizip yeni bir sanayi bölgesi kurar.
+    cooldownSeconds: 0
+    onActivate:
+    - rid: 7300000000000000028
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000026
+      type: {class: UnlockRegionConversionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        target: 3
+    - rid: 7300000000000000028
+      type: {class: EnterRegionConversionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        target: 3

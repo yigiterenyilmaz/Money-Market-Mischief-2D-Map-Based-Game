@@ -94,7 +94,9 @@ public class SkillTreeTooltip : MonoBehaviour
             SkillActiveAbility ability = skill.activeAbility;
             string abilityName = string.IsNullOrWhiteSpace(ability.abilityName) ? "Aktif yetenek" : ability.abilityName;
 
-            builder.Append($"<color=#FFD65A><b>⚡ {abilityName}</b></color>");
+            //Emoji KULLANMA: LiberationSans'ta ⚡ (U+26A1) yok, TMP her çizimde uyarı basıp
+            //konsolu dolduruyordu ve karakter boş kutuya düşüyordu. Düz ASCII işaret güvenli.
+            builder.Append($"<color=#FFD65A><b>&gt;&gt; {abilityName}</b></color>");
 
             if (!string.IsNullOrWhiteSpace(ability.description))
                 builder.Append("\n").Append(ability.description);

@@ -22,6 +22,9 @@ public class SkillTreeManager : MonoBehaviour
     //decay eğrisi her kaynak için ayrı tutulur (effect üzerinden gelir)
     private List<DirectIncomeSource> directIncomeSources = new List<DirectIncomeSource>();
 
+    //güven programları — her tick'te para harcayıp güven kazandıran sürekli taahhütler
+    private List<TrustProgram> trustPrograms = new List<TrustProgram>();
+
     //investment — yatırım sistemi (al, değeri artsın, sat)
     private HashSet<InvestmentProduct> unlockedInvestments = new HashSet<InvestmentProduct>();
     private List<OwnedInvestment> ownedInvestments = new List<OwnedInvestment>();
@@ -147,6 +150,7 @@ public class SkillTreeManager : MonoBehaviour
                 OnJewelerTick?.Invoke(totalJewelerIncome, totalSuspicion, totalReputation);
             }
 
+            TickTrustPrograms();
         }
 
         //yatırım tick'i (sahip olunan + piyasa salınımı)
@@ -666,6 +670,58 @@ public class SkillTreeManager : MonoBehaviour
         return total;
     }
 
+    // ==================== GÜVEN PROGRAMLARI ====================
+
+    /// <summary>TrustProgramEffect tarafından çağrılır. Sürekli bir güven taahhüdü ekler.</summary>
+    public void AddTrustProgram(float wealthPerTick, float trustPerTick)
+    {
+        trustPrograms.Add(new TrustProgram(wealthPerTick, trustPerTick));
+    }
+
+    /// <summary>
+    /// Her programı sırayla işler: parası yetiyorsa harcar ve güven verir, yetmiyorsa
+    /// o programı ATLAR (borç yok, ceza yok — sadece o tur beslenemez).
+    /// </summary>
+    private void TickTrustPrograms()
+    {
+        if (trustPrograms.Count == 0) return;
+        if (GameStatManager.Instance == null) return;
+
+        float totalTrust = 0f;
+        int skipped = 0;
+
+        for (int i = 0; i < trustPrograms.Count; i++)
+        {
+            TrustProgram program = trustPrograms[i];
+
+            if (program.wealthPerTick > 0f)
+            {
+                if (!GameStatManager.Instance.HasEnoughWealth(program.wealthPerTick)) { skipped++; continue; }
+                if (!GameStatManager.Instance.TrySpendWealth(program.wealthPerTick)) { skipped++; continue; }
+            }
+
+            totalTrust += program.trustPerTick;
+        }
+
+        if (totalTrust != 0f)
+            GameStatManager.Instance.AddTrust(totalTrust);
+
+        OnTrustProgramTick?.Invoke(totalTrust, skipped);
+    }
+
+    /// <summary>Programların tick başına toplam maliyeti (UI özeti için).</summary>
+    public float GetTrustProgramCostPerTick()
+    {
+        float total = 0f;
+        for (int i = 0; i < trustPrograms.Count; i++) total += trustPrograms[i].wealthPerTick;
+        return total;
+    }
+
+    public int GetTrustProgramCount() => trustPrograms.Count;
+
+    /// <summary>bu tick'te kazanılan güven, parası yetmediği için atlanan program sayısı</summary>
+    public static event Action<float, int> OnTrustProgramTick;
+
     // ==================== ÜRÜN GETTER'LARI ====================
 
     public bool IsProductUnlocked(PassiveIncomeProduct product)
@@ -1099,6 +1155,21 @@ public class DirectIncomeSource
         this.decayAt3Min = decayAt3Min;
         this.decayAt4Min = decayAt4Min;
         this.decayAt5Min = decayAt5Min;
+    }
+}
+
+/// <summary>
+/// Sürekli güven taahhüdü: her tick'te para harcar, güven kazandırır.
+/// </summary>
+public class TrustProgram
+{
+    public float wealthPerTick;
+    public float trustPerTick;
+
+    public TrustProgram(float wealthPerTick, float trustPerTick)
+    {
+        this.wealthPerTick = wealthPerTick;
+        this.trustPerTick  = trustPerTick;
     }
 }
 

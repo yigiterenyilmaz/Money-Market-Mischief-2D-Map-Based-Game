@@ -19,9 +19,14 @@ MonoBehaviour:
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: d2d93e247d272d14b95b82f3e6d3538d, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000021
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000021
+      type: {class: PermanentPassiveIncomeEffect, ns: , asm: Assembly-CSharp}
+      data:
+        incomePerSecond: 30

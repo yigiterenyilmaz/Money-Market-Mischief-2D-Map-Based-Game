@@ -19,9 +19,15 @@ MonoBehaviour:
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 6e61930335f26e444bb2193125018cda, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000024
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000024
+      type: {class: TrustProgramEffect, ns: , asm: Assembly-CSharp}
+      data:
+        wealthPerTick: 2000
+        trustPerTick: 6

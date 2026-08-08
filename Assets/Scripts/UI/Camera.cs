@@ -124,7 +124,9 @@ public class MapController : MonoBehaviour
 
         // Kare hızından bağımsız üstel yumuşatma: her karede kalan mesafenin sabit bir
         // oranını kapatır, hedefe yaklaştıkça doğal olarak yavaşlar.
-        float t = 1f - Mathf.Exp(-zoomSmoothing * Time.deltaTime);
+        // unscaledDeltaTime: oyun duraklatılmışken (bölge çizimi, menü) da zoom çalışsın —
+        // Time.deltaTime timeScale=0'da sıfırdır ve kamera hedefe hiç ulaşmaz.
+        float t = 1f - Mathf.Exp(-zoomSmoothing * Time.unscaledDeltaTime);
         float newSize = Mathf.Lerp(cam.orthographicSize, targetSize, t);
 
         // Hedefe çok yaklaşınca sonsuz küçük adımlarla sürünmesin diye kilitle.

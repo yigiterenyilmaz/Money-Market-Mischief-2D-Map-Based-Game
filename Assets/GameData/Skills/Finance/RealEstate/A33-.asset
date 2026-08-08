@@ -19,9 +19,13 @@ MonoBehaviour:
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: ddc981964cfe5874bab31b5d5bf98d06, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000020
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000020
+      type: {class: UnlockRealEstateEffect, ns: , asm: Assembly-CSharp}
+      data: {}

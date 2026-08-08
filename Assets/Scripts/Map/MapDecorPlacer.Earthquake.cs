@@ -23,6 +23,9 @@ public partial class MapDecorPlacer
 
             if (bd.dayRenderer == null) continue;
 
+            //onarım (emlak sistemi) orijinali buradan geri yazar — swap'tan ÖNCE sakla
+            CacheOriginalSprites(new Vector2Int(bd.tileX, bd.tileY), bd);
+
             int brokenIdx = -1;
             if (brokenBuildingSprites != null && brokenBuildingSprites.Count > 0)
             {
@@ -90,16 +93,37 @@ public partial class MapDecorPlacer
     public void DestroyBuildingsOnFaultLines(FaultLineGenerator faultGen)
     {
         int destroyed = 0;
+        List<Vector2Int> spared = null;
+
         for (int i = cityBuildings.Count - 1; i >= 0; i--)
         {
             BuildingData bd = cityBuildings[i];
             if (!faultGen.IsFault(bd.tileX, bd.tileY)) continue;
+
+            //Oyuncunun sahip olduğu bina haritadan SİLİNMEZ — onarılabilsin diye kırık duruma
+            //düşürülür. Kırma işi döngüden SONRA yapılır: RemoveAt tile→indeks tablosunu kaydırır.
+            Vector2Int tile = new Vector2Int(bd.tileX, bd.tileY);
+            if (IsPropertyProtected(tile))
+            {
+                if (spared == null) spared = new List<Vector2Int>();
+                spared.Add(tile);
+                continue;
+            }
+
             decorObjects.Remove(bd.go);
             if (bd.go != null) Destroy(bd.go);
             cityBuildings.RemoveAt(i);
             destroyed++;
         }
-        Debug.Log($"MapDecorPlacer: {destroyed} building(s) destroyed by fault lines.");
+
+        if (destroyed > 0) InvalidatePropertyIndex();
+
+        if (spared != null)
+            for (int i = 0; i < spared.Count; i++) MarkPropertyBroken(spared[i]);
+
+        Debug.Log($"MapDecorPlacer: {destroyed} building(s) destroyed by fault lines" +
+                  (spared != null ? $", {spared.Count} owned building(s) left as rubble." : "."));
+
         if (destroyed > 0) InvalidateBuildingImposter();
     }
 
@@ -107,18 +131,38 @@ public partial class MapDecorPlacer
     {
         int destroyed = 0;
         int r2        = radius * radius;
+        List<Vector2Int> spared = null;
+
         for (int i = cityBuildings.Count - 1; i >= 0; i--)
         {
             BuildingData bd = cityBuildings[i];
             int dx = bd.tileX - epicenter.x, dy = bd.tileY - epicenter.y;
             if (dx * dx + dy * dy > r2)                continue;
             if (!faultGen.IsFault(bd.tileX, bd.tileY)) continue;
+
+            //sahipli bina yıkılmaz, kırılır — gerekçe için DestroyBuildingsOnFaultLines'a bak
+            Vector2Int tile = new Vector2Int(bd.tileX, bd.tileY);
+            if (IsPropertyProtected(tile))
+            {
+                if (spared == null) spared = new List<Vector2Int>();
+                spared.Add(tile);
+                continue;
+            }
+
             decorObjects.Remove(bd.go);
             if (bd.go != null) Destroy(bd.go);
             cityBuildings.RemoveAt(i);
             destroyed++;
         }
-        Debug.Log($"MapDecorPlacer: {destroyed} building(s) destroyed by earthquake.");
+
+        if (destroyed > 0) InvalidatePropertyIndex();
+
+        if (spared != null)
+            for (int i = 0; i < spared.Count; i++) MarkPropertyBroken(spared[i]);
+
+        Debug.Log($"MapDecorPlacer: {destroyed} building(s) destroyed by earthquake" +
+                  (spared != null ? $", {spared.Count} owned building(s) left as rubble." : "."));
+
         if (destroyed > 0) InvalidateBuildingImposter();
     }
 }

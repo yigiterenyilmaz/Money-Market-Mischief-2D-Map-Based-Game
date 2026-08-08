@@ -43,6 +43,42 @@ public class SkillNodeView : MonoBehaviour, IPointerClickHandler, IPointerEnterH
     private Coroutine punchRoutine;
     private bool punching; //Update'in ölçek lerp'i animasyonla çakışmasın
 
+    /// <summary>
+    /// Basılı tutarak satın alma tamamlandıktan sonra parmak kalkınca OnPointerClick de
+    /// tetiklenir. O anda node artık "alınmış + aktif yeteneği var" durumundadır, yani
+    /// tıklama yeteneği ANINDA kullanır — oyuncu sadece satın almak istemişken harita
+    /// modu açılıyordu. Satın almayı izleyen ilk tıklama bu bayrakla yutulur.
+    /// </summary>
+    private bool suppressClickAfterPurchase;
+
+    /// <summary>
+    /// Coroutine ile doğan geçici görseller (patlama halkası, süpürme yayı). Normalde
+    /// rutinin sonunda yok edilirler — AMA GameObject devre dışı kalınca coroutine'ler
+    /// öldüğü için o satıra hiç ulaşılmaz ve görsel yarı animasyonlu halde ekranda kalır.
+    /// Bölge çizim modu ağacı kapattığı için bu HER SEFERİNDE oluyordu.
+    /// </summary>
+    private readonly System.Collections.Generic.List<GameObject> transientVisuals
+        = new System.Collections.Generic.List<GameObject>();
+
+    private void OnDisable()
+    {
+        //panel kapanırken yarım kalan her şeyi temizle
+        for (int i = 0; i < transientVisuals.Count; i++)
+            if (transientVisuals[i] != null) Destroy(transientVisuals[i]);
+        transientVisuals.Clear();
+
+        //rutinler ölmüş olacak; bıraktıkları durumu elle geri al
+        punching  = false;
+        holding   = false;
+        holdTimer = 0f;
+        rewindRoutine = punchRoutine = deniedRoutine = null;
+
+        if (holdFill != null) { holdFill.fillAmount = 0f; holdFill.enabled = false; }
+
+        targetScale = 1f;
+        transform.localScale = Vector3.one;
+    }
+
     public bool HasActiveAbility => hasActiveAbility;
 
     /// <summary>
@@ -264,6 +300,29 @@ public class SkillNodeView : MonoBehaviour, IPointerClickHandler, IPointerEnterH
         track.a = 0.18f;
         activeTrack.color = track;
 
+        //Bekleme süresi OLMAYAN yetenekler (ör. bir harita aracını açanlar):
+        //halka DURUR ama SÖNÜK ve HAREKETSİZ çizilir. Amaç, "bu skill kullanılabilir"
+        //işaretinin b8 gibi bekleme süresi olan skillerle aynı dili konuşması; nabız ve
+        //tam parlaklık ise gerçekten bir sayaç dönerken saklanır.
+        if (Skill.activeAbility.cooldownSeconds <= 0f)
+        {
+            activeTrack.enabled = true;
+            activeFill.enabled  = true;
+
+            Color idleTrack = style.activeReadyColor;
+            idleTrack.a = 0.12f;
+            activeTrack.color = idleTrack;
+
+            Color idleRing = style.activeReadyColor;
+            idleRing.a = 0.45f;
+            activeFill.color = idleRing;
+
+            fill.color = style.unlocked.fill;
+            cost.text  = "KULLAN";
+            cost.color = style.activeReadyColor;
+            return;
+        }
+
         if (ready)
         {
             Color highlight = style.activeReadyColor;
@@ -319,6 +378,13 @@ public class SkillNodeView : MonoBehaviour, IPointerClickHandler, IPointerEnterH
         //sürükleme sonrası bırakma tıklama sayılmasın (pan yaparken skill tetiklenmesin)
         if (eventData.dragging) return;
         if (Skill == null) return;
+
+        //az önce satın alındıysa bu tıklama satın almanın devamıdır, ayrı bir niyet değil
+        if (suppressClickAfterPurchase)
+        {
+            suppressClickAfterPurchase = false;
+            return;
+        }
 
         //satın alma basılı tutmayla olur; tek tık sadece aktif yeteneği kullanır
         if (tree.IsActivatable(this))
@@ -427,6 +493,9 @@ public class SkillNodeView : MonoBehaviour, IPointerClickHandler, IPointerEnterH
         holdTimer = 0f;
         holdFill.enabled = false;
 
+        //parmak kalkınca gelecek tıklama yeteneği kullanmasın — sadece satın alındı
+        suppressClickAfterPurchase = true;
+
         tree.PurchaseNode(this);
     }
 
@@ -503,6 +572,7 @@ public class SkillNodeView : MonoBehaviour, IPointerClickHandler, IPointerEnterH
         sweep.fillAmount = 0f;
         sweep.color = color;
 
+        transientVisuals.Add(sweep.gameObject);
         StartCoroutine(RingSweepRoutine(sweep, color));
     }
 
@@ -528,7 +598,11 @@ public class SkillNodeView : MonoBehaviour, IPointerClickHandler, IPointerEnterH
             yield return null;
         }
 
-        if (sweep != null) Destroy(sweep.gameObject);
+        if (sweep != null)
+        {
+            transientVisuals.Remove(sweep.gameObject);
+            Destroy(sweep.gameObject);
+        }
     }
 
     /// <summary>Node'dan dışa doğru genişleyip sönen halka.</summary>
@@ -538,6 +612,8 @@ public class SkillNodeView : MonoBehaviour, IPointerClickHandler, IPointerEnterH
         SkillTreeUI.Stretch(burst.rectTransform);
         burst.raycastTarget = false;
         burst.color = color;
+
+        transientVisuals.Add(burst.gameObject);
         StartCoroutine(BurstRoutine(burst, color));
     }
 
@@ -559,7 +635,10 @@ public class SkillNodeView : MonoBehaviour, IPointerClickHandler, IPointerEnterH
         }
 
         if (burst != null)
+        {
+            transientVisuals.Remove(burst.gameObject);
             Destroy(burst.gameObject);
+        }
     }
 
     /// <summary>Alınamayan node'a tıklanınca kısa bir uyarı titremesi.</summary>

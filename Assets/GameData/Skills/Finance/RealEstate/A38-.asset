@@ -19,9 +19,25 @@ MonoBehaviour:
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 21338269cd68a0d4ab9d11d63a62fbb1, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000025
+  activeAbility:
+    enabled: 1
+    abilityName: Şehir Kur
+    description: Haritada boş araziye sınır çizip yeni bir şehir bölgesi kurar.
+    cooldownSeconds: 0
+    onActivate:
+    - rid: 7300000000000000027
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000025
+      type: {class: UnlockRegionConversionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        target: 2
+    - rid: 7300000000000000027
+      type: {class: EnterRegionConversionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        target: 2

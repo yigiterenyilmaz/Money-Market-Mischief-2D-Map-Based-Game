@@ -86,6 +86,28 @@ public class UImanager : MonoBehaviour
 
     }
     
+    /// <summary>
+    /// Harita üstü bir araç (bölge çizimi gibi) aktifken çağrılır. Duraklat butonu DIŞINDA
+    /// her şey gizlenir: araç sırasında skill ağacını açmak modu yarıda bırakır ve
+    /// ekranın üstündeki panellerle çizim çakışır.
+    /// </summary>
+    public void SetMapToolMode(bool active)
+    {
+        skillTreePanel.SetActive(false);
+        pausePanel.SetActive(false);
+
+        skillTreeButton.SetActive(!active);
+        moneyBar.SetActive(!active);
+        pauseButton.SetActive(true); //duraklat her zaman erişilebilir kalır
+
+        //KRİTİK: skill ağacı açılırken kamera kapatılıyor (OnSkillTreeOpen). Araç modu
+        //ağaçtan tıklanarak başladığı için buradan AÇILMAZSA kamera kilitli kalır —
+        //oyuncu ne kaydırabilir ne yakınlaştırabilir, mod bitince de kilit sürer.
+        mainCamera.enable = true;
+
+        currentui = 0;
+    }
+
     public void ToggleUI()
     {
         if (enable)

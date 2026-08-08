@@ -16,6 +16,7 @@ public class GameStatManager : MonoBehaviour
     public float startingSuspicion = 0f;
     public float startingReputation = 50f;
     public float startingPoliticalInfluence = 0f;
+    public float startingTrust = 0f;
 
     [Header("Suspicion Settings")]
     public float minSuspicion = 0f;
@@ -30,6 +31,12 @@ public class GameStatManager : MonoBehaviour
     public float minPoliticalInfluence = -100f;
     public float maxPoliticalInfluence = 100f;
 
+    [Header("Trust (Güven) Settings")]
+    [Tooltip("Güven riske karşı tampondur. YARIM: stat birikiyor ama riski azaltma davranışı " +
+             "henüz bağlı değil — bkz. Assets/Scripts/Stats/trust-system-readme.md")]
+    public float minTrust = 0f;
+    public float maxTrust = 100f;
+
     [Header("Suspicion Modifier Settings (itibar etkisi)")]
     public float baseSuspicionMultiplier = 1.5f; //itibar 0'da çarpan
     public float minSuspicionMultiplier = 0.5f;  //itibar 100'de çarpan
@@ -43,6 +50,7 @@ public class GameStatManager : MonoBehaviour
     private float suspicion;
     private float reputation;
     private float politicalInfluence;
+    private float trust;
 
     //itibar tavan düşüşü — eksiye düşülen en düşük nokta kadar tavan kalıcı olarak düşer
     private float lowestNegativeReputation = 0f; //en düşük negatif itibar noktası (0 = hiç eksiye düşmedi)
@@ -55,6 +63,7 @@ public class GameStatManager : MonoBehaviour
     private float suspicionGainMultiplier = 1f;
     private float reputationGainMultiplier = 1f;
     private float politicalInfluenceGainMultiplier = 1f;
+    private float trustGainMultiplier = 1f;
 
     //events
     public static event Action<StatType, float, float> OnStatChanged; //stat, oldValue, newValue
@@ -78,6 +87,7 @@ public class GameStatManager : MonoBehaviour
         suspicion = startingSuspicion;
         reputation = startingReputation;
         politicalInfluence = startingPoliticalInfluence;
+        trust = startingTrust;
     }
 
     #region Getters
@@ -90,6 +100,7 @@ public class GameStatManager : MonoBehaviour
             StatType.Suspicion => suspicion,
             StatType.Reputation => reputation,
             StatType.PoliticalInfluence => politicalInfluence,
+            StatType.Trust => trust,
             _ => 0f
         };
     }
@@ -98,6 +109,7 @@ public class GameStatManager : MonoBehaviour
     public float Suspicion => suspicion;
     public float Reputation => reputation;
     public float PoliticalInfluence => politicalInfluence;
+    public float Trust => trust;
 
     #endregion
 
@@ -158,6 +170,9 @@ public class GameStatManager : MonoBehaviour
             case StatType.PoliticalInfluence:
                 politicalInfluenceGainMultiplier *= multiplier;
                 break;
+            case StatType.Trust:
+                trustGainMultiplier *= multiplier;
+                break;
         }
         OnPermanentMultiplierChanged?.Invoke(statType, GetPermanentGainMultiplier(statType));
     }
@@ -170,6 +185,7 @@ public class GameStatManager : MonoBehaviour
             StatType.Suspicion => suspicionGainMultiplier,
             StatType.Reputation => reputationGainMultiplier,
             StatType.PoliticalInfluence => politicalInfluenceGainMultiplier,
+            StatType.Trust => trustGainMultiplier,
             _ => 1f
         };
     }
@@ -229,6 +245,7 @@ public class GameStatManager : MonoBehaviour
             StatType.Suspicion => maxSuspicion,
             StatType.Reputation => EffectiveMaxReputation,
             StatType.PoliticalInfluence => maxPoliticalInfluence,
+            StatType.Trust => maxTrust,
             _ => float.MaxValue
         };
     }
@@ -260,6 +277,9 @@ public class GameStatManager : MonoBehaviour
                 break;
             case StatType.PoliticalInfluence:
                 AddPoliticalInfluence(amount);
+                break;
+            case StatType.Trust:
+                AddTrust(amount);
                 break;
         }
     }
@@ -369,6 +389,25 @@ public class GameStatManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Güven ekler/çıkarır. Riske karşı tampon olarak TASARLANDI ama o davranış henüz bağlı
+    /// değil — şu an yalnızca birikir. Bkz. Assets/Scripts/Stats/trust-system-readme.md
+    /// </summary>
+    public void AddTrust(float amount)
+    {
+        if (amount > 0)
+            amount *= trustGainMultiplier;
+
+        float oldValue = trust;
+        float trustMax = GetEffectiveMax(StatType.Trust);
+        trust = Mathf.Clamp(trust + amount, minTrust, trustMax);
+
+        if (oldValue != trust)
+        {
+            OnStatChanged?.Invoke(StatType.Trust, oldValue, trust);
+        }
+    }
+
     #endregion
 
     #region Set Methods
@@ -392,6 +431,9 @@ public class GameStatManager : MonoBehaviour
                 break;
             case StatType.PoliticalInfluence:
                 politicalInfluence = Mathf.Clamp(value, minPoliticalInfluence, GetEffectiveMax(StatType.PoliticalInfluence));
+                break;
+            case StatType.Trust:
+                trust = Mathf.Clamp(value, minTrust, GetEffectiveMax(StatType.Trust));
                 break;
             default:
                 return;
@@ -447,6 +489,7 @@ public class GameStatManager : MonoBehaviour
             StatType.Suspicion => suspicion / maxSuspicion,
             StatType.Reputation => EffectiveMaxReputation > 0f ? reputation / EffectiveMaxReputation : 0f,
             StatType.PoliticalInfluence => (politicalInfluence - minPoliticalInfluence) / (maxPoliticalInfluence - minPoliticalInfluence),
+            StatType.Trust => maxTrust > minTrust ? (trust - minTrust) / (maxTrust - minTrust) : 0f,
             _ => 0f
         };
     }

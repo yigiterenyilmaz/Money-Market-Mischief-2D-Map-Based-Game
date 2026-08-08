@@ -836,6 +836,15 @@ public class MapGenerator : MonoBehaviour
         if (apply) mapTexture.Apply();
     }
 
+    /// <summary>
+    /// SetTile(..., apply: false) ile yapılan toplu düzenlemeleri tek seferde yükler.
+    /// Her tile'da Apply() çağırmak tüm dokuyu yeniden yüklediği için toplu işte çok pahalıdır.
+    /// </summary>
+    public void ApplyTileEdits()
+    {
+        if (mapTexture != null) mapTexture.Apply();
+    }
+
     public int[,] GetBiomeMapCopy()
     {
         int[,] copy = new int[width, height];

@@ -383,6 +383,7 @@ public partial class MapDecorPlacer : MonoBehaviour
         dayNight         = DayNightCycle.Instance;
         dayNightLookedUp = (dayNight != null);
         cachedMap        = map;
+        cachedSettings   = settings; //bölge dönüşümü sonradan aynı ayarlarla bina yerleştirir
 
         int scaledCellSize = Mathf.Max(cellSize, Mathf.RoundToInt(cellSize * (map.width / 256f)));
         int cellArea       = scaledCellSize * scaledCellSize;
