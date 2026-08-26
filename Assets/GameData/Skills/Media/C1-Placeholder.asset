@@ -13,14 +13,19 @@ MonoBehaviour:
   m_Name: C1-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c1
-  displayName: Medya C1
-  description: 'PLACEHOLDER — Medya agaci, C1. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Siyaset Başlangıcı'
+  description: 'Siyaset ağacının kökü. Politik nüfuzu artırır ve politikayı ilgilendiren skillerin etkisini çarpan gibi yükseltir.'
   icon: {fileID: 0}
   cost: 0
   prerequisites: []
-  effects: []
+  effects:
+  - rid: 7300000000000000001
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: UnlockPoliticsSystemEffect, ns: , asm: Assembly-CSharp}
+      data:
+        startingInfluence: 10

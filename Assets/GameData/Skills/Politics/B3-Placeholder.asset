@@ -13,15 +13,38 @@ MonoBehaviour:
   m_Name: B3-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b3
-  displayName: Siyaset B3
-  description: 'PLACEHOLDER — Siyaset agaci, B3. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Sosyal Medya'
+  description: 'Sosyal medyaya giriş: kendini övdürürsün.'
   icon: {fileID: 0}
   cost: 15000
   prerequisites:
   - {fileID: 11400000, guid: 1a0096196144d0bdf48f857816c89e27, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  - rid: 7300000000000000002
+  activeAbility:
+    enabled: 1
+    abilityName: Kendini Övdür
+    description: Sosyal medyada övgü kampanyası başlatır. İtibar kazandırır, küçük bir şüphe bırakır.
+    cooldownSeconds: 30
+    onActivate:
+    - rid: 7300000000000000003
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: AcquireMediaOutletEffect, ns: , asm: Assembly-CSharp}
+      data:
+        outlet: 1
+    - rid: 7300000000000000002
+      type: {class: MediaActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 3
+        unlockOnly: 1
+    - rid: 7300000000000000003
+      type: {class: MediaActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 3
+        unlockOnly: 0

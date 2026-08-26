@@ -14,14 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a25
   displayName: From The Inside V2
-  description: devletten insider
+  description: "Devlet i\u00E7inden kaynak. Formasyonun ad\u0131n\u0131, b\u00FCy\u00FCkl\u00FC\u011F\u00FCn\u00FC ve bo\u015Fa \u00E7\u0131k\u0131p \u00E7\u0131kmayaca\u011F\u0131n\u0131 \u00F6nceden s\u0131zd\u0131r\u0131r."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 9dc8f2c12c025ac4b9a80928afbeeece, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000035
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000035
+      type: {class: UnlockMarketInsiderEffect, ns: , asm: Assembly-CSharp}
+      data:
+        level: 2

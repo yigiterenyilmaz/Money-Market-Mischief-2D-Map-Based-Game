@@ -13,15 +13,33 @@ MonoBehaviour:
   m_Name: B11-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b11
-  displayName: Siyaset B11
-  description: 'PLACEHOLDER — Siyaset agaci, B11. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Anket Yapma'
+  description: 'Anket yaparsın: itibarını kestirirsin.'
   icon: {fileID: 0}
   cost: 15000
   prerequisites:
   - {fileID: 11400000, guid: 1a0096196144d0bdf48f857816c89e27, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Anket Yaptır
+    description: İtibarını kestirir. Kesin değer değil, hata paylı bir tahmin verir.
+    cooldownSeconds: 45
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: PollEffect, ns: , asm: Assembly-CSharp}
+      data:
+        kind: 0
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: PollEffect, ns: , asm: Assembly-CSharp}
+      data:
+        kind: 0
+        unlockOnly: 0

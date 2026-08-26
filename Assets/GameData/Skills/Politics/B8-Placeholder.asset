@@ -13,18 +13,19 @@ MonoBehaviour:
   m_Name: B8-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b8
-  displayName: Siyaset B8
-  description: 'PLACEHOLDER — Siyaset agaci, B8. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Trendlere Yön Verme'
+  description: 'Trendlere yön verir, konuyu dağıtırsın.'
   icon: {fileID: 0}
   cost: 60000
   prerequisites:
   - {fileID: 11400000, guid: a51c6415cf9e4e2399e4ad88b4adf8ac, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
   activeAbility:
     enabled: 1
-    abilityName: Kulis Pazarligi
-    description: Perde arkasi anlasmayla nufuz kazandirir.
-    cooldownSeconds: 45
+    abilityName: Konuyu Dağıt
+    description: Gündemdeki konuyu bastırır, yerine sıradan bir gündem koyar.
+    cooldownSeconds: 60
     onActivate:
     - rid: 7300000000000000002
   otherPrerequisites: 0
@@ -32,8 +33,13 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 7300000000000000002
-      type: {class: StatModifierEffect, ns: , asm: Assembly-CSharp}
+    - rid: 7300000000000000001
+      type: {class: MediaActionEffect, ns: , asm: Assembly-CSharp}
       data:
-        statType: 3
-        changeValue: 12.0
+        action: 4
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: MediaActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 4
+        unlockOnly: 0

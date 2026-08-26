@@ -13,27 +13,15 @@ MonoBehaviour:
   m_Name: C6-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c6
-  displayName: Medya C6
-  description: 'PLACEHOLDER — Medya agaci, C6. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Yerel Rüşvet'
+  description: 'Yerel rüşvet. Şüphe riski çok düşüktür. Bkz. rüşvet mekaniği.'
   icon: {fileID: 0}
   cost: 60000
   prerequisites:
   - {fileID: 11400000, guid: 8c5c4ae4e2bd2a5a729407279ee940b8, type: 2}
   effects: []
-  activeAbility:
-    enabled: 1
-    abilityName: Manset Patlatma
-    description: Gundemi aninda degistiren bir haber yayinlar.
-    cooldownSeconds: 25
-    onActivate:
-    - rid: 7300000000000000004
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds:
-    - rid: 7300000000000000004
-      type: {class: StatModifierEffect, ns: , asm: Assembly-CSharp}
-      data:
-        statType: 2
-        changeValue: 10.0
+    RefIds: []

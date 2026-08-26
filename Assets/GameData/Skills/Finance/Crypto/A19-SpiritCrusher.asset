@@ -14,14 +14,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a19
   displayName: Spirit Crusher
-  description: flashcrash
+  description: Piyasayı ani bir çöküşe sürükler. Şüphe bedeli vardır; dipten alan
+    kazanır.
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: c1b1265e9bcbf59499c434ce14b2548d, type: 2}
   effects: []
+  activeAbility:
+    enabled: 1
+    abilityName: Flash Crash
+    description: Piyasayı ani bir çöküşe sürükler. Dibi görmeden önce pozisyonunu
+      kapatmış olman gerekir; dipten alan kazanır.
+    cooldownSeconds: 240
+    onActivate:
+    - rid: 7300000000000000033
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000033
+      type: {class: ForceChartPatternEffect, ns: , asm: Assembly-CSharp}
+      data:
+        patternIds:
+        - D2_Dump
+        suspicionCost: 10

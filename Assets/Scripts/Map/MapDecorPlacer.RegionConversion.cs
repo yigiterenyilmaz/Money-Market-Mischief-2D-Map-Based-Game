@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// REGION CONVERSION — boş araziyi (biome 1 / Urban) şehre veya sanayiye çevirme.
+// REGION CONVERSION — boş araziyi (biome 1 / Urban) şehre veya sanayiye çevirme. a29
+// "kırsaldan kente göç" açıldıysa tarım arazisi (biome 4) de kaynak olabilir.
 //
 // Repaint() tüm haritayı sıfırdan kurar; dönüşüm ise SADECE seçilen tile'lara dokunmalı,
 // yoksa oyuncunun sahip olduğu mülkler, limanlar, gemiler ve yollar da yeniden üretilir.
@@ -32,15 +33,28 @@ public partial class MapDecorPlacer
         Industrial = 3,
     }
 
-    /// <summary>Boş arazi biome indeksi — dönüşümün tek kaynağı.</summary>
+    /// <summary>Boş arazi biome indeksi — dönüşümün varsayılan kaynağı.</summary>
     private const int URBAN_BIOME = 1;
+
+    /// <summary>
+    /// Tarım arazisi de dönüştürülebilir mi. a29 "kırsaldan kente göç" açar
+    /// (UnlockFarmlandConversionEffect). Kapalıyken tarlalar dokunulmazdır.
+    /// </summary>
+    private bool agriculturalConvertible;
+
+    public bool AgriculturalConvertible => agriculturalConvertible;
+
+    /// <summary>UnlockFarmlandConversionEffect tarafından çağrılır.</summary>
+    public void SetAgriculturalConvertible(bool on) => agriculturalConvertible = on;
 
     public bool CanConvert => cachedMap != null && cachedSettings != null;
 
     /// <summary>
-    /// Tile dönüşüme uygun mu: boş arazi (Urban), gerçek kara, sisin altında değil.
+    /// Tile dönüşüme uygun mu: uygun kaynak biyom, gerçek kara, sisin altında değil.
     /// Şehre çevirirken ayrıca yola çok yakın olmamalı — Repaint'teki bina filtresinin aynısı,
     /// yoksa binalar yolun üstüne oturur.
+    ///
+    /// Kaynak biyom normalde yalnızca boş arazidir; a29 açıldıysa tarım arazisi de sayılır.
     /// </summary>
     public bool IsConvertible(Vector2Int tile, ConvertTarget target)
     {
@@ -48,7 +62,12 @@ public partial class MapDecorPlacer
         if (tile.x < 0 || tile.x >= cachedMap.width || tile.y < 0 || tile.y >= cachedMap.height) return false;
 
         if (!cachedMap.IsActionableLand(tile.x, tile.y)) return false;
-        if (cachedMap.GetBiome(tile.x, tile.y) != URBAN_BIOME) return false;
+
+        int biome = cachedMap.GetBiome(tile.x, tile.y);
+        bool validSource = biome == URBAN_BIOME ||
+                           (biome == AGRICULTURAL_BIOME && agriculturalConvertible);
+        if (!validSource) return false;
+
         if (cachedMap.GetFog(tile.x, tile.y) > 0.6f) return false;
 
         if (target == ConvertTarget.Cities &&
@@ -107,13 +126,17 @@ public partial class MapDecorPlacer
         cachedMap.ApplyTileEdits();
         affected = new RectInt(minX, minY, maxX - minX + 1, maxY - minY + 1);
 
-        //2) dönüşen alanda duran eski dekoru (urban ağaçları vb.) temizle
+        //2) tarla mozaiği ayrı bir quad olarak haritanın ÜSTÜNDE duruyor; biyomu değiştirmek
+        //   onu silmez. Temizlenmezse yeni şehrin altından ekin parselleri görünmeye devam eder.
+        ClearCropTiles(tiles);
+
+        //3) dönüşen alanda duran eski dekoru (urban ağaçları vb.) temizle
         if (clearDecorOnConversion) RemoveDecorInTiles(tiles);
 
-        //3) yeni yerleşim — İSTENİRSE. Varsayılan KAPALI: oyuncu arsayı alır, binayı kendi kurar.
+        //4) yeni yerleşim — İSTENİRSE. Varsayılan KAPALI: oyuncu arsayı alır, binayı kendi kurar.
         if (placeBuildingsOnConversion) PlaceLayoutForConverted(tiles, target);
 
-        //4) önbellekleri tazele — bina listesi değişti
+        //5) önbellekleri tazele — bina listesi değişti
         InvalidatePropertyIndex();
         InvalidateBuildingImposter();
 

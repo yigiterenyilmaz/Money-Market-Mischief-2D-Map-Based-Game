@@ -207,6 +207,10 @@ public class RealEstateSystem : MonoBehaviour
         if (RegionConversionSystem.Instance != null && RegionConversionSystem.Instance.IsModeActive)
             return false;
 
+        //depo yerleştirme de sol tıklamayı kullanıyor — aynı sebep
+        if (CropDepotSystem.Instance != null && CropDepotSystem.Instance.IsPlacementMode)
+            return false;
+
         return true;
     }
 

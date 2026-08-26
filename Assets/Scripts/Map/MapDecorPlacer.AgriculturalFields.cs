@@ -197,6 +197,13 @@ public partial class MapDecorPlacer
             S--;
 
         int texW = bw * S, texH = bh * S;
+
+        // Mozaiğin tile→piksel dönüşümünü sakla: bölge dönüşümü (a29) dönüşen tarlaların
+        // piksellerini tek tek silmek zorunda (bkz. MapDecorPlacer.CropDepot.ClearCropTiles).
+        cropFieldOriginX       = minX;
+        cropFieldOriginY       = minY;
+        cropFieldPixelsPerTile = S;
+
         cropFieldTexture = new Texture2D(texW, texH, TextureFormat.RGBA32, false)
         {
             wrapMode   = TextureWrapMode.Clamp,
@@ -449,6 +456,7 @@ public partial class MapDecorPlacer
         if (cropFieldTexture != null) { Destroy(cropFieldTexture); cropFieldTexture = null; }
 
         cropFieldTiles.Clear();
+        cropFieldPixelsPerTile = 0; //doku gitti — eski tile→piksel eşlemesi artık geçersiz
     }
 
     /// <summary>

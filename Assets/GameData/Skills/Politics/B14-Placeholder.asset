@@ -13,15 +13,33 @@ MonoBehaviour:
   m_Name: B14-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b14
-  displayName: Siyaset B14
-  description: 'PLACEHOLDER — Siyaset agaci, B14. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Feed Yatkınlığı'
+  description: 'Feed yatkınlığını ölçersin.'
   icon: {fileID: 0}
   cost: 600000
   prerequisites:
   - {fileID: 11400000, guid: 333dd3f6e54eacd7e3c2b5bdbcb5ad64, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Feed Ölçümü
+    description: Feed neye yatkın, ölçer. Konu haritanın hassas konusuysa onu da söyler.
+    cooldownSeconds: 30
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: PollEffect, ns: , asm: Assembly-CSharp}
+      data:
+        kind: 3
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: PollEffect, ns: , asm: Assembly-CSharp}
+      data:
+        kind: 3
+        unlockOnly: 0

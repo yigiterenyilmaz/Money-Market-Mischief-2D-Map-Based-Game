@@ -14,14 +14,30 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a17
   displayName: The Clairvoyant
-  description: polymarket
+  description: Tahmin piyasasını açar. Evet/hayır sorularına para yatırırsın, doğru
+    tahmin katsayıyla ödenir.
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: c84f59bad880207448cc2adeace33936, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000036
+  activeAbility:
+    enabled: 1
+    abilityName: Tahmin Piyasası
+    description: Açık evet/hayır sorularını listeler. Bir tarafa para yatırırsın,
+      sonuç açıklanınca kazanan katsayıyla ödenir.
+    cooldownSeconds: 0
+    onActivate:
+    - rid: 7300000000000000037
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000036
+      type: {class: UnlockPredictionMarketEffect, ns: , asm: Assembly-CSharp}
+      data: {}
+    - rid: 7300000000000000037
+      type: {class: OpenPredictionMarketEffect, ns: , asm: Assembly-CSharp}
+      data: {}

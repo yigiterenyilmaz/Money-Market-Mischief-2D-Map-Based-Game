@@ -13,27 +13,15 @@ MonoBehaviour:
   m_Name: C12-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c12
-  displayName: Medya C12
-  description: 'PLACEHOLDER — Medya agaci, C12. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Yargı Rüşveti'
+  description: 'Yargıya rüşvet. Paralel yapılanma çetesi devreye girer; peşindeki davaları uzaklaştırır, şüpheyi azıcık düşürebilir.'
   icon: {fileID: 0}
   cost: 600000
   prerequisites:
   - {fileID: 11400000, guid: 6ea41277f0f1eb9d2a934979d377eaba, type: 2}
   effects: []
-  activeAbility:
-    enabled: 1
-    abilityName: Troll Ordusu
-    description: Kisa sureligine algiyi yonlendirir.
-    cooldownSeconds: 40
-    onActivate:
-    - rid: 7300000000000000005
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds:
-    - rid: 7300000000000000005
-      type: {class: StatModifierEffect, ns: , asm: Assembly-CSharp}
-      data:
-        statType: 1
-        changeValue: -6.0
+    RefIds: []

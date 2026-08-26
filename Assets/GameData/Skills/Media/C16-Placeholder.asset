@@ -13,15 +13,20 @@ MonoBehaviour:
   m_Name: C16-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c16
-  displayName: Medya C16
-  description: 'PLACEHOLDER — Medya agaci, C16. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Medyaya Yönlendirme'
+  description: 'Yetiştirdiklerini medyaya yönlendirirsin.'
   icon: {fileID: 0}
   cost: 200000
   prerequisites:
   - {fileID: 11400000, guid: fed1264999aba87591b607aeea52d6e1, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: OpenCadreTrackEffect, ns: , asm: Assembly-CSharp}
+      data:
+        track: 2

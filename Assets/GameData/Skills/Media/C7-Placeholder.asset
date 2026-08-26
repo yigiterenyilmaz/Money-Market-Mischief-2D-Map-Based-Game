@@ -13,15 +13,33 @@ MonoBehaviour:
   m_Name: C7-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c7
-  displayName: Medya C7
-  description: 'PLACEHOLDER — Medya agaci, C7. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Parti Seçip Fonlama'
+  description: 'Bir siyasi parti seçip fonlarsın.'
   icon: {fileID: 0}
   cost: 200000
   prerequisites:
   - {fileID: 11400000, guid: 147abcd57cc0551aa56fc4064cd6f3aa, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Partini Fonla
+    description: Desteklediğin partiyi fonlar. Aynı parayla daha çok nüfuz üretir.
+    cooldownSeconds: 45
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: PoliticalActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 2
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: PoliticalActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 2
+        unlockOnly: 0

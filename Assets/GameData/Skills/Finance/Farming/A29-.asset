@@ -14,14 +14,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a29
   displayName: 
-  description: "k\u0131rsaldan kente g\xF6\xE7"
+  description: "Tarım arazisini şehre çevirmeyi açar. Kentleşen tarlalar, oradaki deponun verimini kalıcı olarak düşürür."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 0998c8252f95e8e4c84cf5234b8590bd, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000006
+  activeAbility:
+    enabled: 1
+    abilityName: Kentleştir
+    description: Tarım arazisine sınır çizip şehre çevirir. Dönüşen tarlalar ekin deposunun verimini düşürür.
+    cooldownSeconds: 0
+    onActivate:
+    - rid: 7300000000000000007
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000006
+      type: {class: UnlockFarmlandConversionEffect, ns: , asm: Assembly-CSharp}
+      data: {}
+    - rid: 7300000000000000007
+      type: {class: EnterRegionConversionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        target: 2

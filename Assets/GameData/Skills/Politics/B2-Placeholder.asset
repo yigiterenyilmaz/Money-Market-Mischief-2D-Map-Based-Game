@@ -13,15 +13,26 @@ MonoBehaviour:
   m_Name: B2-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b2
-  displayName: Siyaset B2
-  description: 'PLACEHOLDER — Siyaset agaci, B2. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Geleneksel Medya'
+  description: 'Geleneksel medyaya giriş: yerel gazete basarsın.'
   icon: {fileID: 0}
   cost: 15000
   prerequisites:
   - {fileID: 11400000, guid: 1a0096196144d0bdf48f857816c89e27, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: AcquireMediaOutletEffect, ns: , asm: Assembly-CSharp}
+      data:
+        outlet: 0
+    - rid: 7300000000000000002
+      type: {class: PermanentStatMultiplierEffect, ns: , asm: Assembly-CSharp}
+      data:
+        statType: 2
+        multiplier: 1.05

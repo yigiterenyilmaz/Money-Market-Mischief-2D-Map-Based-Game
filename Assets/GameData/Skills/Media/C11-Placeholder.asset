@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: C11-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c11
-  displayName: Medya C11
-  description: 'PLACEHOLDER — Medya agaci, C11. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Siyasetçi Rüşveti'
+  description: 'Siyasetçiye rüşvet. Zincir açılır, risk ve para daha da artar; skill açma hızını artırır.'
   icon: {fileID: 0}
   cost: 600000
   prerequisites:

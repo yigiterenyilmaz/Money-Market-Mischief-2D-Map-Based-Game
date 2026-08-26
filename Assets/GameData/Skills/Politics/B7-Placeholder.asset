@@ -13,15 +13,26 @@ MonoBehaviour:
   m_Name: B7-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b7
-  displayName: Siyaset B7
-  description: 'PLACEHOLDER — Siyaset agaci, B7. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Ünlülerle İş Birliği'
+  description: 'Ünlülerle iş birliği yaparsın.'
   icon: {fileID: 0}
   cost: 60000
   prerequisites:
   - {fileID: 11400000, guid: 2f9fa9b3741f810f7acbe38029c9bf88, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: AcquireMediaOutletEffect, ns: , asm: Assembly-CSharp}
+      data:
+        outlet: 3
+    - rid: 7300000000000000002
+      type: {class: TopicWeightModifierEffect, ns: , asm: Assembly-CSharp}
+      data:
+        topic: 7
+        weightChange: 0.15

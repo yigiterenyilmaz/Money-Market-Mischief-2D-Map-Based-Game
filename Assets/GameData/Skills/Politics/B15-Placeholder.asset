@@ -13,15 +13,33 @@ MonoBehaviour:
   m_Name: B15-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b15
-  displayName: Siyaset B15
-  description: 'PLACEHOLDER — Siyaset agaci, B15. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Münazara'
+  description: 'Münazaraya çıkarsın.'
   icon: {fileID: 0}
   cost: 200000
   prerequisites:
   - {fileID: 11400000, guid: 4807b60dd545aed1bd71fa0ab9965b28, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Münazaraya Çık
+    description: Münazaraya çıkar. Kazanırsan büyük itibar, kaybedersen itibar ve şüphe bedeli.
+    cooldownSeconds: 90
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: MediaActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 2
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: MediaActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 2
+        unlockOnly: 0

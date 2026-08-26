@@ -13,27 +13,15 @@ MonoBehaviour:
   m_Name: C17-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c17
-  displayName: Medya C17
-  description: 'PLACEHOLDER — Medya agaci, C17. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Mafya II'
+  description: 'Rüşvette pazarlık payını ve kabul oranını artırır.'
   icon: {fileID: 0}
   cost: 60000
   prerequisites:
   - {fileID: 11400000, guid: 17adfbbca7e67a44fb937d8da36d501a, type: 2}
   effects: []
-  activeAbility:
-    enabled: 1
-    abilityName: Karalama Kampanyasi
-    description: Rakibi hedef alan yayin dalgasi baslatir.
-    cooldownSeconds: 75
-    onActivate:
-    - rid: 7300000000000000006
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds:
-    - rid: 7300000000000000006
-      type: {class: StatModifierEffect, ns: , asm: Assembly-CSharp}
-      data:
-        statType: 2
-        changeValue: 18.0
+    RefIds: []

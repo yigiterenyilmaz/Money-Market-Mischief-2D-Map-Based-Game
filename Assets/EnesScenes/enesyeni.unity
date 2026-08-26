@@ -240,6 +240,67 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 20728348}
   m_CullTransparentMesh: 1
+--- !u!1 &29778576
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 29778577}
+  - component: {fileID: 29778578}
+  m_Layer: 5
+  m_Name: StatHUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &29778577
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 29778576}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1943374658}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &29778578
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 29778576}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3733d0bf32456a4ebf24fbd5bd77150, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StatHUD
+  offset: {x: 24, y: -24}
+  barWidth: 260
+  barHeight: 18
+  rowSpacing: 46
+  hideUntilPollUnlocked: 0
+  panelColor: {r: 0.05, g: 0.06, b: 0.09, a: 0.78}
+  trackColor: {r: 1, g: 1, b: 1, a: 0.1}
+  reputationColor: {r: 0.35, g: 0.75, b: 1, a: 1}
+  reputationNegativeColor: {r: 1, g: 0.45, b: 0.35, a: 1}
+  lostCeilingColor: {r: 1, g: 0.35, b: 0.3, a: 0.22}
+  suspicionCalmColor: {r: 0.45, g: 0.8, b: 0.5, a: 1}
+  suspicionDangerColor: {r: 1, g: 0.3, b: 0.25, a: 1}
+  labelColor: {r: 1, g: 1, b: 1, a: 0.75}
 --- !u!224 &31881664 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 2413435378473842668, guid: 3ce8a642d54f59843aac8272a90662c5, type: 3}
@@ -999,6 +1060,41 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 112528392}
   m_CullTransparentMesh: 1
+--- !u!1 &136947621
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 136947622}
+  m_Layer: 5
+  m_Name: MarketIntelUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &136947622
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 136947621}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1943374658}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &227284864
 GameObject:
   m_ObjectHideFlags: 0
@@ -7351,6 +7447,535 @@ MonoBehaviour:
   riskCheckInterval: 1
   riskMultiplier: 0.003
   postProcessEventInterval: 20
+--- !u!114 &1037351578
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de5479311746a3647bf2f2f7a84d53d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PropertyInspectUI
+  canvas: {fileID: 0}
+  panelWidth: 460
+  rightMargin: 28
+  background: {r: 0.07, g: 0.08, b: 0.11, a: 0.97}
+  border: {r: 0.35, g: 0.4, b: 0.48, a: 1}
+  textColor: {r: 0.95, g: 0.97, b: 1, a: 1}
+  mutedColor: {r: 0.72, g: 0.77, b: 0.85, a: 1}
+  accentColor: {r: 0.45, g: 0.8, b: 1, a: 1}
+  warnColor: {r: 0.95, g: 0.55, b: 0.45, a: 1}
+  goodColor: {r: 0.42, g: 0.88, b: 0.58, a: 1}
+--- !u!114 &1037351579
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99ab5644d3ee1364b9c4532ff69671ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RealEstateSystem
+  mapCamera: {fileID: 0}
+  mapController: {fileID: 0}
+  minBuildingValue: 25000
+  maxBuildingValue: 400000
+  hallNearMultiplier: 1.6
+  hallFarMultiplier: 0.7
+  hallFalloffTiles: 90
+  roadNearMultiplier: 1.25
+  roadFarMultiplier: 0.85
+  roadFalloffTiles: 25
+  priceJitter: 0.04
+  paybackSeconds: 900
+  rentInterval: 10
+  sellRatio: 0.75
+  brokenSellPenalty: 0.4
+  rebuildCostRatio: 0.35
+  clickMoveThreshold: 8
+  ownedTint: {r: 0.72, g: 0.88, b: 1, a: 1}
+  selectedTint: {r: 1, g: 0.92, b: 0.55, a: 1}
+  showOwnedMarker: 1
+  ownedMarkerColor: {r: 0.35, g: 0.72, b: 1, a: 1}
+  ownedMarkerWidthRatio: 1.05
+  ownedMarkerSquash: 0.45
+  ownedMarkerVerticalOffset: 0
+  ownedMarkerPulseSpeed: 2.2
+  ownedMarkerMinAlpha: 0.3
+  ownedMarkerMaxAlpha: 0.95
+--- !u!114 &1037351590
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a942a4dceb8f12649adc1103a8173cc1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RegionConversionUI
+  canvas: {fileID: 0}
+  anchoredOffset: {x: 28, y: 28}
+  panelWidth: 380
+  background: {r: 0.07, g: 0.08, b: 0.11, a: 0.97}
+  border: {r: 0.35, g: 0.4, b: 0.48, a: 1}
+  textColor: {r: 0.95, g: 0.97, b: 1, a: 1}
+  mutedColor: {r: 0.72, g: 0.77, b: 0.85, a: 1}
+  warnColor: {r: 0.95, g: 0.55, b: 0.45, a: 1}
+  goodColor: {r: 0.42, g: 0.88, b: 0.58, a: 1}
+--- !u!114 &1037351591
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52a9a23bc494f0949bfe8b7d53bffced, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RegionConversionSystem
+  mapCamera: {fileID: 0}
+  mapController: {fileID: 0}
+  mapPainter: {fileID: 0}
+  cityCostPerTile: 900
+  industrialCostPerTile: 650
+  minConvertibleTiles: 12
+  maxConvertibleTiles: 40000
+  maxStrokePoints: 4000
+  previewInterval: 0.1
+  constructionSeconds: 4
+  maxSmokePuffs: 70
+  smokeColor: {r: 0.78, g: 0.76, b: 0.72, a: 1}
+  smokeRiseSpeed: {x: 0.15, y: 0.45}
+  smokeLifetime: {x: 1.1, y: 2.2}
+  smokeSize: {x: 0.25, y: 0.75}
+  existingColor: {r: 0.35, g: 0.85, b: 1, a: 0.3}
+  restrictedColor: {r: 0.85, g: 0.2, b: 0.2, a: 0.26}
+  restrictedFill: {r: 0.75, g: 0.1, b: 0.1, a: 0.22}
+  restrictedStripePeriod: 10
+  restrictedStripeWidth: 4
+  convertibleColor: {r: 0, g: 0, b: 0, a: 0}
+  selectionFillValid: {r: 0.45, g: 0.95, b: 0.65, a: 0.35}
+  selectionFillInvalid: {r: 1, g: 0.45, b: 0.35, a: 0.35}
+  selectionExcluded: {r: 0.15, g: 0.15, b: 0.18, a: 0.45}
+  selectionExcludedFill: {r: 0.05, g: 0.05, b: 0.07, a: 0.42}
+  strokeColor: {r: 0.95, g: 0.98, b: 1, a: 0.95}
+  strokeWidth: 0.06
+  overlaySortingOrder: 29000
+  selectionSortingOrder: 29500
+  strokeSortingOrder: 30000
+  smokeSortingOrder: 30500
+  overlayZ: -6
+--- !u!114 &1037351592
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de5479311746a3647bf2f2f7a84d53d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PropertyInspectUI
+  canvas: {fileID: 0}
+  panelWidth: 460
+  rightMargin: 28
+  background: {r: 0.07, g: 0.08, b: 0.11, a: 0.97}
+  border: {r: 0.35, g: 0.4, b: 0.48, a: 1}
+  textColor: {r: 0.95, g: 0.97, b: 1, a: 1}
+  mutedColor: {r: 0.72, g: 0.77, b: 0.85, a: 1}
+  accentColor: {r: 0.45, g: 0.8, b: 1, a: 1}
+  warnColor: {r: 0.95, g: 0.55, b: 0.45, a: 1}
+  goodColor: {r: 0.42, g: 0.88, b: 0.58, a: 1}
+--- !u!114 &1037351593
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99ab5644d3ee1364b9c4532ff69671ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RealEstateSystem
+  mapCamera: {fileID: 0}
+  mapController: {fileID: 0}
+  minBuildingValue: 25000
+  maxBuildingValue: 400000
+  hallNearMultiplier: 1.6
+  hallFarMultiplier: 0.7
+  hallFalloffTiles: 90
+  roadNearMultiplier: 1.25
+  roadFarMultiplier: 0.85
+  roadFalloffTiles: 25
+  priceJitter: 0.04
+  paybackSeconds: 900
+  rentInterval: 10
+  sellRatio: 0.75
+  brokenSellPenalty: 0.4
+  rebuildCostRatio: 0.35
+  clickMoveThreshold: 8
+  ownedTint: {r: 0.42, g: 0.68, b: 1, a: 1}
+  selectedTint: {r: 1, g: 0.92, b: 0.55, a: 1}
+  showOwnedMarker: 1
+  ownedMarkerColor: {r: 0.35, g: 0.72, b: 1, a: 1}
+  ownedMarkerWidthRatio: 1.05
+  ownedMarkerSquash: 0.45
+  ownedMarkerVerticalOffset: 0
+  ownedMarkerPulseSpeed: 2.2
+  ownedMarkerMinAlpha: 0.3
+  ownedMarkerMaxAlpha: 0.95
+--- !u!114 &1037351594
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 95081f391b66182448535d4b686c59f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StockMarketSystem
+  chart: {fileID: 0}
+  botSuspicionPerCandle: 0.05
+  tipDurationSeconds: 8
+--- !u!114 &1037351595
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71ea85750aafc7bf86a089c61d54c481, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CropDepotSystem
+  mapCamera: {fileID: 0}
+  depotCost: 15000
+  collectionRadiusTiles: 28
+  minDepotSpacingTiles: 24
+  maxDepots: 6
+  minCropTilesToBuild: 40
+  yieldPerCropTilePerSecond: 0.015
+  capacityPerCropTile: 4
+  minCapacity: 250
+  maxCapacity: 6000
+  basePricePerUnit: 14
+  priceMinRatio: 0.65
+  priceMaxRatio: 1.55
+  priceTickSeconds: 6
+  priceStepRatio: 0.05
+  priceMeanReversion: 0.08
+  chainPurchaseRatio: 0.25
+  chainPriceRatio: 0.85
+  chainSuspicionPerTick: 0.4
+  chainTickSeconds: 10
+  hoardingCapacityMultiplier: 2.5
+  demandSpikeMaxMultiplier: 2.2
+  demandSpikeFullStockUnits: 3000
+  demandSpikeSeconds: 45
+  demandSpikeSuspicion: 6
+  demandSpikeTopic: 9
+  poisonYieldMultiplier: 1.75
+  poisonSuspicionPerTick: 1.2
+  poisonTickSeconds: 10
+  poisonReputationHit: 12
+  packagingSaleMultiplier: 1.35
+  packagingReputationPerSale: 1.5
+  clickMoveThreshold: 8
+  depotSprite: {fileID: 0}
+  depotScale: 0.6
+  depotZ: -0.6
+--- !u!114 &1037351606
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eafdc74037e4b5f4e827046101bcd4b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PredictionMarketUI
+  mapController: {fileID: 0}
+  panelWidth: 720
+  rowHeight: 74
+--- !u!114 &1037351607
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71012423964f06f4180fafc33dd00d1d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PredictionMarketSystem
+  openSlots: 3
+  houseEdge: 0.05
+  refillDelay: 5
+  questionPool:
+  - text: "Borsa bu d\xF6nem y\xFCkseli\u015Fle kapatacak m\u0131?"
+    yesChance: 0.55
+    resolveSeconds: 90
+  - text: "Yeni vergi paketi meclisten ge\xE7ecek mi?"
+    yesChance: 0.45
+    resolveSeconds: 120
+  - text: "B\xFCy\xFCk bir yolsuzluk skandal\u0131 patlayacak m\u0131?"
+    yesChance: 0.3
+    resolveSeconds: 150
+  - text: "Merkez bankas\u0131 faizi indirecek mi?"
+    yesChance: 0.4
+    resolveSeconds: 120
+  - text: "Kripto piyasas\u0131 sert bir d\xFC\u015F\xFC\u015F ya\u015Fayacak m\u0131?"
+    yesChance: 0.35
+    resolveSeconds: 90
+  - text: "\u0130mar plan\u0131 bu d\xF6nem onaylanacak m\u0131?"
+    yesChance: 0.6
+    resolveSeconds: 150
+  - text: "\u015Eehirde b\xFCy\xFCk bir protesto \xE7\u0131kacak m\u0131?"
+    yesChance: 0.25
+    resolveSeconds: 180
+--- !u!114 &1037351608
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93a28e0e438006b488b756e751375c07, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PriceWarUI
+  hostPanel: {fileID: 0}
+  margin: {x: 16, y: -16}
+  panelWidth: 300
+--- !u!114 &1037351609
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc3f422e899452d43b63c3a7e62cca8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PriceWarSystem
+  chart: {fileID: 0}
+  rivalStrengthMin: 4000
+  rivalStrengthMax: 14000
+  rivalRecoveryPerSecond: 25
+  basePushCost: 500
+  pushCostGrowth: 0.15
+  pushPowerPerWealth: 1.4
+  pushVariance: 0.2
+  victoryMultiplier: 1.8
+  victorySuspicion: 8
+  victoryPatternUp: D1_Pump
+  victoryPatternDown: D2_Dump
+--- !u!114 &1037351610
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93a28e0e438006b488b756e751375c07, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PriceWarUI
+  hostPanel: {fileID: 0}
+  margin: {x: 16, y: -16}
+  panelWidth: 300
+--- !u!114 &1037351611
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc3f422e899452d43b63c3a7e62cca8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PriceWarSystem
+  chart: {fileID: 0}
+  rivalStrengthMin: 4000
+  rivalStrengthMax: 14000
+  rivalRecoveryPerSecond: 25
+  basePushCost: 500
+  pushCostGrowth: 0.15
+  pushPowerPerWealth: 1.4
+  pushVariance: 0.2
+  victoryMultiplier: 1.8
+  victorySuspicion: 8
+  victoryPatternUp: D1_Pump
+  victoryPatternDown: D2_Dump
+--- !u!114 &1037351612
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 973827bb738e10c44998bb6284409180, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CoinPanelUI
+  hostPanel: {fileID: 0}
+  margin: {x: -16, y: -16}
+  cardWidth: 260
+--- !u!114 &1037351613
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f528696bd2bd9843be1d908caa090bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CoinLaunchSystem
+  scamLaunchPrice: 0.02
+  scamSupply: 500000
+  hypePerPost: 0.05
+  hypeDecayPerSecond: 0.02
+  hypeTopic: 3
+  maxHypeMultiplier: 12
+  collapseChanceAtFullHype: 0.01
+  rugPullBaseSuspicion: 6
+  rugPullHypeSuspicion: 14
+  legalLaunchPrice: 1
+  legalSupply: 100000
+  legalGrowthPerSecond: 0.0015
+  legalMaxMultiplier: 3
+  legalIncomePerSecond: 15
+  legalReputationPerTick: 0.1
+--- !u!114 &1037351614
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb531657cccfd15469635b614e4237c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TradingPanelUI
+  tradingSystem: {fileID: 0}
+  barHeight: 96
+--- !u!114 &1037351615
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fddf78e88107bf34d824dcfece95143f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TradingSystem
+  chart: {fileID: 0}
+  tradeFeeRate: 0
+  defaultOrderAmount: 100
+  showPanelButtonWhenUnlocked: 1
+--- !u!114 &1037351616
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7fb0664df1351e48b7c5c59676a0344, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PoliticsSystem
+  partyCount: 3
+  movementCost: 10000
+  movementInfluence: 4
+  movementReputation: 1.5
+  donationCost: 50000
+  donationInfluence: 8
+  donationSuspicion: 0.5
+  backedPartyMultiplier: 1.6
+  fundAllMultiplier: 1.15
+  fundAllCostPerParty: 40000
+  fundAllSuspicion: 0
+  consensusInfluenceMultiplier: 1.25
+  consensusSuspicionMultiplier: 0.9
+  scholarshipCadrePerMinute: 0.5
+  youthCampCadrePerMinute: 1
+  scaleCadreByEducation: 1
+  holdingIncomePerCadre: 15
+  academyInfluencePerCadre: 0.02
+  mediaReachPerCadre: 0.03
+  mediaReachCap: 0.6
+--- !u!114 &1037351617
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037351544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2d9623deb683ee47bcba4dfdf1cad33, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MediaSystem
+  baseReach: 1
+  newspaperReach: 0.25
+  socialMediaReach: 0.35
+  newsChannelReach: 0.6
+  celebrityReach: 0.5
+  charityCost: 25000
+  charityReputation: 6
+  charityMinLandFactor: 0.3
+  statementReputation: 3
+  statementOverrideSeconds: 25
+  statementOverrideRatio: 0.6
+  debateWinReputation: 10
+  debateLoseReputation: -6
+  debateLoseSuspicion: 2
+  debateBaseWinChance: 0.5
+  praiseReputation: 4
+  praiseSuspicion: 0.5
+  steerSeconds: 45
+  steerRatio: 0.65
+  steerCounterRatio: 0.1
+  propagandaInfluence: 5
+  propagandaSuspicion: 1
+  propagandaSeconds: 60
+  propagandaRatio: 0.7
+  scandalInfluence: 10
+  scandalSuspicion: 6
+  scandalSeconds: 90
+  scandalRatio: 0.85
+  sensitiveTopicPayoffMultiplier: 2.5
+  reputationPollMargin: 8
+  suspicionPollMargin: 5
+  influencePollMargin: 6
+  suspicionPollCost: 1
 --- !u!1 &1041656167
 GameObject:
   m_ObjectHideFlags: 0
@@ -10842,6 +11467,8 @@ MonoBehaviour:
   industrialAlongSpacing: 1
   industrialFillChance: 1
   industrialAlongJitter: 0.2
+  placeBuildingsOnConversion: 0
+  clearDecorOnConversion: 1
   urbanPlaceBuildings: 1
   urbanScaleRange: {x: 0.35, y: 0.55}
   urbanFillDensity: 0.5
@@ -11723,6 +12350,7 @@ MonoBehaviour:
   initialZoom: 0.85
   minZoomFactor: 0.55
   focusSkillId: a1
+  verticalLayout: 0
   testUnlockAnything: 0
   closeButton: {fileID: 0}
   closeButtonName: MenuClose
@@ -11814,6 +12442,7 @@ MonoBehaviour:
   candlePrefab: {fileID: 4031646444824416830, guid: a9344ccbb81280246afa27d722521458, type: 3}
   investmentPanel: {fileID: 1873171972}
   mapController: {fileID: 1524760701}
+  requireTradingSkill: 1
   candleInterval: 6
   candleWidth: 24
   candleSpacing: 3
@@ -13512,6 +14141,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1709891473170653770, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 3707995630626690391, guid: 384b4bb300e251d42a643bba49396562, type: 3}
       propertyPath: m_LocalPosition.x
       value: 506.3474
@@ -13568,6 +14201,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Managers
       objectReference: {fileID: 0}
+    - target: {fileID: 6843358324374739844, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7258465140580761787, guid: 384b4bb300e251d42a643bba49396562, type: 3}
       propertyPath: infiniteWealth
       value: 1
@@ -13575,6 +14212,10 @@ PrefabInstance:
     - target: {fileID: 7258465140580761787, guid: 384b4bb300e251d42a643bba49396562, type: 3}
       propertyPath: startingWealth
       value: 100000
+      objectReference: {fileID: 0}
+    - target: {fileID: 8877899481719963599, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      propertyPath: m_Enabled
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -13589,6 +14230,66 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1037351577}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351579}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351578}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351593}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351592}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351591}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351590}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351595}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351594}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351615}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351614}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351613}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351612}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351611}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351610}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351609}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351608}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351607}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351606}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351617}
+    - targetCorrespondingSourceObject: {fileID: 6020507653955250300, guid: 384b4bb300e251d42a643bba49396562, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037351616}
   m_SourcePrefab: {fileID: 100100000, guid: 384b4bb300e251d42a643bba49396562, type: 3}
 --- !u!1 &3975817108838017173 stripped
 GameObject:
@@ -14152,6 +14853,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6472813910704381368, guid: 4b6bc07ee93e983419d0e5694665c043, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1395091669}
+    - targetCorrespondingSourceObject: {fileID: 6472813910704381368, guid: 4b6bc07ee93e983419d0e5694665c043, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 136947622}
+    - targetCorrespondingSourceObject: {fileID: 6472813910704381368, guid: 4b6bc07ee93e983419d0e5694665c043, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 29778577}
     - targetCorrespondingSourceObject: {fileID: 5209069778519876814, guid: 4b6bc07ee93e983419d0e5694665c043, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1900000011}

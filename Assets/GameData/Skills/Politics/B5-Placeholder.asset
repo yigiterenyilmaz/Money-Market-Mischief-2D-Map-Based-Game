@@ -13,15 +13,33 @@ MonoBehaviour:
   m_Name: B5-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b5
-  displayName: Siyaset B5
-  description: 'PLACEHOLDER — Siyaset agaci, B5. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Demeç Verme'
+  description: 'Demeç verirsin. Konu, üzerinde bulunduğun mape göre seçilir.'
   icon: {fileID: 0}
   cost: 60000
   prerequisites:
   - {fileID: 11400000, guid: 2f9fa9b3741f810f7acbe38029c9bf88, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Demeç Ver
+    description: Haritanın baskın bölgesine göre seçilen bir konuda demeç verir ve gündemi oraya çeker.
+    cooldownSeconds: 40
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: MediaActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 1
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: MediaActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 1
+        unlockOnly: 0

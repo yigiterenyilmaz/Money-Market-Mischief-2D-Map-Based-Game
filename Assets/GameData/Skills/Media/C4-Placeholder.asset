@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: C4-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c4
-  displayName: Medya C4
-  description: 'PLACEHOLDER — Medya agaci, C4. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Mafya Başlangıcı'
+  description: 'Mafya ilişkilerine giriş.'
   icon: {fileID: 0}
   cost: 15000
   prerequisites:

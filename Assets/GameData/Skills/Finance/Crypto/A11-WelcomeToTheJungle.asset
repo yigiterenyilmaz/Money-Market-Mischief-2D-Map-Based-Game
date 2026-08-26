@@ -14,14 +14,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a11
   displayName: Welcome To The Jungle
-  description: "trade yapmay\u0131 a\xE7ar genel olarak"
+  description: Trade yapmayı açar. Canlı mum grafiğinden kendi paranla alım satım yaparsın.
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: ddc981964cfe5874bab31b5d5bf98d06, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000030
+  activeAbility:
+    enabled: 1
+    abilityName: Trade Paneli
+    description: Canlı mum grafiğini açar; o anki fiyattan alım satım yapılır.
+    cooldownSeconds: 0
+    onActivate:
+    - rid: 7300000000000000031
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000030
+      type: {class: UnlockTradingEffect, ns: , asm: Assembly-CSharp}
+      data: {}
+    - rid: 7300000000000000031
+      type: {class: OpenTradingPanelEffect, ns: , asm: Assembly-CSharp}
+      data: {}

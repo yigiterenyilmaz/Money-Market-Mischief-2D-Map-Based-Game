@@ -14,14 +14,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a31
   displayName: 
-  description: zehirleme
+  description: "Ekine katkı karıştırır; depo üretimi %75 hızlanır. İtibar bir kez düşer, üretim sürdükçe şüphe birikir."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: bfe05944c87a5134095f9ebcd1e45aec, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000010
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000010
+      type: {class: PoisonCropsEffect, ns: , asm: Assembly-CSharp}
+      data: {}

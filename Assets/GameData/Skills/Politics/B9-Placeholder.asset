@@ -13,15 +13,33 @@ MonoBehaviour:
   m_Name: B9-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b9
-  displayName: Siyaset B9
-  description: 'PLACEHOLDER — Siyaset agaci, B9. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Siyasi Propaganda'
+  description: 'Feed üzerinden siyasi propaganda yaparsın.'
   icon: {fileID: 0}
   cost: 200000
   prerequisites:
   - {fileID: 11400000, guid: cc1bc872c229c254ae4a14b0a740632a, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Propaganda Yayını
+    description: Gündemi siyasete çevirir, siyasi nüfuz kazandırır.
+    cooldownSeconds: 75
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: MediaActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 5
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: MediaActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 5
+        unlockOnly: 0

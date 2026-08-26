@@ -13,14 +13,17 @@ Finance/RealEstate subtree (`a33`); follow the same route for the rest.
 | Subtree | Branch | Size | Wired | Stale |
 |---|---|---:|---:|---:|
 | `a2` You Could Be Mine | Finance / Mine | 11 | 7 | 4 |
-| `a11` Welcome To The Jungle | Finance / Crypto | 7 | 0 | 7 |
+| `a11` Welcome To The Jungle | Finance / Crypto | 7 | 7 | 0 |
 | `a20` *(unnamed)* | Finance / Market | 6 | 0 | 6 |
-| `a26` *(unnamed)* | Finance / Farming | 7 | 0 | 7 |
+| `a26` *(unnamed)* | Finance / Farming | 7 | 7 | 0 |
 | `a33` *(unnamed)* | Finance / RealEstate | 8 | 7 | 1 |
-| `b2` / `b3` / `b11` | Politics | 6 / 4 / 4 | 1 / 1 / 1 | 5 / 3 / 3 |
-| `c2` / `c3` / `c4` | Media | 9 / 6 / 3 | 2 / 0 / 1 | 7 / 6 / 2 |
+| `b2` / `b3` / `b11` | **Media** (klasör yanlış) | 6 / 4 / 4 | 6 / 4 / 4 | 0 |
+| `c2` / `c3` / `c4` | **Politics** (klasör yanlış) | 9 / 6 / 3 | 4 / 6 / 0 | 5 / 0 / 3 |
 
-**Total wired: 20 / 71.**
+**Total wired: 58 / 71** (counted from the assets on 2026-08-12: a 35/40, b 15/15, c 11/19,
+minus the three roots). Every remaining stale skill in the b/c trees is bribery or mafia —
+`c4`, `c6`, `c10`, `c11`, `c12`, `c17`, `c18`, `c20` — and is blocked on the unwritten bribery
+mechanic, not on design. See [../Media/media-politics-readme.md](../Media/media-politics-readme.md).
 
 Two cautions on that table:
 
@@ -28,12 +31,27 @@ Two cautions on that table:
   stub**, not real design: `b4`, `b8`, `b13`, `c6`, `c12`, `c17` carry invented
   `StatModifierEffect` active abilities that exist only to exercise the cooldown-ring
   UI. Treat them as stale.
-- **All 34 Politics + Media skills share byte-identical `PLACEHOLDER —` descriptions.**
-  There is no design to implement from. Those six subtrees are blocked on the user,
-  not on code.
+- **The 34 Politics + Media skills are no longer specless.** They shared byte-identical
+  `PLACEHOLDER —` descriptions until 2026-08-12, when the user supplied the design;
+  every asset now carries a real name and note. Read
+  [politics-media-design.md](politics-media-design.md) **before touching either tree** —
+  it records the cross-cutting mechanics (bribery, reputation↔suspicion, feed
+  manipulation) and three open decisions, the loudest being that **`b*` is Media and
+  `c*` is Politics**, the opposite of what the folders and `SkillBranch` flags say.
 
-That leaves `a11`, `a20`, `a26` as the real remaining work. Each skill's only spec is
-a one-line Turkish note in its asset `description`.
+`a20` and the two trees above are the remaining work. Each skill's only spec is a
+one-line Turkish note in its asset `description`.
+
+`a26` (Farming) is done — see `Assets/Scripts/Map/crop-depot-readme.md` for what that
+subtree built, which numbers were invented, and the one note (`a32` "yumaklı files")
+that had to be implemented from an interpretation rather than a readable spec.
+
+`a11` (Crypto) is done — see `Assets/Scripts/Trading/trading-readme.md`. It turned the
+previously decorative `CandlestickChart` into a real trade screen and gated it behind
+the skill. Note for `a20`: that subtree's own readme flagged "no screen where the player
+trades by hand" as a gap — `a11` fills it, so build on `TradingSystem` rather than a
+second buy/sell path. `a15` ("sidik yarışı") was specified verbally by the user
+mid-session, not from the asset note; the spec is recorded in the readme.
 
 ---
 
@@ -157,8 +175,10 @@ Write-Output "EXIT: $LASTEXITCODE"
 ```
 
 If new `.cs` files aren't in the `.csproj` yet, Unity regenerates it on focus — or
-add `<Compile Include="..." />` entries temporarily. **Restore the `.csproj`
-afterwards**; it's tracked in git and a generated file.
+add `<Compile Include="..." />` entries yourself. The `.csproj` is **not** tracked in git
+(`.gitignore:55` ignores `*.csproj`), so leaving correct entries in costs nothing and keeps
+CLI builds working until Unity next regenerates it. An earlier version of this doc claimed it
+was tracked and had to be restored — it isn't.
 
 ---
 

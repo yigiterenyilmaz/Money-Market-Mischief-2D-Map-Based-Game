@@ -14,15 +14,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a28
   displayName: 
-  description: "t\xFCketiciye sokma- stok\xE7uluk, sosyal medyada ak\u0131m yarat\u0131p
-    insanlara al\u0131\u015Fveri\u015F yapt\u0131rma, feede d\xFC\u015Fer "
+  description: "Depo kapasitesini 2,5 katına çıkarır — ürünü satmayıp dalgayı bekleyebilirsin."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 6c3c198da1fc934478b6fc01e1e0dfd9, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000004
+  activeAbility:
+    enabled: 1
+    abilityName: Talep Dalgası Yarat
+    description: Sosyal medyada akım başlatır ve ürün fiyatını geçici olarak yükseltir. Etki, elde tutulan stokla orantılıdır. Şüphe artırır.
+    cooldownSeconds: 120
+    onActivate:
+    - rid: 7300000000000000005
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000004
+      type: {class: UnlockCropHoardingEffect, ns: , asm: Assembly-CSharp}
+      data: {}
+    - rid: 7300000000000000005
+      type: {class: TriggerDemandWaveEffect, ns: , asm: Assembly-CSharp}
+      data: {}

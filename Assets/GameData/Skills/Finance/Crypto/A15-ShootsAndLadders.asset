@@ -14,14 +14,30 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a15
   displayName: Shoots and Ladders
-  description: "sidik yar\u0131\u015F\u0131"
+  description: Fiyatı bir yöne itmek için rakip bir balinayla güç yarışına girersin.
+    Ya gücünü kırana kadar basarsın ya da çekilip yaktığın parayı kaybedersin.
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 8da66722be591914ca6ae4ac8909714d, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000038
+  activeAbility:
+    enabled: 1
+    abilityName: Fiyat Savaşı Başlat
+    description: Masaya bir rakip oturur. Baskı uyguladıkça para yakarsın; rakibin
+      gücü gizlidir. Kırarsan yaktığının katını alırsın.
+    cooldownSeconds: 180
+    onActivate:
+    - rid: 7300000000000000039
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000038
+      type: {class: UnlockPriceWarEffect, ns: , asm: Assembly-CSharp}
+      data: {}
+    - rid: 7300000000000000039
+      type: {class: StartPriceWarEffect, ns: , asm: Assembly-CSharp}
+      data: {}

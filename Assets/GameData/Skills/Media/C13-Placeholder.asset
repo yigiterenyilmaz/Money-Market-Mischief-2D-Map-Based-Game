@@ -13,15 +13,20 @@ MonoBehaviour:
   m_Name: C13-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c13
-  displayName: Medya C13
-  description: 'PLACEHOLDER — Medya agaci, C13. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Gençlik Kampları'
+  description: 'Gençlik kampları kurarsın.'
   icon: {fileID: 0}
   cost: 60000
   prerequisites:
   - {fileID: 11400000, guid: 6fe257caa76481843ad6c4aa34abda30, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: EnableCadreSourceEffect, ns: , asm: Assembly-CSharp}
+      data:
+        source: 1

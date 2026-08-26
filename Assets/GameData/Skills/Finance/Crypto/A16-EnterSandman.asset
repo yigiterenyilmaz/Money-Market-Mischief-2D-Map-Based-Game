@@ -14,14 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a16
   displayName: Enter Sandman
-  description: Borsa kurma pasif gelir
+  description: Kendi borsanı kurarsın. Saniyede 40 kalıcı gelir sağlar, hiç sönmez.
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 8da66722be591914ca6ae4ac8909714d, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000032
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000032
+      type: {class: PermanentPassiveIncomeEffect, ns: , asm: Assembly-CSharp}
+      data:
+        incomePerSecond: 40

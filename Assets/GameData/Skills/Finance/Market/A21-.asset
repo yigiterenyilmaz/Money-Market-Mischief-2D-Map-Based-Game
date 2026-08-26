@@ -14,14 +14,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a21
   displayName: 
-  description: "hileli al\u0131m sat\u0131m botu"
+  description: "Borsada senin ad\u0131na i\u015Flem yapan hileli bot. Y\u00F6n\u00FC \u00F6nceden bildi\u011Fi i\u00E7in her mumdan k\u00E2r yazar, kar\u015F\u0131l\u0131\u011F\u0131nda \u015F\u00FCphe biriktirir."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 32aac072ef876044aac5851823280006, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000031
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000031
+      type: {class: UnlockTradingBotEffect, ns: , asm: Assembly-CSharp}
+      data:
+        capital: 50000
+        efficiency: 0.6

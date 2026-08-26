@@ -20,6 +20,10 @@ public abstract class ChartPattern
     protected virtual float FailureChance => 0f;
     protected bool isFailedRun;
 
+    // Init'te atilan zarin sonucu. Insider mekanigi (a25 devlet kaynagi) formasyonun
+    // gercekten hangi yone cozulecegini bilmek icin okur.
+    public bool IsFailedRun => isFailedRun;
+
     public virtual void Init(MarketState marketState, float p0, float volatilityMultiplier)
     {
         this.marketState = marketState;

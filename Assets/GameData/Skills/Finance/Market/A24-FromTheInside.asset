@@ -14,14 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a24
   displayName: From The Inside
-  description: "\u015Firketten insider"
+  description: "\u015Eirket i\u00E7inden kaynak. Yeni bir formasyon ba\u015Flarken piyasan\u0131n hangi y\u00F6ne gidece\u011Fini \u00F6nceden s\u0131zd\u0131r\u0131r."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 32aac072ef876044aac5851823280006, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000034
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000034
+      type: {class: UnlockMarketInsiderEffect, ns: , asm: Assembly-CSharp}
+      data:
+        level: 1

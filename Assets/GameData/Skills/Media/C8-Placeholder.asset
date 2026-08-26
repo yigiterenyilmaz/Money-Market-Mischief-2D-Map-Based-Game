@@ -13,15 +13,33 @@ MonoBehaviour:
   m_Name: C8-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c8
-  displayName: Medya C8
-  description: 'PLACEHOLDER — Medya agaci, C8. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Tüm Partileri Fonlama'
+  description: 'Tüm siyasi partileri aynı anda fonlarsın.'
   icon: {fileID: 0}
   cost: 200000
   prerequisites:
   - {fileID: 11400000, guid: 147abcd57cc0551aa56fc4064cd6f3aa, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Hepsini Fonla
+    description: Bütün partileri birden fonlar. Pahalıdır ve verimi düşüktür ama şüphe bırakmaz.
+    cooldownSeconds: 60
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: PoliticalActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 3
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: PoliticalActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 3
+        unlockOnly: 0

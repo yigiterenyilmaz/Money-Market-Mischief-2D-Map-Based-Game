@@ -13,15 +13,33 @@ MonoBehaviour:
   m_Name: C5-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c5
-  displayName: Medya C5
-  description: 'PLACEHOLDER — Medya agaci, C5. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Siyasi Partilere Bağış'
+  description: 'Siyasi partilere bağış yaparsın.'
   icon: {fileID: 0}
   cost: 60000
   prerequisites:
   - {fileID: 11400000, guid: 8c5c4ae4e2bd2a5a729407279ee940b8, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Bağış Yap
+    description: Siyasi partilere bağış yapar. Nüfuz kazandırır, küçük bir şüphe bırakır.
+    cooldownSeconds: 45
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: PoliticalActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 1
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: PoliticalActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 1
+        unlockOnly: 0

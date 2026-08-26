@@ -13,27 +13,33 @@ MonoBehaviour:
   m_Name: B13-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b13
-  displayName: Siyaset B13
-  description: 'PLACEHOLDER — Siyaset agaci, B13. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Siyasi Anket'
+  description: 'Siyasi anket yaparsın: siyasi nüfuz öğrenilir.'
   icon: {fileID: 0}
   cost: 200000
   prerequisites:
   - {fileID: 11400000, guid: 5f3cfa1b16778e4c506e5d487fb261f0, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
   activeAbility:
     enabled: 1
-    abilityName: Acil Kararname
-    description: Tek seferlik olaganustu yetki kullandirir.
-    cooldownSeconds: 90
+    abilityName: Siyasi Anket
+    description: Siyasi nüfuzunu kestirir.
+    cooldownSeconds: 60
     onActivate:
-    - rid: 7300000000000000003
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
     RefIds:
-    - rid: 7300000000000000003
-      type: {class: StatModifierEffect, ns: , asm: Assembly-CSharp}
+    - rid: 7300000000000000001
+      type: {class: PollEffect, ns: , asm: Assembly-CSharp}
       data:
-        statType: 3
-        changeValue: 25.0
+        kind: 2
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: PollEffect, ns: , asm: Assembly-CSharp}
+      data:
+        kind: 2
+        unlockOnly: 0

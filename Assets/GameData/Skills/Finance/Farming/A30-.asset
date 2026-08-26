@@ -14,14 +14,26 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a30
   displayName: 
-  description: "vergi reg\xFClasyonu"
+  description: "Vergi indirimi sağlar; tüm para kazançları kalıcı olarak %15 artar. Karşılığında şüphe bir miktar yükselir."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 2a60314ebf227d1498f9f26c71b9dc6a, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000008
+  - rid: 7300000000000000009
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000008
+      type: {class: PermanentStatMultiplierEffect, ns: , asm: Assembly-CSharp}
+      data:
+        statType: 0
+        multiplier: 1.15
+    - rid: 7300000000000000009
+      type: {class: StatModifierEffect, ns: , asm: Assembly-CSharp}
+      data:
+        statType: 1
+        changeValue: 8

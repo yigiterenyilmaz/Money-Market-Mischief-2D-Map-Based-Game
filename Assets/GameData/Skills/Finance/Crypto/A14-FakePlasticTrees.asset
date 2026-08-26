@@ -14,14 +14,26 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a14
   displayName: Fake Plastic Trees
-  description: "feed tabanl\u0131 scam coin \xE7\u0131kartma"
+  description: Sahte coin çıkarırsın. Feed'de piyasa konuşuldukça şişer; balon patlamadan
+    boşaltırsan büyük para, şüphe bedeliyle.
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 8da66722be591914ca6ae4ac8909714d, type: 2}
   effects: []
+  activeAbility:
+    enabled: 1
+    abilityName: Scam Coin Çıkar
+    description: Piyasaya sahte bir coin sürer. Feed'de piyasa konuşuldukça şişer;
+      balon patlamadan önce sağ üstteki karttan boşaltman gerekir.
+    cooldownSeconds: 300
+    onActivate:
+    - rid: 7300000000000000034
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000034
+      type: {class: LaunchScamCoinEffect, ns: , asm: Assembly-CSharp}
+      data: {}

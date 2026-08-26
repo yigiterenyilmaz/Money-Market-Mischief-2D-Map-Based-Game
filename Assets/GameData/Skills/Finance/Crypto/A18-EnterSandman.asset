@@ -14,14 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a18
   displayName: Enter Sandman
-  description: "kendi legal coinini \xE7\u0131karma"
+  description: Kendi yasal coinini listelersin. Fiyatı zamanla 3 katına çıkar, sürekli
+    gelir ve itibar üretir.
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: c84f59bad880207448cc2adeace33936, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000035
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000035
+      type: {class: LaunchLegalCoinEffect, ns: , asm: Assembly-CSharp}
+      data: {}

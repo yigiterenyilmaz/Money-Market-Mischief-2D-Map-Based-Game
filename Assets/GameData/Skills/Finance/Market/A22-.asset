@@ -14,14 +14,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a22
   displayName: 
-  description: "bilgi manipulasyonu yalan bilan\xE7o"
+  description: "Aktif: \u015Fi\u015Firilmi\u015F bilan\u00E7o yay\u0131nlar, piyasay\u0131 FOMO rallisine sokar. \u015E\u00FCphe art\u0131r\u0131r."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 32aac072ef876044aac5851823280006, type: 2}
   effects: []
+  activeAbility:
+    enabled: 1
+    abilityName: Yalan Bilanço
+    description: Şirketin bilançosunu şişirir; piyasa bir FOMO rallisine girer. Şüphe
+      artar.
+    cooldownSeconds: 180
+    onActivate:
+    - rid: 7300000000000000032
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000032
+      type: {class: ForceChartPatternEffect, ns: , asm: Assembly-CSharp}
+      data:
+        patternIds:
+        - D1_Pump
+        suspicionCost: 5

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
@@ -21,6 +22,10 @@ public class CandlestickChart : MonoBehaviour
 
     [Tooltip("Harita kamera kontrolcusu (panel acikken devre disi)")]
     public MapController mapController;
+
+    [Tooltip("Panel yalnizca a11 skill'i alindiktan sonra acilabilsin. Kapatilirsa panel " +
+             "skill olmadan da acilir - sadece gelistirme icin.")]
+    public bool requireTradingSkill = true;
 
     [Header("Grafik Ayarlari")]
     [Tooltip("Mum olusturma araligi (saniye)")]
@@ -86,6 +91,36 @@ public class CandlestickChart : MonoBehaviour
 
     // Fiyat durumu
     float currentPrice;
+
+    /// <summary>Grafigin o anki fiyati. TradingSystem al/sat icin bunu okur.</summary>
+    public float CurrentPrice => currentPrice;
+
+    /// <summary>Panel su an acik mi.</summary>
+    public bool IsPanelOpen => investmentPanel != null && investmentPanel.activeSelf;
+
+    /// <summary>
+    /// Panel acilabilir mi. a11 alinmadan trade ekrani kapalidir; TradingSystem sahnede
+    /// yoksa da acilmaz - o durumda skill'i acacak bir sey olmadigi icin panel kalici
+    /// olarak kilitli kalir ve Console'a uyari duser.
+    /// </summary>
+    public bool CanOpenPanel =>
+        !requireTradingSkill || (TradingSystem.Instance != null && TradingSystem.Instance.IsUnlocked);
+
+    /// <summary>
+    /// Bir mum kapandiginda, OHLC'si kesinlestikten sonra tetiklenir.
+    /// StockMarketSystem'in hileli botu (a21) bunu dinler.
+    /// </summary>
+    public event Action<CandleOHLC> CandleClosed;
+
+    /// <summary>
+    /// Yeni bir formasyon devreye girince tetiklenir. Insider mekanigi (a24/a25) bunu dinler.
+    /// Grafik dinleyiciyi tanimaz — bagimlilik tek yonlu.
+    /// </summary>
+    public event Action<ChartPattern> PatternActivated;
+
+    /// <summary>Su an bir formasyon isliyor mu. Manipulasyon (a22/a23) ustune yazamaz.</summary>
+    public bool HasActivePattern => scheduler != null && scheduler.HasActivePattern;
+
     float candleOpenPrice;
     float candleHighPrice;
     float candleLowPrice;
@@ -183,6 +218,7 @@ public class CandlestickChart : MonoBehaviour
         noiseDriver = new NoiseDriver(volatility, trendNoise, trendDecay, maxTrend, startPrice);
         pathPlayer = new CandlePathPlayer();
         scheduler = new PatternScheduler(patternCooldownMin, patternCooldownMax, volatilityMultiplier);
+        scheduler.PatternActivated += pattern => PatternActivated?.Invoke(pattern);
         scheduler.RegisterAll(new ChartPattern[]
         {
             // A grubu — Klasik Formasyonlar
@@ -434,11 +470,13 @@ public class CandlestickChart : MonoBehaviour
         candles[activeCandleIndex] = data;
 
         // Pattern sistemine bildir
+        CandleOHLC closedOhlc = new CandleOHLC(data.open, data.high, data.low, data.close);
         if (marketState != null)
-        {
-            CandleOHLC ohlc = new CandleOHLC(data.open, data.high, data.low, data.close);
-            marketState.OnCandleClosed(ohlc);
-        }
+            marketState.OnCandleClosed(closedOhlc);
+
+        // Disariya bildir (bot). Scheduler'dan ONCE: bu mumun sonucu, bir sonraki
+        // formasyon kararindan bagimsiz olarak degerlendirilmeli.
+        CandleClosed?.Invoke(closedOhlc);
 
         if (scheduler != null)
         {
@@ -630,21 +668,66 @@ public class CandlestickChart : MonoBehaviour
         textRect.anchorMin = Vector2.zero;
         textRect.anchorMax = Vector2.one;
         textRect.sizeDelta = Vector2.zero;
+
+        // Buton panelin kilidine tabidir: a11 alinana kadar hic gorunmez.
+        bool showButton = CanOpenPanel &&
+                          (TradingSystem.Instance == null || TradingSystem.Instance.showPanelButtonWhenUnlocked);
+        SetPanelButtonVisible(showButton);
+    }
+
+    /// <summary>Panel acma butonunu gosterir/gizler. TradingSystem skill kilidine gore cagirir.</summary>
+    public void SetPanelButtonVisible(bool visible)
+    {
+        if (debugButton != null)
+            debugButton.SetActive(visible);
+    }
+
+    /// <summary>
+    /// Paneli acar/kapatir. Panel acikken harita kontrolu kapanir, kapaninca geri acilir.
+    /// </summary>
+    public void SetPanelOpen(bool open)
+    {
+        if (investmentPanel == null) return;
+
+        if (open && !CanOpenPanel)
+        {
+            Debug.LogWarning("[CandlestickChart] Trade ekrani kilitli - a11 skill'i alinmadan acilamaz.", this);
+            return;
+        }
+
+        if (investmentPanel.activeSelf == open) return;
+
+        investmentPanel.SetActive(open);
+
+        if (mapController != null)
+            mapController.enable = !open;
+
+        if (open)
+            timer = 0f;
     }
 
     void ToggleInvestmentPanel()
     {
         if (investmentPanel == null) return;
 
-        bool isActive = investmentPanel.activeSelf;
-        investmentPanel.SetActive(!isActive);
+        SetPanelOpen(!investmentPanel.activeSelf);
+    }
 
-        // Panel acilinca harita kontrolunu kapat, kapaninca ac
-        if (mapController != null)
-            mapController.enable = isActive;
+    // === Formasyon enjeksiyonu (oyun ici) ===
 
-        if (!isActive)
-            timer = 0f;
+    /// <summary>
+    /// Verilen formasyonu hemen grafige bindirir. Manipulasyon skill'leri (a22/a23)
+    /// StockMarketSystem uzerinden burayi cagirir. Zaten bir formasyon isliyorsa false doner.
+    /// </summary>
+    public bool ForcePattern(string patternId)
+    {
+        if (scheduler == null || marketState == null)
+        {
+            Debug.LogWarning("[Pattern] Grafik henuz baslamadi — formasyon enjekte edilemedi.");
+            return false;
+        }
+
+        return scheduler.TryForcePattern(patternId, marketState);
     }
 
     // === Debug pattern tetikleyiciler (Inspector right-click) ===

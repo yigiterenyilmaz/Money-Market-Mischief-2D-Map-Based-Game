@@ -14,14 +14,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a26
   displayName: 
-  description: "tar\u0131m root ekin deposu kurma"
+  description: "Ekin deposu sistemini açar. Depo, çevredeki ekili tarlalardan ürün biriktirir; stok dalgalı piyasa fiyatından satılır."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: ddc981964cfe5874bab31b5d5bf98d06, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Ekin Deposu Kur
+    description: Tarım bölgesinde bir kare seçip ekin deposu kurar. Depo çevredeki ekili tarlalardan ürün biriktirir.
+    cooldownSeconds: 0
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: UnlockCropDepotEffect, ns: , asm: Assembly-CSharp}
+      data: {}
+    - rid: 7300000000000000002
+      type: {class: EnterCropDepotPlacementEffect, ns: , asm: Assembly-CSharp}
+      data: {}

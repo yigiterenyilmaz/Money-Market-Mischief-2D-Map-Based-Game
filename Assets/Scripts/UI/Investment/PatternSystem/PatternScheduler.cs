@@ -23,6 +23,10 @@ public class PatternScheduler
     public ChartPattern ActivePattern => activePattern;
     public bool HasActivePattern => activePattern != null;
 
+    // Yeni bir pattern devreye girdiginde tetiklenir. StockMarketSystem insider ipucunu
+    // burdan alir; scheduler dinleyiciyi tanimaz.
+    public event Action<ChartPattern> PatternActivated;
+
     public PatternScheduler(int cooldownMin, int cooldownMax, float volatilityMultiplier)
     {
         this.cooldownMin = Mathf.Max(1, cooldownMin);
@@ -93,6 +97,8 @@ public class PatternScheduler
             recentlyUsed.Dequeue();
 
         Debug.Log($"[Pattern] {instance.Id} started, P0={marketState.currentPrice:F2}, totalCandles~{instance.TotalCandles}");
+
+        PatternActivated?.Invoke(instance);
     }
 
     public void MarkActiveDone()

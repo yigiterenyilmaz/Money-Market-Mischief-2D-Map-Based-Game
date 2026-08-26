@@ -13,15 +13,19 @@ MonoBehaviour:
   m_Name: C21-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c21
-  displayName: Medya C21
-  description: 'PLACEHOLDER — Medya agaci, C21. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Konsensüs İnşası'
+  description: 'Konsensüs inşa edersin.'
   icon: {fileID: 0}
   cost: 600000
   prerequisites:
   - {fileID: 11400000, guid: d18341dac0baec32a6fbda3132b00ae9, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: BuildConsensusEffect, ns: , asm: Assembly-CSharp}
+      data: {}

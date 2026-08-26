@@ -13,15 +13,33 @@ MonoBehaviour:
   m_Name: B12-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: b12
-  displayName: Siyaset B12
-  description: 'PLACEHOLDER — Siyaset agaci, B12. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Şüphe Anketi'
+  description: 'Şüphe anketi yaparsın: şüphe bir tık artar, karşılığında şüphe değeri öğrenilir.'
   icon: {fileID: 0}
   cost: 60000
   prerequisites:
   - {fileID: 11400000, guid: 7c10355d5e56cf65fa1aa0c8a310cb74, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Şüphe Anketi
+    description: Şüpheni kestirir. Anketin kendisi şüpheyi bir tık artırır.
+    cooldownSeconds: 60
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: PollEffect, ns: , asm: Assembly-CSharp}
+      data:
+        kind: 1
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: PollEffect, ns: , asm: Assembly-CSharp}
+      data:
+        kind: 1
+        unlockOnly: 0

@@ -14,14 +14,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a32
   displayName: 
-  description: "yumakl\u0131 files"
+  description: "Ürünü kabartılmış filede satar; elden satış geliri %35 artar, her satış itibar yakar. Zincir alımlarına işlemez."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: c2ba6528139367d4c9c3b573237f8eab, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000011
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000011
+      type: {class: UnlockDeceptivePackagingEffect, ns: , asm: Assembly-CSharp}
+      data: {}

@@ -14,14 +14,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a27
   displayName: 
-  description: los pollos hermanos
+  description: "Restoran zinciri, stoğun bir kısmını düzenli olarak piyasa altı sabit fiyattan satın alır ve her alımda şüpheyi düşürür."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: 6c3c198da1fc934478b6fc01e1e0dfd9, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000003
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000003
+      type: {class: UnlockPoultryChainEffect, ns: , asm: Assembly-CSharp}
+      data: {}

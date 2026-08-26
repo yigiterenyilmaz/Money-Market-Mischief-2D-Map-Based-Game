@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: C20-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c20
-  displayName: Medya C20
-  description: 'PLACEHOLDER — Medya agaci, C20. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Seçimde Hile'
+  description: 'Seçimde hile yaparsın.'
   icon: {fileID: 0}
   cost: 1500000
   prerequisites:

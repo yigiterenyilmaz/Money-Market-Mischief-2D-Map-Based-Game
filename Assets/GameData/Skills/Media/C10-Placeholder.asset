@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: C10-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c10
-  displayName: Medya C10
-  description: 'PLACEHOLDER — Medya agaci, C10. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Müfettiş Rüşveti'
+  description: 'Müfettişe rüşvet. Risk orta; pazarlık ve ifşa olma ihtimali açılır, para biraz daha artar.'
   icon: {fileID: 0}
   cost: 200000
   prerequisites:

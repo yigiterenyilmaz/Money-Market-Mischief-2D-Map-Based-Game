@@ -14,15 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: a20
   displayName: 
-  description: "Profesyonel dan\u0131\u015Fmanl\u0131k yat\u0131r\u0131m tavsiyesi
-    vermek"
+  description: "Profesyonel yat\u0131r\u0131m dan\u0131\u015Fmanl\u0131\u011F\u0131 verirsin. M\u00FC\u015Fteri \u00FCcretleri s\u00FCrekli ve azalmayan gelir sa\u011Flar."
   icon: {fileID: 0}
   cost: 0
   prerequisites:
   - {fileID: 11400000, guid: ddc981964cfe5874bab31b5d5bf98d06, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000030
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000030
+      type: {class: PermanentPassiveIncomeEffect, ns: , asm: Assembly-CSharp}
+      data:
+        incomePerSecond: 25

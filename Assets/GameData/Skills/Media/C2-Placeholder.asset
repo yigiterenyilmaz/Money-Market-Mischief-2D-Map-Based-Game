@@ -13,15 +13,33 @@ MonoBehaviour:
   m_Name: C2-Placeholder
   m_EditorClassIdentifier: Assembly-CSharp::Skill
   id: c2
-  displayName: Medya C2
-  description: 'PLACEHOLDER — Medya agaci, C2. Gercek tasarim gelince isim, aciklama, maliyet ve efektler doldurulacak.'
+  displayName: 'Ufak Siyasi Hareketler'
+  description: 'Ufak siyasi hareketlere başlarsın.'
   icon: {fileID: 0}
   cost: 15000
   prerequisites:
   - {fileID: 11400000, guid: e3b67cadbf62e33350bf00dadd7053bf, type: 2}
-  effects: []
+  effects:
+  - rid: 7300000000000000001
+  activeAbility:
+    enabled: 1
+    abilityName: Hareket Başlat
+    description: Ufak bir siyasi hareket örgütler. Siyasi nüfuz ve az miktarda itibar kazandırır.
+    cooldownSeconds: 60
+    onActivate:
+    - rid: 7300000000000000002
   otherPrerequisites: 0
   blocksSkills: []
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 7300000000000000001
+      type: {class: PoliticalActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 0
+        unlockOnly: 1
+    - rid: 7300000000000000002
+      type: {class: PoliticalActionEffect, ns: , asm: Assembly-CSharp}
+      data:
+        action: 0
+        unlockOnly: 0
